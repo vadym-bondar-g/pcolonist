@@ -1,0 +1,38 @@
+# Model registry and placement.
+# model <id> <asset-path>
+# spawn_model <id> px py pz sx sy sz colliderHalfX colliderHalfY colliderHalfZ
+
+model tree models/tree.obj
+model rock models/rock.obj
+model oak models/kenney/Large_Oak_Green_01.obj
+model tent models/kenney/Tent_01.obj
+model campfire models/kenney/Campfire_01.obj
+model fallen_trunk models/kenney/Fallen_Trunk_01.obj
+model fence models/kenney/Wood_Fence_01.obj
+model mushroom models/kenney/Mushroom_Red_01.obj
+
+spawn_model tree -12 0 -10 1 1 1 0.45 2.4 0.45
+spawn_model tree -10 0 9 1 1 1 0.45 2.4 0.45
+spawn_model tree 12 0 -8 1 1 1 0.45 2.4 0.45
+spawn_model tree 11 0 11 1 1 1 0.45 2.4 0.45
+spawn_model tree -15 0 2 1 1 1 0.45 2.4 0.45
+spawn_model tree 15 0 3 1 1 1 0.45 2.4 0.45
+spawn_model tree -5 0 14 1 1 1 0.45 2.4 0.45
+spawn_model tree 5 0 -14 1 1 1 0.45 2.4 0.45
+
+spawn_model rock -6 0 5 1 1 1 1.3 0.8 1
+spawn_model rock 7 0 7 1 1 1 1.3 0.8 1
+spawn_model rock -9 0 -5 1 1 1 1.3 0.8 1
+spawn_model rock 9 0 -10 1 1 1 1.3 0.8 1
+spawn_model rock -2 0 -12 1 1 1 1.3 0.8 1
+spawn_model rock 13 0 -1 1 1 1 1.3 0.8 1
+
+# Kenney 3D Nature Pack, CC0.
+spawn_model oak -13 0 -4 1 1 1 1.5 2.3 1.4
+spawn_model oak 10 0 13 0.8 0.8 0.8 1.25 1.9 1.2
+spawn_model tent -4 0 10 0.75 0.75 0.75 1.2 1.1 1.2
+spawn_model campfire -1 0 10 1.4 1.4 1.4 0.5 0.25 0.5
+spawn_model fallen_trunk 8 0 -13 1.2 1.2 1.2 1.35 0.55 0.75
+spawn_model fence -11 0 12 1 1 1 0.3 0.65 1.5
+spawn_model fence -8 0 12 1 1 1 0.3 0.65 1.5
+spawn_model mushroom -5 0 12 1.6 1.6 1.6 0.4 0.5 0.4
