@@ -9,6 +9,7 @@ uniform float exposure;
 uniform float daylight;
 uniform float time;
 uniform int bloomEnabled;
+uniform int underwater;
 
 float luminance(vec3 color) {
     return dot(color, vec3(0.2126, 0.7152, 0.0722));
@@ -56,6 +57,10 @@ float noise(vec2 position) {
 
 void main() {
     vec2 uv = textureCoordinate;
+    if (underwater != 0) {
+        uv.x += sin(uv.y * 38.0 + time * 1.7) * 0.0025;
+        uv.y += cos(uv.x * 31.0 - time * 1.3) * 0.0018;
+    }
     vec2 texel = 1.0 / resolution.xy;
     vec3 color = fxaa(uv, texel);
     if (bloomEnabled != 0) {
@@ -76,6 +81,11 @@ void main() {
     vec3 highlights = mix(vec3(1.02, 0.96, 0.9), vec3(1.03, 1.0, 0.94), daylight);
     color *= mix(shadows, highlights, smoothstep(0.15, 0.85, luminance(color)));
     color = mix(vec3(luminance(color)), color, 1.08);
+    if (underwater != 0) {
+        float depthHaze = smoothstep(0.0, 1.0, uv.y);
+        color = mix(color, vec3(0.015, 0.16, 0.2), 0.46 + depthHaze * 0.12);
+        color *= vec3(0.66, 0.92, 1.02);
+    }
     float vignette = smoothstep(0.95, 0.25, length(uv - 0.5));
     color *= mix(0.78, 1.0, vignette);
     color += (noise(gl_FragCoord.xy) - 0.5) / 255.0;

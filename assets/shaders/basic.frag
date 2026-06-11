@@ -4,6 +4,7 @@ in vec3 vertexColor;
 in vec3 worldPosition;
 in vec3 worldNormal;
 in vec4 lightSpacePosition;
+in vec2 uv;
 out vec4 fragmentColor;
 
 uniform vec3 cameraPosition;
@@ -19,7 +20,9 @@ uniform float nightFactor;
 uniform float water;
 uniform float time;
 uniform sampler2D shadowMap;
+uniform sampler2D diffuseTexture;
 uniform int shadowsEnabled;
+uniform int hasDiffuseTexture;
 
 float hash(vec3 position) {
     return fract(sin(dot(position, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
@@ -63,7 +66,11 @@ void main() {
     float shadow = shadowAmount(normal, lightDirection) * daylight;
 
     float surfaceVariation = mix(0.94, 1.06, hash(floor(worldPosition * 3.0)));
-    vec3 color = vertexColor * surfaceVariation * (hemisphereLight + sunColor * diffuse * daylight * (1.0 - shadow) + moonColor * moonDiffuse * nightFactor) * contactShade;
+    vec3 albedo = vertexColor;
+    if (hasDiffuseTexture != 0) {
+        albedo *= texture(diffuseTexture, uv).rgb;
+    }
+    vec3 color = albedo * surfaceVariation * (hemisphereLight + sunColor * diffuse * daylight * (1.0 - shadow) + moonColor * moonDiffuse * nightFactor) * contactShade;
     color += sunColor * specular * (water > 0.5 ? 0.8 : 0.18) * (1.0 - shadow);
     color += moonColor * moonSpecular * nightFactor * (water > 0.5 ? 0.65 : 0.1);
     color += ambientColor * rim * 0.2;

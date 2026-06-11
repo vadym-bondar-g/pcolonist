@@ -6,6 +6,7 @@
 #include <glm/mat4x4.hpp>
 
 #include <cstddef>
+#include <filesystem>
 #include <unordered_map>
 
 namespace pcolonist {
@@ -39,15 +40,17 @@ private:
     };
 
     const GpuMesh& upload(const Mesh& mesh);
+    unsigned int loadTexture(const std::filesystem::path& path);
     void createRenderTargets();
     void releaseRenderTargets();
     void createShadowMap();
     void renderShadowMap(const Camera& camera, Registry& registry, const WeatherSystem& weather);
-    void postProcess(const WeatherSystem& weather);
+    void postProcess(const WeatherSystem& weather, bool underwater);
 
     ShaderLibrary shaders_;
     Skybox skybox_;
     std::unordered_map<const Mesh*, GpuMesh> meshes_;
+    std::unordered_map<std::filesystem::path, unsigned int> textures_;
     unsigned int hdrFramebuffer_ = 0;
     unsigned int hdrColor_ = 0;
     unsigned int hdrDepth_ = 0;

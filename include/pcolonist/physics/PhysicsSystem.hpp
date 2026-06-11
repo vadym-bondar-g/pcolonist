@@ -11,6 +11,7 @@ struct RigidBody {
     float mass = 1.0F;
     bool useGravity = true;
     bool grounded = false;
+    bool inWater = false;
 };
 
 struct BoxCollider {

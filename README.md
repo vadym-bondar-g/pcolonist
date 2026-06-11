@@ -26,6 +26,15 @@ include/pcolonist/
 Implementations mirror this layout under `src/`. Runtime content is stored
 under `assets/maps`, `assets/models`, `assets/scripts` and `assets/shaders`.
 
+The generated world is a large mysterious island with an arrival camp,
+forests, coastal rocks, an eastern marsh, a western standing-stone circle, a
+sunken northern temple and a ruined watchtower above the eastern bay. Rebuild
+the deterministic map and scenery placement with:
+
+```bash
+python3 tools/generate_island.py
+```
+
 ## Frame pipeline
 
 Every frame executes ordered tasks:
@@ -80,7 +89,8 @@ Every frame executes ordered tasks:
   with a box collider.
 - The OBJ loader supports triangulation, negative indices, exported vertex
   normals, split face normals, optional vertex colors and diffuse `Kd` colors
-  from MTL materials. Textures and PBR material properties are not loaded yet.
+  from MTL materials. UV-mapped PNG diffuse textures referenced by `map_Kd`
+  are supported; PBR material properties are not loaded yet.
 - `SceneSerializer` serializes transforms and rigid bodies and validates a
   round-trip during startup.
 - `FrameArena` provides temporary per-frame memory.
@@ -102,7 +112,8 @@ Every frame executes ordered tasks:
 
 - `W`, `A`, `S`, `D`: move
 - Mouse: look around
-- `Space`, `Left Shift`: move up/down
+- `Space`: jump or swim upward
+- `Left Shift`: dive while swimming
 - `F1`: release/capture mouse
 - `F11`: toggle fullscreen
 - `Escape`: open/close pause and settings menu
@@ -119,7 +130,22 @@ The HUD displays in-world time, day/night state and current weather. Panels
 use shadows, borders and subtle gradients for better readability.
 
 Dependencies (`GLFW`, `GLAD`, `GLM`) are downloaded by CMake through
-`FetchContent`.
+`FetchContent`. PNG texture decoding uses the system `libpng` development
+package.
+
+## Windows build
+
+Install Visual Studio 2022 with the Desktop development with C++ workload,
+CMake and [vcpkg](https://github.com/microsoft/vcpkg). Set `VCPKG_ROOT` to the
+vcpkg directory, then build with:
+
+```bat
+build-windows.bat Release
+```
+
+Use `Debug` instead of `Release` for a debug build. The vcpkg manifest installs
+`libpng` automatically. The executable is written to
+`build\windows\<configuration>\pcolonist.exe`.
 
 ## Free model sources
 
@@ -147,5 +173,42 @@ spawn_model campfire 4 0 -6 1 1 1 0.7 0.8 0.7
 ```
 
 Keep models low-poly, apply transforms before export, use Y-up coordinates,
-and verify the license of every individual download. Models relying on
-textures or material files currently receive procedural vertex-based colors.
+and verify the license of every individual download. MTL diffuse `Kd` colors
+and PNG diffuse textures are supported.
+
+### Importing custom models
+
+Use the import script to validate, copy and register a custom model:
+
+```bash
+python3 tools/import_model.py ~/Models/watchtower.obj --id watchtower
+```
+
+The script copies the OBJ and its referenced MTL and PNG files into
+`assets/models/custom/watchtower/` and adds its `model` declaration to
+`assets/scripts/models.scene`. To place one instance immediately, provide its
+position, scale and collider half extents:
+
+```bash
+python3 tools/import_model.py ~/Models/watchtower.obj --id watchtower \
+  --spawn 5 0 -8 1 1 1 1.5 3 1.5
+```
+
+Custom models must meet these requirements:
+
+- The format must be Wavefront OBJ. Other mesh formats are not supported yet.
+- The OBJ must contain vertex (`v`) and face (`f`) records.
+- Keep the model low-poly. Triangles are recommended; polygons are
+  triangulated by the loader.
+- Use Y-up coordinates, place the origin sensibly, and apply rotation and
+  scale before exporting.
+- Vertex normals (`vn`) are optional; the loader calculates missing normals.
+- Vertex colors are supported. Otherwise, the loader uses `Kd` diffuse colors
+  from a referenced MTL file or generates colors from vertex positions.
+- UV coordinates (`vt`) and PNG diffuse textures referenced by MTL `map_Kd`
+  are supported. Other image formats and normal/PBR texture maps are not
+  supported yet.
+- Keep referenced MTL and PNG files next to the OBJ. Filenames and referenced
+  paths must not contain whitespace.
+- Collider half extents in `spawn_model` are not calculated automatically and
+  must be chosen to fit the model.

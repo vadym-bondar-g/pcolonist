@@ -31,11 +31,15 @@ void Player::update(Registry& registry, const Input& input, Camera& camera, floa
     movement += input.keyDown(GLFW_KEY_D) ? camera.horizontalRight() : glm::vec3{};
     movement -= input.keyDown(GLFW_KEY_A) ? camera.horizontalRight() : glm::vec3{};
     if (glm::length(movement) > 0.0F) {
-        movement = glm::normalize(movement) * moveSpeed_;
+        movement = glm::normalize(movement) * (body.inWater ? swimSpeed_ : moveSpeed_);
     }
     body.velocity.x = movement.x;
     body.velocity.z = movement.z;
-    if (input.keyDown(GLFW_KEY_SPACE) && body.grounded) {
+    if (body.inWater) {
+        body.velocity.y = input.keyDown(GLFW_KEY_SPACE)
+            ? swimVerticalSpeed_
+            : input.keyDown(GLFW_KEY_LEFT_SHIFT) ? -swimVerticalSpeed_ : body.velocity.y;
+    } else if (input.keyDown(GLFW_KEY_SPACE) && body.grounded) {
         body.velocity.y = jumpSpeed_;
         body.grounded = false;
     }

@@ -33,6 +33,7 @@ public:
     void initialize();
     void shutdown();
     void resize(int width, int height);
+    void setPointerPosition(double x, double y);
     void render(
         bool fullscreen,
         bool cursorCaptured,
@@ -61,6 +62,8 @@ private:
     int height_ = 720;
     float elapsed_ = 0.0F;
     std::uint32_t frames_ = 0;
+    double pointerX_ = 0.0;
+    double pointerY_ = 0.0;
 };
 
 } // namespace pcolonist

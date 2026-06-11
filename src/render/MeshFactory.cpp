@@ -37,6 +37,7 @@ Mesh MeshFactory::plane(float size, glm::vec3 color) {
             {{-half, 0.0F, half}, color, {0.0F, 1.0F, 0.0F}},
         },
         {0, 1, 2, 0, 2, 3},
+        {},
     };
 }
 

@@ -19,5 +19,6 @@ struct MeshRenderer {
 };
 
 struct WaterSurface {};
+struct TerrainSurface {};
 
 } // namespace pcolonist

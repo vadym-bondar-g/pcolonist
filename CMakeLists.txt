@@ -1,15 +1,13 @@
 cmake_minimum_required(VERSION 3.24)
 project(pcolonist VERSION 0.1.0 LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
 include(FetchContent)
 
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build GLFW documentation")
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build GLFW tests")
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build GLFW examples")
+set(GLM_BUILD_TESTS OFF CACHE BOOL "Build GLM tests")
+
 FetchContent_Declare(
     glfw
     GIT_REPOSITORY https://github.com/glfw/glfw.git
@@ -35,6 +33,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(glfw glm glad)
 glad_add_library(glad_gl_core_33 REPRODUCIBLE API gl:core=3.3)
 find_package(Threads REQUIRED)
+find_package(PNG REQUIRED)
 
 add_executable(pcolonist
     main.cpp
@@ -54,6 +53,7 @@ add_executable(pcolonist
     src/platform/Input.cpp
     src/render/Camera.cpp
     src/render/MeshFactory.cpp
+    src/render/PngLoader.cpp
     src/render/Renderer.cpp
     src/render/Shader.cpp
     src/render/ShaderLibrary.cpp
@@ -65,32 +65,64 @@ add_executable(pcolonist
 )
 
 target_include_directories(pcolonist PRIVATE include)
-target_link_libraries(pcolonist PRIVATE glfw glad_gl_core_33 glm::glm Threads::Threads)
+target_link_libraries(pcolonist PRIVATE glfw glad_gl_core_33 glm::glm PNG::PNG Threads::Threads)
+target_compile_features(pcolonist PRIVATE cxx_std_20)
+set_target_properties(pcolonist PROPERTIES CXX_EXTENSIONS OFF)
+
+set(PCOLONIST_RUNTIME_ASSET_DIR "${CMAKE_CURRENT_BINARY_DIR}/assets")
 target_compile_definitions(pcolonist PRIVATE
-    PCOLONIST_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    PCOLONIST_ASSET_DIR="${PCOLONIST_RUNTIME_ASSET_DIR}"
 )
 
-find_program(GLSLANG_VALIDATOR glslangValidator)
-if(GLSLANG_VALIDATOR)
-    add_custom_target(validate_shaders ALL
-        COMMAND ${GLSLANG_VALIDATOR} -l
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/basic.vert
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/basic.frag
-        COMMAND ${GLSLANG_VALIDATOR} -l
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/sky.vert
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/sky.frag
-        COMMAND ${GLSLANG_VALIDATOR} -l
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ui.vert
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/ui.frag
-        COMMAND ${GLSLANG_VALIDATOR} -l
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/shadow.vert
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/shadow.frag
-        COMMAND ${GLSLANG_VALIDATOR} -l
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/post.vert
-            ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/post.frag
+add_custom_target(copy_assets ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        "${PCOLONIST_RUNTIME_ASSET_DIR}"
+    COMMENT "Copying runtime assets"
+    VERBATIM
+)
+add_dependencies(pcolonist copy_assets)
+
+set(PCOLONIST_SHADER_PROGRAMS
+    basic
+    sky
+    ui
+    shadow
+    post
+)
+set(PCOLONIST_SHADER_FILES)
+foreach(program IN LISTS PCOLONIST_SHADER_PROGRAMS)
+    list(APPEND PCOLONIST_SHADER_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/${program}.vert"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/${program}.frag"
+    )
+endforeach()
+
+option(PCOLONIST_VALIDATE_SHADERS "Validate GLSL shaders during the build" ON)
+if(PCOLONIST_VALIDATE_SHADERS)
+    find_program(GLSLANG_VALIDATOR glslangValidator)
+endif()
+
+if(PCOLONIST_VALIDATE_SHADERS AND GLSLANG_VALIDATOR)
+    set(shader_validation_stamp "${CMAKE_CURRENT_BINARY_DIR}/shaders.validated")
+    set(shader_validation_commands)
+    foreach(program IN LISTS PCOLONIST_SHADER_PROGRAMS)
+        list(APPEND shader_validation_commands
+            COMMAND "${GLSLANG_VALIDATOR}" -l
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/${program}.vert"
+                "${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/${program}.frag"
+        )
+    endforeach()
+
+    add_custom_command(
+        OUTPUT "${shader_validation_stamp}"
+        ${shader_validation_commands}
+        COMMAND ${CMAKE_COMMAND} -E touch "${shader_validation_stamp}"
+        DEPENDS ${PCOLONIST_SHADER_FILES}
         COMMENT "Validating GLSL shader programs"
         VERBATIM
     )
+    add_custom_target(validate_shaders DEPENDS "${shader_validation_stamp}")
     add_dependencies(pcolonist validate_shaders)
 endif()
 

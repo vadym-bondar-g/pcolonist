@@ -116,6 +116,7 @@ void Application::run() {
 
 void Application::registerEventHandlers() {
     events_.subscribe<MouseMovedEvent>([this](const MouseMovedEvent& event) {
+        ui_.setPointerPosition(event.x, event.y);
         if (!input_.cursorCaptured()) {
             return;
         }
@@ -229,15 +230,7 @@ void Application::loadMap() {
     const Entity mapEntity = registry_.create();
     registry_.emplace<Transform>(mapEntity);
     registry_.emplace<MeshRenderer>(mapEntity, map);
-
-    const Entity animatedEntity = registry_.create();
-    registry_.emplace<Transform>(
-        animatedEntity,
-        Transform{{0.0F, 3.0F, 0.0F}, {}, {0.12F, 0.12F, 0.12F}});
-    registry_.emplace<MeshRenderer>(animatedEntity, map);
-    registry_.emplace<Animation>(
-        animatedEntity,
-        Animation{{0.0F, 0.7F, 0.0F}, 0.5F, 1.5F, 3.0F, 0.0F});
+    registry_.emplace<TerrainSurface>(mapEntity);
 }
 
 void Application::createWorld() {
@@ -248,16 +241,18 @@ void Application::createWorld() {
         return MeshFactory::cube({0.75F, 0.12F, 0.1F});
     });
     const auto waterMesh = resources_.load<Mesh>("builtin/water", [] {
-        return MeshFactory::plane(180.0F, {0.02F, 0.24F, 0.42F});
+        return MeshFactory::plane(320.0F, {0.02F, 0.24F, 0.42F});
     });
 
-    const std::array<Transform, 6> obstacles = {
-        Transform{{-5.0F, 1.0F, -3.0F}, {}, {2.0F, 2.0F, 2.0F}},
-        Transform{{4.0F, 1.5F, -5.0F}, {}, {1.5F, 3.0F, 1.5F}},
-        Transform{{0.0F, 1.0F, 6.0F}, {}, {5.0F, 2.0F, 1.0F}},
-        Transform{{-8.0F, 1.0F, 4.0F}, {}, {1.0F, 2.0F, 5.0F}},
-        Transform{{8.0F, 1.0F, 4.0F}, {}, {1.0F, 2.0F, 5.0F}},
-        Transform{{0.0F, 0.5F, -9.0F}, {}, {8.0F, 1.0F, 1.0F}},
+    const std::array<Transform, 8> obstacles = {
+        Transform{{-8.0F, 3.0F, -48.0F}, {}, {2.0F, 6.0F, 2.0F}},
+        Transform{{8.0F, 3.0F, -48.0F}, {}, {2.0F, 6.0F, 2.0F}},
+        Transform{{-8.0F, 3.0F, -36.0F}, {}, {2.0F, 6.0F, 2.0F}},
+        Transform{{8.0F, 3.0F, -36.0F}, {}, {2.0F, 6.0F, 2.0F}},
+        Transform{{0.0F, 2.6F, -42.0F}, {}, {1.2F, 5.2F, 1.2F}},
+        Transform{{45.0F, 2.5F, 10.0F}, {}, {8.0F, 5.0F, 8.0F}},
+        Transform{{-43.0F, 0.35F, 19.0F}, {}, {8.0F, 0.7F, 8.0F}},
+        Transform{{0.0F, 0.5F, -27.0F}, {}, {7.0F, 1.0F, 1.5F}},
     };
     for (const Transform& transform : obstacles) {
         const Entity entity = registry_.create();
@@ -271,9 +266,11 @@ void Application::createWorld() {
     registry_.emplace<MeshRenderer>(water, waterMesh);
     registry_.emplace<WaterSurface>(water);
 
-    player_.create(registry_, {0.0F, 2.0F, 8.0F});
-    Enemy::create(registry_, {-6.0F, 1.0F, -6.0F}, enemyMesh);
-    Enemy::create(registry_, {6.0F, 1.0F, -4.0F}, enemyMesh);
+    player_.create(registry_, {0.0F, 2.0F, 18.0F});
+    Enemy::create(registry_, {-14.0F, 1.0F, -22.0F}, enemyMesh);
+    Enemy::create(registry_, {20.0F, 1.0F, -30.0F}, enemyMesh);
+    Enemy::create(registry_, {38.0F, 1.0F, 25.0F}, enemyMesh);
+    Enemy::create(registry_, {-35.0F, 1.0F, 12.0F}, enemyMesh);
 }
 
 void Application::initializeSystems() {

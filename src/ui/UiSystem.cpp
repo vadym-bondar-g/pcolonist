@@ -19,6 +19,36 @@ namespace {
 
 using Glyph = std::array<unsigned char, 7>;
 
+constexpr glm::vec4 panel{0.025F, 0.04F, 0.065F, 0.94F};
+constexpr glm::vec4 panelRaised{0.045F, 0.065F, 0.1F, 0.96F};
+constexpr glm::vec4 panelHover{0.07F, 0.105F, 0.15F, 0.98F};
+constexpr glm::vec4 border{0.16F, 0.24F, 0.32F, 0.8F};
+constexpr glm::vec4 textPrimary{0.88F, 0.94F, 0.98F, 1.0F};
+constexpr glm::vec4 textMuted{0.46F, 0.58F, 0.68F, 1.0F};
+constexpr glm::vec4 cyan{0.16F, 0.72F, 0.88F, 1.0F};
+constexpr glm::vec4 green{0.2F, 0.82F, 0.52F, 1.0F};
+constexpr glm::vec4 amber{0.96F, 0.65F, 0.24F, 1.0F};
+constexpr glm::vec4 red{0.9F, 0.25F, 0.3F, 1.0F};
+
+struct MenuLayout {
+    float left;
+    float top;
+    float width = 560.0F;
+    float height = 590.0F;
+    float contentLeft;
+    float contentWidth = 492.0F;
+};
+
+MenuLayout menuLayout(int width, int height) {
+    const float left = static_cast<float>(width) * 0.5F - 280.0F;
+    const float top = static_cast<float>(height) * 0.5F - 295.0F;
+    return {left, top, 560.0F, 590.0F, left + 34.0F, 492.0F};
+}
+
+bool contains(double x, double y, float left, float top, float width, float height) {
+    return x >= left && x <= left + width && y >= top && y <= top + height;
+}
+
 Glyph glyph(char character) {
     switch (static_cast<char>(std::toupper(static_cast<unsigned char>(character)))) {
     case 'A': return {14, 17, 17, 31, 17, 17, 17}; case 'B': return {30, 17, 17, 30, 17, 17, 30};
@@ -74,6 +104,11 @@ void UiSystem::resize(int width, int height) {
     height_ = height;
 }
 
+void UiSystem::setPointerPosition(double x, double y) {
+    pointerX_ = x;
+    pointerY_ = y;
+}
+
 void UiSystem::render(
     bool fullscreen,
     bool cursorCaptured,
@@ -88,63 +123,105 @@ void UiSystem::render(
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBindVertexArray(vertexArray_);
 
-    rectangle(19.0F, static_cast<float>(height_ - 55), 235.0F, 42.0F, {0.0F, 0.0F, 0.0F, 0.32F}, 10.0F);
-    rectangle(16.0F, static_cast<float>(height_ - 58), 235.0F, 42.0F, {0.025F, 0.035F, 0.055F, 0.88F}, 10.0F);
-    rectangle(30.0F, static_cast<float>(height_ - 43), 150.0F, 8.0F, {0.12F, 0.8F, 0.42F, 0.9F}, 4.0F);
-    text(30.0F, static_cast<float>(height_ - 38), "PLAYER", 2.0F, {0.8F, 0.92F, 1.0F, 0.95F});
+    const auto card = [this](float x, float y, float width, float height, float radius = 10.0F) {
+        rectangle(x + 3.0F, y + 5.0F, width, height, {0.0F, 0.0F, 0.0F, 0.28F}, radius);
+        rectangle(x, y, width, height, border, radius);
+        rectangle(x + 1.0F, y + 1.0F, width - 2.0F, height - 2.0F, panel, radius - 1.0F);
+    };
+    const auto statusPill = [this](float x, float y, std::string_view label, const glm::vec4& accent) {
+        rectangle(x, y, 74.0F, 24.0F, {accent.r, accent.g, accent.b, 0.16F}, 12.0F);
+        rectangle(x + 9.0F, y + 9.0F, 6.0F, 6.0F, accent, 3.0F);
+        text(x + 22.0F, y + 6.0F, label, 1.5F, textPrimary);
+    };
 
-    const float timePanelX = static_cast<float>(width_) * 0.5F - 145.0F;
-    rectangle(timePanelX + 3.0F, 19.0F, 290.0F, 44.0F, {0, 0, 0, 0.3F}, 11.0F);
-    rectangle(timePanelX, 16.0F, 290.0F, 44.0F, {0.025F, 0.04F, 0.075F, 0.86F}, 11.0F);
+    const float playerY = static_cast<float>(height_ - 82);
+    card(18.0F, playerY, 244.0F, 62.0F, 12.0F);
+    rectangle(18.0F, playerY, 4.0F, 62.0F, green, 2.0F);
+    text(36.0F, playerY + 13.0F, "EXPLORER", 2.0F, textPrimary);
+    text(36.0F, playerY + 37.0F, cursorCaptured ? "FIELD MODE" : "CURSOR FREE", 1.5F, textMuted);
+    rectangle(153.0F, playerY + 39.0F, 91.0F, 5.0F, {0.1F, 0.16F, 0.2F, 1.0F}, 2.5F);
+    rectangle(153.0F, playerY + 39.0F, 75.0F, 5.0F, green, 2.5F);
+
+    const float timePanelX = static_cast<float>(width_) * 0.5F - 178.0F;
+    card(timePanelX, 18.0F, 356.0F, 58.0F, 14.0F);
+    rectangle(timePanelX + 18.0F, 31.0F, 3.0F, 32.0F, amber, 1.5F);
     const int totalMinutes = static_cast<int>(weather.dayProgress() * 24.0F * 60.0F);
     const int hours = totalMinutes / 60;
     const int minutes = totalMinutes % 60;
     std::ostringstream clock;
     clock << std::setfill('0') << std::setw(2) << hours << ':' << std::setw(2) << minutes;
-    text(timePanelX + 18.0F, 30.0F, clock.str(), 2.0F, {0.95F, 0.78F, 0.38F, 1.0F});
-    text(timePanelX + 104.0F, 30.0F, weather.daylight() > 0.2F ? "DAY" : "NIGHT", 2.0F, weather.daylight() > 0.2F ? glm::vec4{0.95F, 0.72F, 0.28F, 1} : glm::vec4{0.48F, 0.68F, 1.0F, 1});
-    text(timePanelX + 178.0F, 30.0F, weather.weatherName(), 2.0F, {0.72F, 0.85F, 1.0F, 1.0F});
-    rectangle(static_cast<float>(width_) * 0.5F - 1.0F, static_cast<float>(height_) * 0.5F - 8.0F, 2.0F, 16.0F, {1, 1, 1, 0.8F});
-    rectangle(static_cast<float>(width_) * 0.5F - 8.0F, static_cast<float>(height_) * 0.5F - 1.0F, 16.0F, 2.0F, {1, 1, 1, 0.8F});
+    text(timePanelX + 34.0F, 31.0F, clock.str(), 3.0F, textPrimary);
+    statusPill(timePanelX + 145.0F, 35.0F, weather.daylight() > 0.2F ? "DAY" : "NIGHT", weather.daylight() > 0.2F ? amber : cyan);
+    statusPill(timePanelX + 230.0F, 35.0F, weather.weatherName(), cyan);
 
-    const glm::vec4 buttonColor = fullscreen
-        ? glm::vec4{0.16F, 0.48F, 0.9F, 0.88F}
-        : glm::vec4{0.08F, 0.11F, 0.17F, 0.88F};
-    rectangle(static_cast<float>(width_ - 74), 16.0F, 58.0F, 42.0F, buttonColor, 9.0F);
-    rectangle(static_cast<float>(width_ - 59), 28.0F, 28.0F, 3.0F, {1, 1, 1, 0.9F});
-    rectangle(static_cast<float>(width_ - 59), 43.0F, 28.0F, 3.0F, {1, 1, 1, 0.9F});
-    rectangle(static_cast<float>(width_ - 59), 28.0F, 3.0F, 18.0F, {1, 1, 1, 0.9F});
-    rectangle(static_cast<float>(width_ - 34), 28.0F, 3.0F, 18.0F, {1, 1, 1, 0.9F});
+    const float centerX = static_cast<float>(width_) * 0.5F;
+    const float centerY = static_cast<float>(height_) * 0.5F;
+    rectangle(centerX - 1.0F, centerY - 13.0F, 2.0F, 7.0F, {0.85F, 0.95F, 1.0F, 0.82F}, 1.0F);
+    rectangle(centerX - 1.0F, centerY + 6.0F, 2.0F, 7.0F, {0.85F, 0.95F, 1.0F, 0.82F}, 1.0F);
+    rectangle(centerX - 13.0F, centerY - 1.0F, 7.0F, 2.0F, {0.85F, 0.95F, 1.0F, 0.82F}, 1.0F);
+    rectangle(centerX + 6.0F, centerY - 1.0F, 7.0F, 2.0F, {0.85F, 0.95F, 1.0F, 0.82F}, 1.0F);
+    rectangle(centerX - 1.5F, centerY - 1.5F, 3.0F, 3.0F, cyan, 1.5F);
+
+    const float fullscreenX = static_cast<float>(width_ - 72);
+    const bool fullscreenHovered = !cursorCaptured && contains(pointerX_, pointerY_, fullscreenX, 18.0F, 54.0F, 44.0F);
+    card(fullscreenX, 18.0F, 54.0F, 44.0F, 11.0F);
+    if (fullscreenHovered || fullscreen) {
+        rectangle(fullscreenX + 1.0F, 19.0F, 52.0F, 42.0F, fullscreen ? glm::vec4{0.08F, 0.38F, 0.58F, 0.94F} : panelHover, 10.0F);
+    }
+    rectangle(fullscreenX + 15.0F, 31.0F, 24.0F, 2.0F, textPrimary);
+    rectangle(fullscreenX + 15.0F, 47.0F, 24.0F, 2.0F, textPrimary);
+    rectangle(fullscreenX + 15.0F, 31.0F, 2.0F, 18.0F, textPrimary);
+    rectangle(fullscreenX + 37.0F, 31.0F, 2.0F, 18.0F, textPrimary);
 
     if (!cursorCaptured) {
-        rectangle(16.0F, 16.0F, 245.0F, 36.0F, {0.05F, 0.08F, 0.13F, 0.82F}, 8.0F);
-        rectangle(28.0F, 31.0F, 215.0F, 5.0F, {0.25F, 0.65F, 1.0F, 0.85F}, 3.0F);
-        text(30.0F, 24.0F, "F1 CAPTURE CURSOR", 2.0F, {0.8F, 0.92F, 1.0F, 0.95F});
+        card(18.0F, 18.0F, 216.0F, 40.0F, 10.0F);
+        rectangle(31.0F, 32.0F, 8.0F, 8.0F, cyan, 4.0F);
+        text(51.0F, 30.0F, "F1 CAPTURE CURSOR", 1.5F, textPrimary);
     }
 
     if (menuOpen) {
-        rectangle(0.0F, 0.0F, static_cast<float>(width_), static_cast<float>(height_), {0.005F, 0.008F, 0.015F, 0.72F});
-        const float left = static_cast<float>(width_) * 0.5F - 190.0F;
-        const float top = static_cast<float>(height_) * 0.5F - 270.0F;
-        rectangle(left + 7.0F, top + 9.0F, 380.0F, 584.0F, {0, 0, 0, 0.42F}, 18.0F);
-        rectangle(left, top, 380.0F, 584.0F, {0.025F, 0.04F, 0.07F, 0.98F}, 18.0F);
-        rectangle(left + 2.0F, top + 2.0F, 376.0F, 3.0F, {0.2F, 0.65F, 1.0F, 0.8F}, 2.0F);
-        rectangle(left + 34.0F, top + 54.0F, 312.0F, 3.0F, {0.2F, 0.65F, 1.0F, 0.7F}, 2.0F);
-        text(left + 104.0F, top + 24.0F, "SETTINGS", 3.0F, {0.84F, 0.93F, 1.0F, 1.0F});
-        rectangle(left + 34.0F, top + 82.0F, 312.0F, 54.0F, {0.08F, 0.42F, 0.72F, 0.95F}, 10.0F);
-        rectangle(left + 34.0F, top + 150.0F, 312.0F, 54.0F, fullscreen ? glm::vec4{0.12F, 0.55F, 0.9F, 0.95F} : glm::vec4{0.08F, 0.12F, 0.2F, 0.95F}, 10.0F);
-        rectangle(left + 34.0F, top + 218.0F, 312.0F, 54.0F, vsync ? glm::vec4{0.12F, 0.62F, 0.35F, 0.95F} : glm::vec4{0.08F, 0.12F, 0.2F, 0.95F}, 10.0F);
-        rectangle(left + 34.0F, top + 286.0F, 312.0F, 54.0F, {0.1F, 0.32F, 0.6F, 0.95F}, 10.0F);
-        rectangle(left + 34.0F, top + 354.0F, 312.0F, 54.0F, shadows ? glm::vec4{0.16F, 0.52F, 0.78F, 0.95F} : glm::vec4{0.08F, 0.12F, 0.2F, 0.95F}, 10.0F);
-        rectangle(left + 34.0F, top + 422.0F, 312.0F, 54.0F, bloom ? glm::vec4{0.55F, 0.34F, 0.12F, 0.95F} : glm::vec4{0.08F, 0.12F, 0.2F, 0.95F}, 10.0F);
-        rectangle(left + 34.0F, top + 490.0F, 312.0F, 54.0F, {0.65F, 0.12F, 0.16F, 0.95F}, 10.0F);
-        text(left + 58.0F, top + 103.0F, "RESUME", 3.0F, {1, 1, 1, 0.95F});
-        text(left + 58.0F, top + 171.0F, fullscreen ? "FULLSCREEN ON" : "FULLSCREEN OFF", 3.0F, {1, 1, 1, 0.95F});
-        text(left + 58.0F, top + 239.0F, vsync ? "VSYNC ON" : "VSYNC OFF", 3.0F, {1, 1, 1, 0.95F});
-        text(left + 58.0F, top + 307.0F, frameLimit == 0 ? "FPS UNLIMITED" : "FPS " + std::to_string(frameLimit), 3.0F, {1, 1, 1, 0.95F});
-        text(left + 58.0F, top + 375.0F, shadows ? "SHADOWS ON" : "SHADOWS OFF", 3.0F, {1, 1, 1, 0.95F});
-        text(left + 58.0F, top + 443.0F, bloom ? "BLOOM ON" : "BLOOM OFF", 3.0F, {1, 1, 1, 0.95F});
-        text(left + 58.0F, top + 511.0F, "QUIT", 3.0F, {1, 1, 1, 0.95F});
+        rectangle(0.0F, 0.0F, static_cast<float>(width_), static_cast<float>(height_), {0.005F, 0.009F, 0.016F, 0.78F});
+        const MenuLayout layout = menuLayout(width_, height_);
+        rectangle(layout.left + 9.0F, layout.top + 12.0F, layout.width, layout.height, {0, 0, 0, 0.42F}, 20.0F);
+        rectangle(layout.left, layout.top, layout.width, layout.height, border, 20.0F);
+        rectangle(layout.left + 1.0F, layout.top + 1.0F, layout.width - 2.0F, layout.height - 2.0F, {0.018F, 0.03F, 0.05F, 0.99F}, 19.0F);
+        rectangle(layout.left + 1.0F, layout.top + 1.0F, 5.0F, layout.height - 2.0F, cyan, 2.5F);
+        text(layout.contentLeft, layout.top + 28.0F, "SYSTEM", 1.5F, cyan);
+        text(layout.contentLeft, layout.top + 51.0F, "SETTINGS", 3.0F, textPrimary);
+        text(layout.contentLeft + 330.0F, layout.top + 55.0F, "ESC RESUME", 1.5F, textMuted);
+        rectangle(layout.contentLeft, layout.top + 82.0F, layout.contentWidth, 1.0F, border);
+
+        const auto menuButton = [this, &layout](
+                                    float y,
+                                    std::string_view label,
+                                    std::string_view value,
+                                    const glm::vec4& accent,
+                                    bool active,
+                                    bool destructive = false) {
+            const bool hovered = contains(pointerX_, pointerY_, layout.contentLeft, y, layout.contentWidth, 52.0F);
+            rectangle(layout.contentLeft, y, layout.contentWidth, 52.0F, hovered ? panelHover : panelRaised, 10.0F);
+            rectangle(layout.contentLeft, y, 4.0F, 52.0F, hovered || active ? accent : border, 2.0F);
+            text(layout.contentLeft + 20.0F, y + 19.0F, label, 2.0F, destructive ? red : textPrimary);
+            if (!value.empty()) {
+                const float pillWidth = 112.0F;
+                rectangle(
+                    layout.contentLeft + layout.contentWidth - pillWidth - 14.0F,
+                    y + 12.0F,
+                    pillWidth,
+                    28.0F,
+                    active ? glm::vec4{accent.r, accent.g, accent.b, 0.28F} : glm::vec4{0.02F, 0.035F, 0.055F, 0.9F},
+                    14.0F);
+                text(layout.contentLeft + layout.contentWidth - pillWidth, y + 20.0F, value, 1.5F, active ? accent : textMuted);
+            }
+        };
+
+        menuButton(layout.top + 102.0F, "RESUME", "ENTER", cyan, true);
+        menuButton(layout.top + 166.0F, "FULLSCREEN", fullscreen ? "ON" : "OFF", cyan, fullscreen);
+        menuButton(layout.top + 230.0F, "VSYNC", vsync ? "ON" : "OFF", green, vsync);
+        menuButton(layout.top + 294.0F, "FRAME LIMIT", frameLimit == 0 ? "UNLIMITED" : std::to_string(frameLimit), amber, frameLimit != 0);
+        menuButton(layout.top + 358.0F, "SHADOWS", shadows ? "ON" : "OFF", cyan, shadows);
+        menuButton(layout.top + 422.0F, "BLOOM", bloom ? "ON" : "OFF", amber, bloom);
+        menuButton(layout.top + 506.0F, "QUIT TO DESKTOP", "", red, false, true);
     }
 
     glDisable(GL_BLEND);
@@ -175,34 +252,33 @@ void UiSystem::updateTitle(
 }
 
 bool UiSystem::fullscreenButtonContains(double x, double y) const {
-    return x >= width_ - 74 && x <= width_ - 16 && y >= 16 && y <= 58;
+    return contains(x, y, static_cast<float>(width_ - 72), 18.0F, 54.0F, 44.0F);
 }
 
 UiAction UiSystem::menuActionAt(double x, double y) const {
-    const double left = static_cast<double>(width_) * 0.5 - 156.0;
-    const double top = static_cast<double>(height_) * 0.5 - 188.0;
-    if (x < left || x > left + 312.0) {
+    const MenuLayout layout = menuLayout(width_, height_);
+    if (x < layout.contentLeft || x > layout.contentLeft + layout.contentWidth) {
         return UiAction::None;
     }
-    if (y >= top && y <= top + 54.0) {
+    if (y >= layout.top + 102.0 && y <= layout.top + 154.0) {
         return UiAction::Resume;
     }
-    if (y >= top + 68.0 && y <= top + 122.0) {
+    if (y >= layout.top + 166.0 && y <= layout.top + 218.0) {
         return UiAction::ToggleFullscreen;
     }
-    if (y >= top + 136.0 && y <= top + 190.0) {
+    if (y >= layout.top + 230.0 && y <= layout.top + 282.0) {
         return UiAction::ToggleVsync;
     }
-    if (y >= top + 204.0 && y <= top + 258.0) {
+    if (y >= layout.top + 294.0 && y <= layout.top + 346.0) {
         return UiAction::CycleFrameLimit;
     }
-    if (y >= top + 272.0 && y <= top + 326.0) {
+    if (y >= layout.top + 358.0 && y <= layout.top + 410.0) {
         return UiAction::ToggleShadows;
     }
-    if (y >= top + 340.0 && y <= top + 394.0) {
+    if (y >= layout.top + 422.0 && y <= layout.top + 474.0) {
         return UiAction::ToggleBloom;
     }
-    if (y >= top + 408.0 && y <= top + 462.0) {
+    if (y >= layout.top + 506.0 && y <= layout.top + 558.0) {
         return UiAction::Quit;
     }
     return UiAction::None;

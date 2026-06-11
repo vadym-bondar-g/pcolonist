@@ -4,6 +4,7 @@
 #include "pcolonist/ecs/Registry.hpp"
 #include "pcolonist/render/Camera.hpp"
 #include "pcolonist/render/Mesh.hpp"
+#include "pcolonist/render/PngLoader.hpp"
 #include "pcolonist/world/WeatherSystem.hpp"
 
 #include <glad/gl.h>
@@ -48,6 +49,10 @@ Renderer::~Renderer() {
         glDeleteBuffers(1, &gpuMesh.vertexBuffer);
         glDeleteVertexArrays(1, &gpuMesh.vertexArray);
     }
+    for (const auto& [path, texture] : textures_) {
+        static_cast<void>(path);
+        glDeleteTextures(1, &texture);
+    }
 }
 
 void Renderer::resize(int width, int height) {
@@ -86,6 +91,7 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
     shader.setFloat("nightFactor", weather.nightFactor());
     shader.setFloat("time", weather.time());
     shader.setInt("shadowMap", 3);
+    shader.setInt("diffuseTexture", 0);
     shader.setInt("shadowsEnabled", shadowsEnabled_ ? 1 : 0);
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, shadowDepth_);
@@ -99,10 +105,32 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
             shader.setMat4("model", modelMatrix(transform));
             shader.setFloat("water", registry.has<WaterSurface>(entity) ? 1.0F : 0.0F);
             glBindVertexArray(gpuMesh.vertexArray);
-            glDrawElements(GL_TRIANGLES, static_cast<int>(gpuMesh.indexCount), GL_UNSIGNED_INT, nullptr);
+            if (renderer.mesh->draws.empty()) {
+                shader.setInt("hasDiffuseTexture", 0);
+                glDrawElements(GL_TRIANGLES, static_cast<int>(gpuMesh.indexCount), GL_UNSIGNED_INT, nullptr);
+                return;
+            }
+            for (const MeshDraw& draw : renderer.mesh->draws) {
+                const bool textured = !draw.diffuseTexture.empty();
+                shader.setInt("hasDiffuseTexture", textured ? 1 : 0);
+                if (textured) {
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, loadTexture(draw.diffuseTexture));
+                }
+                glDrawElements(
+                    GL_TRIANGLES,
+                    static_cast<int>(draw.indexCount),
+                    GL_UNSIGNED_INT,
+                    reinterpret_cast<void*>(draw.firstIndex * sizeof(std::uint32_t)));
+            }
         });
 
-    postProcess(weather);
+    bool underwater = false;
+    registry.each<Transform, WaterSurface>(
+        [&underwater, &camera](Entity, const Transform& transform, const WaterSurface&) {
+            underwater = underwater || camera.position().y < transform.position.y;
+        });
+    postProcess(weather, underwater);
 }
 
 void Renderer::setShadowsEnabled(bool enabled) {
@@ -209,7 +237,7 @@ void Renderer::renderShadowMap(const Camera& camera, Registry& registry, const W
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Renderer::postProcess(const WeatherSystem& weather) {
+void Renderer::postProcess(const WeatherSystem& weather, bool underwater) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, width_, height_);
     glDisable(GL_DEPTH_TEST);
@@ -218,6 +246,7 @@ void Renderer::postProcess(const WeatherSystem& weather) {
     shader.use();
     shader.setInt("hdrScene", 0);
     shader.setInt("bloomEnabled", bloomEnabled_ ? 1 : 0);
+    shader.setInt("underwater", underwater ? 1 : 0);
     shader.setFloat("exposure", 1.08F + weather.daylight() * 0.12F);
     shader.setFloat("daylight", weather.daylight());
     shader.setFloat("time", weather.time());
@@ -252,7 +281,36 @@ const Renderer::GpuMesh& Renderer::upload(const Mesh& mesh) {
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, normal)));
     glEnableVertexAttribArray(2);
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, textureCoordinate)));
+    glEnableVertexAttribArray(3);
     return meshes_.emplace(&mesh, gpuMesh).first->second;
+}
+
+unsigned int Renderer::loadTexture(const std::filesystem::path& path) {
+    if (const auto iterator = textures_.find(path); iterator != textures_.end()) {
+        return iterator->second;
+    }
+
+    const Image image = PngLoader::load(std::filesystem::path(PCOLONIST_ASSET_DIR) / path);
+    unsigned int texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_SRGB8_ALPHA8,
+        image.width,
+        image.height,
+        0,
+        GL_RGBA,
+        GL_UNSIGNED_BYTE,
+        image.pixels.data());
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    return textures_.emplace(path, texture).first->second;
 }
 
 } // namespace pcolonist

@@ -3,11 +3,13 @@
 layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 color;
 layout (location = 2) in vec3 normal;
+layout (location = 3) in vec2 textureCoordinate;
 
 out vec3 vertexColor;
 out vec3 worldPosition;
 out vec3 worldNormal;
 out vec4 lightSpacePosition;
+out vec2 uv;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -31,5 +33,6 @@ void main() {
     worldPosition = world.xyz;
     worldNormal = normalize(mat3(transpose(inverse(model))) * localNormal);
     lightSpacePosition = lightSpaceMatrix * world;
+    uv = vec2(textureCoordinate.x, 1.0 - textureCoordinate.y);
     gl_Position = projection * view * world;
 }

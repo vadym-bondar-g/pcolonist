@@ -21,6 +21,8 @@ private:
     Entity entity_ = nullEntity;
     float moveSpeed_ = 6.0F;
     float jumpSpeed_ = 6.0F;
+    float swimSpeed_ = 3.5F;
+    float swimVerticalSpeed_ = 3.0F;
 };
 
 } // namespace pcolonist
