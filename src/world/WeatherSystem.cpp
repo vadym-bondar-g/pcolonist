@@ -15,12 +15,20 @@ constexpr float pi = 3.14159265358979323846F;
 
 void WeatherSystem::update(float deltaTime) {
     time_ += static_cast<double>(deltaTime);
-    const int phase = static_cast<int>(time_ / 60.0F) % 3;
-    weather_ = phase == 0 ? WeatherType::Clear : phase == 1 ? WeatherType::Cloudy : WeatherType::Storm;
+    if (automaticWeather_) {
+        const int phase = static_cast<int>(time_ / 60.0F) % 3;
+        weather_ = phase == 0 ? WeatherType::Clear : phase == 1 ? WeatherType::Cloudy : WeatherType::Storm;
+    }
 }
 
 void WeatherSystem::setWeather(WeatherType weather) {
     weather_ = weather;
+    automaticWeather_ = false;
+}
+
+void WeatherSystem::setDayProgress(float progress) {
+    const double day = std::floor(time_ / dayDuration);
+    time_ = (day + static_cast<double>(glm::clamp(progress, 0.0F, 0.9999F))) * dayDuration;
 }
 
 glm::vec3 WeatherSystem::skyColor() const {

@@ -74,6 +74,20 @@ void ScriptSystem::execute(
             continue;
         }
 
+        if (command == "spawn_collider") {
+            Transform transform;
+            BoxCollider collider;
+            collider.isStatic = true;
+            if (!(row >> transform.position.x >> transform.position.y >> transform.position.z
+                  >> collider.halfExtents.x >> collider.halfExtents.y >> collider.halfExtents.z)) {
+                throw std::runtime_error("Script spawn_collider expects position and half extents");
+            }
+            const Entity entity = registry.create();
+            registry.emplace<Transform>(entity, transform);
+            registry.emplace<BoxCollider>(entity, collider);
+            continue;
+        }
+
         if (command == "model") {
             std::string id;
             std::string path;

@@ -34,6 +34,15 @@ void runWorldSystemTests() {
     if (weather.dayNumber() != 2U || weather.dayProgress() > 0.001F) {
         throw std::runtime_error("Weather system must advance to the next day");
     }
+    weather.setDayProgress(0.5F);
+    if (weather.daylight() < 0.99F || std::abs(weather.dayProgress() - 0.5F) > 0.001F) {
+        throw std::runtime_error("Developer controls must be able to set noon");
+    }
+    weather.setWeather(pcolonist::WeatherType::Storm);
+    weather.update(1.0F);
+    if (weather.weatherName() != "STORM") {
+        throw std::runtime_error("Manually selected weather must persist");
+    }
 
     const pcolonist::WaterWaveSample first = pcolonist::WaterWaves::sample({4.0F, -3.0F}, 1.0F);
     const pcolonist::WaterWaveSample later = pcolonist::WaterWaves::sample({4.0F, -3.0F}, 3.0F);

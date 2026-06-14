@@ -78,7 +78,10 @@ Every frame executes ordered tasks:
 - Shader uniform locations are cached after their first lookup.
 - The sky pass renders atmospheric horizon scattering, broad sun glow,
   raymarched volumetric clouds with parallax and internal lighting, storm
-  lightning and spherical twinkling stars.
+  lightning and spherical twinkling stars. The sun and moon discs use
+  analytic ray-sphere intersections in the sky fragment pass. Approximate
+  Rayleigh/Mie scattering, a procedural Milky Way and lunar surface variation
+  add depth without additional render passes.
 - A full 180-second day/night cycle moves the sun and moon across the sky,
   transitions through sunrise and sunset, and switches scene lighting between
   warm sunlight and cool moonlight.
@@ -88,7 +91,9 @@ Every frame executes ordered tasks:
   tone mapping, gamma correction and 4x MSAA improve scene rendering.
 - The post-process pass applies FXAA edge smoothing, subtle sharpening,
   multi-scale bloom, depth-based aerial perspective, ACES-style tone mapping,
-  adaptive day/night color grading, dithering and vignette.
+  adaptive day/night color grading, dithering and vignette. Linear-depth
+  screen-space occlusion and distance-aware sharpening preserve nearby detail
+  without producing halos on the sky.
 - Procedural surface variation prevents large untextured meshes from looking
   completely flat. Water uses layered waves, stronger Fresnel reflections and
   animated highlights.
@@ -97,7 +102,8 @@ Every frame executes ordered tasks:
 - A 2048x2048 directional shadow map with PCF filtering adds soft dynamic
   shadows from the current sun or moon direction.
 - Near and far stabilized shadow cascades preserve detail around the player
-  while covering the larger island.
+  while covering the larger island. Their overlap is blended to hide the
+  transition between cascade resolutions.
 - Terrain colors form height-dependent wet sand, beach, low grass, forest
   soil, high grass and mountain-rock layers. Procedural micro-normals, grains,
   stone veins, grass fibers, moving cloud shadows, wet shoreline shading,
@@ -121,6 +127,9 @@ Every frame executes ordered tasks:
   with a box collider. Use `spawn_decor <id> px py pz sx sy sz` for visual
   vegetation and props that should not block movement. Both spawn commands
   accept an optional final yaw angle in radians.
+- `spawn_collider px py pz halfX halfY halfZ` creates an invisible static
+  collision volume. The generated island uses these volumes for three
+  walkable stone grottos with open entrances, walls and ceilings.
 - The OBJ loader supports triangulation, negative indices, exported vertex
   normals, split face normals, optional vertex colors and diffuse `Kd` colors
   from MTL materials. UV-mapped PNG diffuse textures referenced by `map_Kd`
@@ -134,13 +143,32 @@ Every frame executes ordered tasks:
   clickable fullscreen button.
 - `F11` or the top-right HUD button switches between windowed and fullscreen
   modes while preserving the previous window position and size.
+- `~` opens a developer testing panel with respawn, landmark teleports,
+  weather and time-of-day controls, plus shadow and bloom toggles.
 - Original low-poly tree and rock OBJ models are included under
   `assets/models` and placed as physical scenery.
 - Deterministic smooth higher-poly layered tree, bush and rock models use
   dense radial and vertical geometry and can be rebuilt with
-  `python3 tools/generate_nature_models.py`.
+  `python3 tools/generate_nature_models.py`. Imported Kenney props can be
+  refined with UV-preserving beveled geometry by running
+  `blender --background --python tools/refine_imported_models.py`.
+- Object materials receive procedural bark fibers, foliage variation, stone
+  pores and fine cloth grain in addition to their MTL colors and PNG textures.
 - The island uses a denser terrain mesh, multi-scale procedural ground detail
-  and understory bushes to improve silhouettes and forest depth.
+  and understory bushes to improve silhouettes and forest depth. Its generated
+  height field combines broad ridges, valleys and walkable terraces, with
+  alternating triangle diagonals to avoid a visible directional grid. The
+  expanded island is centered around a volcanic cone with an animated magma
+  crater, and is divided into a northern plateau, inland lake, river valley,
+  eastern bay, marsh and southern peninsula.
+- Terrain rendering is split into seamless 64-unit chunks. The complete
+  collider remains resident, while chunk GPU meshes are uploaded lazily as
+  they enter the camera's streaming radius.
+- Terrain uses seamless triplanar earth, sand and basalt textures blended by
+  height, slope and proximity to the volcano. Procedural fine detail is layered
+  over the textures to reduce visible repetition. Noisy material boundaries,
+  large-scale color variation and reflective wet shoreline sand make the
+  transitions less uniform.
 - Selected camp, vegetation and prop models from Kenney's CC0 3D Nature Pack
   are included under `assets/models/kenney`; the original license is kept next
   to the models. The imported source is
@@ -151,6 +179,7 @@ Every frame executes ordered tasks:
 ## Controls
 
 - `W`, `A`, `S`, `D`: move
+- `~`: open the developer testing panel
 - Mouse: look around
 - `Space`: jump or swim upward
 - `Left Shift`: dive while swimming
@@ -170,7 +199,9 @@ FPS Limit, Shadows, Bloom and Quit buttons. The limiter supports `30`, `60`,
 UI text uses a built-in 5x7 bitmap font, so it renders consistently without
 external font files.
 
-The HUD displays in-world time, day/night state and current weather. Panels
+The HUD uses a strict graphite visual system with flat surfaces, compact
+square controls, thin dividers and a single cold accent for active states.
+It displays in-world time, day/night state and current weather. Panels
 use shadows, borders and subtle gradients for better readability.
 
 The bottom hotbar contains five selectable tool slots. The axe starts in slot
@@ -194,16 +225,40 @@ ctest --test-dir build/debug --output-on-failure
 ## Windows build
 
 Install Visual Studio 2022 with the Desktop development with C++ workload,
-CMake and [vcpkg](https://github.com/microsoft/vcpkg). Set `VCPKG_ROOT` to the
-vcpkg directory, then build with:
+CMake and [vcpkg](https://github.com/microsoft/vcpkg), or let the build script
+bootstrap them through `winget`:
 
 ```bat
 build-windows.bat Release
+build-windows.bat Release --bootstrap
+build-windows.bat --bootstrap-only
+build-windows.bat Debug --clean --no-package
 ```
 
 Use `Debug` instead of `Release` for a debug build. The vcpkg manifest installs
-`libpng` automatically. The executable is written to
-`build\windows\<configuration>\pcolonist.exe`.
+`libpng` automatically. Runtime assets are copied next to the executable. The
+build script runs tests before creating a portable
+`dist\pcolonist-windows-x64-<configuration>.zip` archive.
+Bootstrap mode installs Git, CMake and Visual Studio Build Tools when missing,
+then creates a local `.tools\vcpkg` checkout. It requires `winget` and may
+request administrator permission from Windows.
+
+Windows build options:
+
+- `--clean` removes the previous Windows build before configuring.
+- `--no-tests` skips automated tests and does not build their target.
+- `--no-package` skips portable ZIP creation.
+- `--bootstrap-only` installs dependencies without starting a build.
+- `--help` prints all supported options.
+
+Portable packages contain only `pcolonist.exe`, runtime DLLs, assets and the
+README instead of the complete Visual Studio output directory. A matching
+`.sha256` file is generated for archive verification.
+
+The renderer currently uses OpenGL 3.3. Its sky pass performs software
+raymarching and analytic ray intersections, but it does not use NVIDIA RTX
+hardware. Hardware ray tracing requires a separate Vulkan Ray Tracing or
+DirectX 12 DXR renderer.
 
 ## Free model sources
 

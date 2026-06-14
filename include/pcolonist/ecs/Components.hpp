@@ -20,9 +20,14 @@ struct MeshRenderer {
 };
 
 struct WaterSurface {
-    glm::vec2 halfExtents{160.0F};
+    glm::vec2 halfExtents{320.0F};
 };
 struct TerrainSurface {};
+struct TerrainChunk {
+    glm::vec2 center{0.0F};
+    float radius = 0.0F;
+};
+struct LavaSurface {};
 
 struct ResourceNode {
     int health = 3;

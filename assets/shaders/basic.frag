@@ -20,6 +20,7 @@ uniform float nightFactor;
 uniform float cloudiness;
 uniform float water;
 uniform float terrain;
+uniform float lava;
 uniform float time;
 uniform float roughness;
 uniform float specularStrength;
@@ -27,6 +28,9 @@ uniform vec3 emissiveColor;
 uniform sampler2D shadowMapNear;
 uniform sampler2D shadowMapFar;
 uniform sampler2D diffuseTexture;
+uniform sampler2D terrainEarthTexture;
+uniform sampler2D terrainSandTexture;
+uniform sampler2D terrainBasaltTexture;
 uniform int shadowsEnabled;
 uniform int hasDiffuseTexture;
 
@@ -75,6 +79,33 @@ vec2 terrainGradient(vec2 position) {
     ) / (stepSize * 2.0);
 }
 
+vec3 triplanarSample(sampler2D material, vec3 position, vec3 normal, float scale) {
+    vec3 weights = pow(abs(normal), vec3(5.0));
+    weights /= max(weights.x + weights.y + weights.z, 0.0001);
+    vec3 xProjection = texture(material, position.zy * scale).rgb;
+    vec3 yProjection = texture(material, position.xz * scale).rgb;
+    vec3 zProjection = texture(material, position.xy * scale).rgb;
+    return xProjection * weights.x + yProjection * weights.y + zProjection * weights.z;
+}
+
+vec3 objectMaterialDetail(vec3 albedo, vec3 position, vec3 normal) {
+    float green = smoothstep(0.03, 0.16, albedo.g - max(albedo.r, albedo.b));
+    float brown = smoothstep(0.015, 0.14, albedo.r - albedo.b)
+        * smoothstep(0.015, 0.22, albedo.g - albedo.b);
+    float neutral = 1.0 - smoothstep(0.035, 0.18, max(albedo.r, max(albedo.g, albedo.b))
+        - min(albedo.r, min(albedo.g, albedo.b)));
+    float fibers = valueNoise(vec2(position.y * 4.6, atan(position.z, position.x) * 2.2));
+    float leafClusters = terrainDetail(position.xz * 2.8 + position.y * 0.71);
+    float pores = cellular(position.xz * 5.2 + normal.xz * 1.7);
+    float cloth = valueNoise(position.xz * 12.0 + position.y * vec2(2.3, 3.7));
+    vec3 detailed = albedo;
+    detailed *= mix(0.84, 1.13, fibers * brown);
+    detailed *= mix(0.82, 1.16, leafClusters * green);
+    detailed *= mix(0.86, 1.08, smoothstep(0.12, 0.62, pores) * neutral);
+    detailed *= mix(0.95, 1.05, cloth * (1.0 - max(green, max(brown, neutral))));
+    return detailed;
+}
+
 float cascadeShadow(sampler2D shadowMap, vec4 lightSpacePosition, vec3 normal, vec3 lightDirection) {
     if (shadowsEnabled == 0) {
         return 0.0;
@@ -98,10 +129,12 @@ float cascadeShadow(sampler2D shadowMap, vec4 lightSpacePosition, vec3 normal, v
 
 float shadowAmount(vec3 normal, vec3 lightDirection) {
     float distanceToCamera = length(cameraPosition - worldPosition);
-    if (distanceToCamera < 34.0) {
-        return cascadeShadow(shadowMapNear, lightSpacePositions[0], normal, lightDirection);
+    float nearShadow = cascadeShadow(shadowMapNear, lightSpacePositions[0], normal, lightDirection);
+    if (distanceToCamera < 28.0) {
+        return nearShadow;
     }
-    return cascadeShadow(shadowMapFar, lightSpacePositions[1], normal, lightDirection);
+    float farShadow = cascadeShadow(shadowMapFar, lightSpacePositions[1], normal, lightDirection);
+    return mix(nearShadow, farShadow, smoothstep(28.0, 42.0, distanceToCamera));
 }
 
 void main() {
@@ -122,7 +155,7 @@ void main() {
     float diffuse = max(dot(normal, lightDirection), 0.0);
     float moonDiffuse = max(dot(normal, normalize(moonDirection)), 0.0);
     vec3 halfDirection = normalize(lightDirection + viewDirection);
-    float materialRoughness = water > 0.5 ? 0.08 : roughness;
+    float materialRoughness = water > 0.5 ? 0.08 : lava > 0.5 ? 0.18 : roughness;
     float specularPower = mix(128.0, 4.0, materialRoughness * materialRoughness);
     float specular = pow(max(dot(normal, halfDirection), 0.0), specularPower);
     vec3 moonHalfDirection = normalize(normalize(moonDirection) + viewDirection);
@@ -137,9 +170,16 @@ void main() {
     float cloudShadow = mix(1.0, smoothstep(0.28, 0.78, cloudShadowNoise), cloudiness * 0.48);
 
     float surfaceVariation = mix(0.94, 1.06, hash(floor(worldPosition * 3.0)));
+    float volcanicGlow = 0.0;
+    float terrainSandAmount = 0.0;
+    float terrainBasaltAmount = 0.0;
+    float terrainWetness = 0.0;
     vec3 albedo = vertexColor;
     if (hasDiffuseTexture != 0) {
         albedo *= texture(diffuseTexture, uv).rgb;
+    }
+    if (terrain < 0.5 && water < 0.5 && lava < 0.5) {
+        albedo = objectMaterialDetail(albedo, worldPosition, normal);
     }
     if (terrain > 0.5) {
         float steep = smoothstep(0.58, 0.9, 1.0 - normal.y);
@@ -165,6 +205,28 @@ void main() {
         albedo = mix(albedo, highGrass, smoothstep(2.8, 4.0, height));
         albedo = mix(albedo, mountainRock, smoothstep(4.8, 6.5, height));
         albedo = mix(albedo, mountainRock, steep);
+
+        vec3 earthTexture = triplanarSample(terrainEarthTexture, worldPosition, normal, 0.105);
+        vec3 sandTexture = triplanarSample(terrainSandTexture, worldPosition, normal, 0.12);
+        vec3 basaltTexture = triplanarSample(terrainBasaltTexture, worldPosition, normal, 0.09);
+        float materialNoise = detail * 0.72 + valueNoise(worldPosition.xz * 0.035) * 0.28;
+        float blendJitter = (materialNoise - 0.5) * 0.65;
+        float sandWeight = (1.0 - smoothstep(-0.05 + blendJitter, 0.85 + blendJitter, height))
+            * (1.0 - steep);
+        float volcanoWeight = (1.0 - smoothstep(24.0, 47.0, length(worldPosition.xz)))
+            * smoothstep(5.5 + blendJitter, 13.0 + blendJitter, height);
+        float basaltWeight = max(steep * smoothstep(2.4 + blendJitter, 5.8 + blendJitter, height), volcanoWeight);
+        float earthWeight = clamp(1.0 - max(sandWeight, basaltWeight), 0.0, 1.0);
+        float materialTotal = max(earthWeight + sandWeight + basaltWeight, 0.0001);
+        vec3 texturedTerrain = (earthTexture * earthWeight
+            + sandTexture * sandWeight
+            + basaltTexture * basaltWeight) / materialTotal;
+        float macroVariation = valueNoise(worldPosition.xz * 0.018);
+        texturedTerrain *= mix(vec3(0.82, 0.88, 0.78), vec3(1.10, 1.06, 0.98), macroVariation);
+        albedo = mix(albedo, texturedTerrain, 0.72);
+        terrainSandAmount = sandWeight / materialTotal;
+        terrainBasaltAmount = basaltWeight / materialTotal;
+
         float stoneVeins = 1.0 - smoothstep(0.045, 0.16, cells);
         albedo = mix(albedo, albedo * vec3(0.58, 0.62, 0.60), stoneVeins * steep * 0.42);
         float grassFibers = smoothstep(0.73, 0.93, grains) * (1.0 - steep)
@@ -173,21 +235,45 @@ void main() {
         albedo = mix(albedo, vec3(0.12, 0.30, 0.08), moss * 0.35 * smoothstep(0.5, 3.0, height));
         float shoreWetness = 1.0 - smoothstep(-0.62, -0.08, height);
         albedo = mix(albedo, albedo * vec3(0.48, 0.60, 0.57), shoreWetness * 0.55);
+        terrainWetness = shoreWetness * terrainSandAmount;
+        float terracePhase = abs(fract((height + 0.08) / 1.35) - 0.5) * 2.0;
+        float terraceEdge = smoothstep(0.78, 0.98, terracePhase) * smoothstep(0.35, 1.4, height);
+        albedo = mix(albedo, albedo * vec3(0.68, 0.72, 0.69), terraceEdge * (0.10 + steep * 0.28));
+        float craterProximity = 1.0 - smoothstep(10.0, 31.0, length(worldPosition.xz));
+        float hotCracks = smoothstep(0.72, 0.9, grains) * craterProximity * smoothstep(10.0, 18.0, height);
+        albedo = mix(albedo, vec3(0.32, 0.035, 0.005), hotCracks * 0.75);
+        volcanicGlow = hotCracks;
         albedo *= mix(0.90, 1.09, fine) * mix(0.96, 1.04, grains);
         float pathLike = smoothstep(0.42, 0.49, abs(sin(worldPosition.x * 0.025 + worldPosition.z * 0.003)));
         albedo = mix(albedo, albedo * vec3(0.82, 0.76, 0.64), pathLike * 0.08 * (1.0 - steep));
     }
+    if (lava > 0.5) {
+        float flowA = valueNoise(worldPosition.xz * 0.32 + vec2(time * 0.22, -time * 0.13));
+        float flowB = valueNoise(worldPosition.xz * 1.45 - vec2(time * 0.17, time * 0.28));
+        float cracks = smoothstep(0.38, 0.72, flowA * 0.72 + flowB * 0.28);
+        albedo = mix(vec3(0.32, 0.015, 0.002), vec3(1.0, 0.28, 0.008), cracks);
+        surfaceVariation = 1.0;
+    }
     vec3 color = albedo * surfaceVariation * (hemisphereLight + sunColor * diffuse * daylight * (1.0 - shadow) * cloudShadow + moonColor * moonDiffuse * nightFactor) * contactShade;
-    float materialSpecular = water > 0.5 ? 0.8 : specularStrength;
+    float materialSpecular = water > 0.5
+        ? 0.8
+        : terrain > 0.5
+            ? mix(0.08, 0.52, terrainWetness) + terrainBasaltAmount * 0.08
+            : specularStrength;
     color += sunColor * specular * materialSpecular * (1.0 - shadow);
     color += moonColor * moonSpecular * nightFactor * materialSpecular * 0.75;
     color += ambientColor * rim * 0.2;
     color += emissiveColor;
+    color += vec3(1.0, 0.16, 0.008) * volcanicGlow * (1.6 + sin(time * 1.3) * 0.25);
+    if (lava > 0.5) {
+        float pulse = 0.78 + sin(time * 1.7 + worldPosition.x * 0.19 + worldPosition.z * 0.13) * 0.22;
+        color = albedo * (2.8 + pulse * 2.2);
+    }
 
     if (water > 0.5) {
         float shimmer = sin(worldPosition.x * 0.25 + time) * 0.04 + sin(worldPosition.z * 0.42 - time * 0.8) * 0.025;
         float crest = smoothstep(0.12, 0.29, worldPosition.y + 0.45);
-        float islandRadius = length(vec2(worldPosition.x / 69.0, worldPosition.z / 61.0));
+        float islandRadius = length(vec2(worldPosition.x / 132.0, worldPosition.z / 112.0));
         float shoreBand = exp(-pow((islandRadius - 0.82) * 18.0, 2.0));
         float shoreBreak = smoothstep(0.35, 0.78, valueNoise(worldPosition.xz * 0.42 + vec2(time * 0.18, 0.0)));
         float distanceFade = smoothstep(12.0, 150.0, length(cameraPosition.xz - worldPosition.xz));

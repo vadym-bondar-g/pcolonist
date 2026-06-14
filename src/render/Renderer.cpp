@@ -21,7 +21,7 @@
 namespace {
 
 constexpr int shadowSize = 2048;
-constexpr std::array<float, 2> shadowRanges = {38.0F, 105.0F};
+constexpr std::array<float, 2> shadowRanges = {48.0F, 190.0F};
 
 glm::mat4 modelMatrix(const pcolonist::Transform& transform) {
     glm::mat4 model = glm::translate(glm::mat4(1.0F), transform.position);
@@ -36,6 +36,7 @@ struct RenderBatch {
     std::vector<glm::mat4> models;
     bool water = false;
     bool terrain = false;
+    bool lava = false;
 };
 
 std::vector<RenderBatch> collectBatches(
@@ -48,21 +49,33 @@ std::vector<RenderBatch> collectBatches(
             pcolonist::Entity entity,
             const pcolonist::Transform& transform,
             const pcolonist::MeshRenderer& renderer) {
-            if (!renderer.mesh || (shadows && registry.has<pcolonist::WaterSurface>(entity))) {
+            if (!renderer.mesh
+                || (shadows && (registry.has<pcolonist::WaterSurface>(entity)
+                    || registry.has<pcolonist::LavaSurface>(entity)))) {
                 return;
             }
             const bool water = registry.has<pcolonist::WaterSurface>(entity);
             const bool terrain = registry.has<pcolonist::TerrainSurface>(entity);
+            const bool lava = registry.has<pcolonist::LavaSurface>(entity);
+            if (registry.has<pcolonist::TerrainChunk>(entity)) {
+                const pcolonist::TerrainChunk& chunk = registry.get<pcolonist::TerrainChunk>(entity);
+                if (glm::distance(glm::vec2{cameraPosition.x, cameraPosition.z}, chunk.center) > chunk.radius + 210.0F) {
+                    return;
+                }
+            }
             const float distance = glm::length(transform.position - cameraPosition);
             const float scale = std::max({transform.scale.x, transform.scale.y, transform.scale.z});
-            if (!terrain && !water && distance > 115.0F + scale * 8.0F) {
+            if (!terrain && !water && distance > 190.0F + scale * 8.0F) {
                 return;
             }
             auto batch = std::find_if(batches.begin(), batches.end(), [&](const RenderBatch& candidate) {
-                return candidate.mesh == renderer.mesh.get() && candidate.water == water && candidate.terrain == terrain;
+                return candidate.mesh == renderer.mesh.get()
+                    && candidate.water == water
+                    && candidate.terrain == terrain
+                    && candidate.lava == lava;
             });
             if (batch == batches.end()) {
-                batches.push_back({renderer.mesh.get(), {}, water, terrain});
+                batches.push_back({renderer.mesh.get(), {}, water, terrain, lava});
                 batch = std::prev(batches.end());
             }
             batch->models.push_back(modelMatrix(transform));
@@ -121,7 +134,7 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
 
     Shader& shader = shaders_.get("scene");
     shader.use();
-    shader.setMat4("projection", glm::perspective(glm::radians(70.0F), aspectRatio, 0.1F, 250.0F));
+    shader.setMat4("projection", glm::perspective(glm::radians(70.0F), aspectRatio, 0.1F, 520.0F));
     shader.setMat4("view", camera.viewMatrix());
     shader.setMat4("lightSpaceMatrices[0]", lightSpaceMatrices_[0]);
     shader.setMat4("lightSpaceMatrices[1]", lightSpaceMatrices_[1]);
@@ -140,6 +153,9 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
     shader.setInt("shadowMapNear", 3);
     shader.setInt("shadowMapFar", 4);
     shader.setInt("diffuseTexture", 0);
+    shader.setInt("terrainEarthTexture", 0);
+    shader.setInt("terrainSandTexture", 1);
+    shader.setInt("terrainBasaltTexture", 2);
     shader.setInt("shadowsEnabled", shadowsEnabled_ ? 1 : 0);
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, shadowDepths_[0]);
@@ -150,6 +166,15 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
             const GpuMesh& gpuMesh = upload(*batch.mesh);
             shader.setFloat("water", batch.water ? 1.0F : 0.0F);
             shader.setFloat("terrain", batch.terrain ? 1.0F : 0.0F);
+            shader.setFloat("lava", batch.lava ? 1.0F : 0.0F);
+            if (batch.terrain) {
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, loadTexture("textures/terrain/earth.png"));
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, loadTexture("textures/terrain/sand.png"));
+                glActiveTexture(GL_TEXTURE2);
+                glBindTexture(GL_TEXTURE_2D, loadTexture("textures/terrain/basalt.png"));
+            }
             glBindVertexArray(gpuMesh.vertexArray);
             glBindBuffer(GL_ARRAY_BUFFER, gpuMesh.instanceBuffer);
             glBufferData(
@@ -410,6 +435,7 @@ unsigned int Renderer::loadTexture(const std::filesystem::path& path) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, -0.2F);
     return textures_.emplace(path, texture).first->second;
 }
 

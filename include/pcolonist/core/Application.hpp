@@ -49,7 +49,9 @@ private:
     void handleUiAction(UiAction action);
     void toggleMenu();
     void toggleInventory();
+    void toggleDebugPanel();
     void toggleFullscreen();
+    void teleportPlayer(glm::vec3 position);
     void useSelectedTool();
     void updateCursorMode();
 
@@ -86,7 +88,9 @@ private:
     bool fullscreen_ = false;
     bool menuOpen_ = false;
     bool inventoryOpen_ = false;
+    bool debugPanelOpen_ = false;
     bool vsync_ = true;
+    std::size_t nextGrotto_ = 0;
     int windowedX_ = 100;
     int windowedY_ = 100;
     int windowedWidth_ = 1280;

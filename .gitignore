@@ -1,5 +1,7 @@
 .idea/
+.tools/
 build/
 cmake-build-*/
+dist/
 tools/__pycache__/
 *.pyc

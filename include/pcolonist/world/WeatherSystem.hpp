@@ -17,6 +17,7 @@ class WeatherSystem {
 public:
     void update(float deltaTime);
     void setWeather(WeatherType weather);
+    void setDayProgress(float progress);
 
     [[nodiscard]] glm::vec3 skyColor() const;
     [[nodiscard]] glm::vec3 horizonColor() const;
@@ -37,6 +38,7 @@ public:
 
 private:
     WeatherType weather_ = WeatherType::Clear;
+    bool automaticWeather_ = true;
     double time_ = 45.0;
 };
 

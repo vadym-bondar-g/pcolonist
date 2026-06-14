@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate deterministic low-poly nature models used by the demo world."""
+"""Generate deterministic detailed nature models used by the demo world."""
 
 from __future__ import annotations
 
@@ -105,19 +105,19 @@ class Obj:
 def generate_tree() -> None:
     obj = Obj("layered_tree", "tree.mtl")
     obj.material("Bark")
-    obj.tapered_cylinder((0.0, 0.0, 0.0), 0.46, 0.25, 3.55, 28, 0.18, 7)
+    obj.tapered_cylinder((0.0, 0.0, 0.0), 0.46, 0.25, 3.55, 36, 0.18, 9)
     for angle, y, length in ((0.4, 2.0, 1.3), (2.5, 2.4, 1.15), (4.6, 2.75, 1.0)):
         x = math.cos(angle) * length * 0.34
         z = math.sin(angle) * length * 0.34
-        obj.tapered_cylinder((x, y, z), 0.18, 0.07, length, 16, angle, 4)
+        obj.tapered_cylinder((x, y, z), 0.18, 0.07, length, 20, angle, 5)
     obj.material("LeafDark")
-    obj.crown((0.0, 2.55, 0.0), 1.72, 2.0, 28, 0.12, 8)
-    obj.crown((-0.75, 2.4, 0.48), 1.05, 1.45, 22, 0.46, 7)
-    obj.crown((0.35, 2.35, 0.82), 0.88, 1.25, 20, 0.22, 7)
+    obj.crown((0.0, 2.55, 0.0), 1.72, 2.0, 36, 0.12, 11)
+    obj.crown((-0.75, 2.4, 0.48), 1.05, 1.45, 28, 0.46, 9)
+    obj.crown((0.35, 2.35, 0.82), 0.88, 1.25, 26, 0.22, 9)
     obj.material("LeafLight")
-    obj.crown((0.68, 3.0, -0.36), 1.18, 1.62, 24, 0.78, 7)
-    obj.crown((-0.18, 3.65, 0.12), 1.02, 1.5, 24, 0.25, 7)
-    obj.crown((-0.62, 3.35, -0.48), 0.82, 1.15, 20, 0.55, 6)
+    obj.crown((0.68, 3.0, -0.36), 1.18, 1.62, 30, 0.78, 9)
+    obj.crown((-0.18, 3.65, 0.12), 1.02, 1.5, 30, 0.25, 9)
+    obj.crown((-0.62, 3.35, -0.48), 0.82, 1.15, 26, 0.55, 8)
     obj.write(MODEL_DIR / "tree.obj")
     (MODEL_DIR / "tree.mtl").write_text(
         "newmtl Bark\nKd 0.24 0.12 0.055\nKs 0.05 0.05 0.05\nNs 8\n"
@@ -130,11 +130,11 @@ def generate_tree() -> None:
 def generate_bush() -> None:
     obj = Obj("bush", "bush.mtl")
     obj.material("BushDark")
-    obj.crown((-0.35, 0.35, 0.1), 0.82, 0.95, 22, 0.3, 7)
-    obj.crown((0.38, 0.28, -0.2), 0.7, 0.84, 22, 0.7, 7)
+    obj.crown((-0.35, 0.35, 0.1), 0.82, 0.95, 30, 0.3, 9)
+    obj.crown((0.38, 0.28, -0.2), 0.7, 0.84, 30, 0.7, 9)
     obj.material("BushLight")
-    obj.crown((0.02, 0.55, 0.28), 0.72, 0.92, 24, 0.1, 7)
-    obj.crown((0.18, 0.42, -0.52), 0.55, 0.70, 20, 0.48, 6)
+    obj.crown((0.02, 0.55, 0.28), 0.72, 0.92, 32, 0.1, 9)
+    obj.crown((0.18, 0.42, -0.52), 0.55, 0.70, 28, 0.48, 8)
     obj.write(MODEL_DIR / "bush.obj")
     (MODEL_DIR / "bush.mtl").write_text(
         "newmtl BushDark\nKd 0.07 0.22 0.06\nKs 0.02 0.02 0.02\nNs 4\n"
@@ -148,7 +148,7 @@ def generate_rock() -> None:
     obj = Obj("faceted_rock", "rock.mtl")
     obj.material("Rock")
     rings: list[list[int]] = []
-    ring_count = 32
+    ring_count = 48
     for level, (y, radius) in enumerate((
         (0.0, 1.25),
         (0.24, 1.28),
@@ -179,11 +179,71 @@ def generate_rock() -> None:
     )
 
 
+def generate_grotto() -> None:
+    random.seed(431)
+    obj = Obj("stone_grotto", "grotto.mtl")
+    obj.material("GrottoStone")
+    sides = 24
+    length_segments = 8
+    inner_radius = 3.0
+    outer_radius = 4.35
+    half_length = 5.0
+    outer: list[list[int]] = []
+    inner: list[list[int]] = []
+    for segment in range(length_segments + 1):
+        progress = segment / length_segments
+        z = -half_length + progress * half_length * 2.0
+        outer_ring: list[int] = []
+        inner_ring: list[int] = []
+        for index in range(sides + 1):
+            angle = index / sides * math.pi
+            roughness = 1.0 + math.sin(index * 2.7 + segment * 1.9) * 0.035
+            outer_ring.append(obj.vertex(
+                math.cos(angle) * outer_radius * roughness,
+                math.sin(angle) * outer_radius * roughness,
+                z + math.sin(index * 1.3 + segment) * 0.08,
+            ))
+            inner_ring.append(obj.vertex(
+                math.cos(angle) * inner_radius,
+                math.sin(angle) * inner_radius,
+                z,
+            ))
+        outer.append(outer_ring)
+        inner.append(inner_ring)
+
+    for segment in range(length_segments):
+        for index in range(sides):
+            obj.face(
+                outer[segment][index],
+                outer[segment + 1][index],
+                outer[segment + 1][index + 1],
+                outer[segment][index + 1],
+            )
+            obj.face(
+                inner[segment][index + 1],
+                inner[segment + 1][index + 1],
+                inner[segment + 1][index],
+                inner[segment][index],
+            )
+    for end in (0, length_segments):
+        for index in range(sides):
+            if end == 0:
+                obj.face(outer[end][index + 1], outer[end][index], inner[end][index], inner[end][index + 1])
+            else:
+                obj.face(outer[end][index], outer[end][index + 1], inner[end][index + 1], inner[end][index])
+    obj.write(MODEL_DIR / "grotto.obj")
+    (MODEL_DIR / "grotto.mtl").write_text(
+        "newmtl GrottoStone\nKd 0.17 0.19 0.18\nKs 0.05 0.05 0.05\nNs 10\n",
+        encoding="utf-8",
+    )
+
+
 def main() -> None:
     generate_tree()
     generate_bush()
     generate_rock()
-    print("Generated tree.obj, bush.obj and rock.obj")
+    generate_grotto()
+    print("Generated tree.obj, bush.obj, rock.obj and grotto.obj")
 
 
 if __name__ == "__main__":

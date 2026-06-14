@@ -17,14 +17,75 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <stdexcept>
+#include <unordered_map>
+#include <vector>
 
 namespace {
 
 constexpr int windowWidth = 1280;
 constexpr int windowHeight = 720;
 constexpr float maximumDeltaTime = 0.1F;
+constexpr float terrainChunkSize = 64.0F;
+
+struct ChunkKey {
+    int x = 0;
+    int z = 0;
+
+    bool operator==(const ChunkKey&) const = default;
+};
+
+struct ChunkKeyHash {
+    std::size_t operator()(const ChunkKey& key) const noexcept {
+        return static_cast<std::size_t>(static_cast<unsigned int>(key.x)) * 0x9e3779b1U
+            ^ static_cast<std::size_t>(static_cast<unsigned int>(key.z));
+    }
+};
+
+std::vector<std::pair<pcolonist::TerrainChunk, std::shared_ptr<pcolonist::Mesh>>> splitTerrain(
+    const pcolonist::Mesh& source) {
+    struct ChunkBuilder {
+        pcolonist::Mesh mesh;
+        std::unordered_map<std::uint32_t, std::uint32_t> remap;
+    };
+    std::unordered_map<ChunkKey, ChunkBuilder, ChunkKeyHash> builders;
+    for (std::size_t index = 0; index + 2 < source.indices.size(); index += 3) {
+        const glm::vec3 center = (
+            source.vertices[source.indices[index]].position
+            + source.vertices[source.indices[index + 1]].position
+            + source.vertices[source.indices[index + 2]].position) / 3.0F;
+        const ChunkKey key{
+            static_cast<int>(std::floor(center.x / terrainChunkSize)),
+            static_cast<int>(std::floor(center.z / terrainChunkSize)),
+        };
+        ChunkBuilder& builder = builders[key];
+        for (std::size_t corner = 0; corner < 3; ++corner) {
+            const std::uint32_t sourceIndex = source.indices[index + corner];
+            const auto [iterator, inserted] = builder.remap.try_emplace(
+                sourceIndex,
+                static_cast<std::uint32_t>(builder.mesh.vertices.size()));
+            if (inserted) {
+                builder.mesh.vertices.push_back(source.vertices[sourceIndex]);
+            }
+            builder.mesh.indices.push_back(iterator->second);
+        }
+    }
+
+    std::vector<std::pair<pcolonist::TerrainChunk, std::shared_ptr<pcolonist::Mesh>>> chunks;
+    chunks.reserve(builders.size());
+    for (auto& [key, builder] : builders) {
+        const glm::vec2 center{
+            (static_cast<float>(key.x) + 0.5F) * terrainChunkSize,
+            (static_cast<float>(key.z) + 0.5F) * terrainChunkSize,
+        };
+        chunks.emplace_back(
+            pcolonist::TerrainChunk{center, terrainChunkSize * 0.78F},
+            std::make_shared<pcolonist::Mesh>(std::move(builder.mesh)));
+    }
+    return chunks;
+}
 
 pcolonist::KeyAction toKeyAction(int action) {
     if (action == GLFW_PRESS) {
@@ -178,10 +239,17 @@ void Application::registerEventHandlers() {
             toggleFullscreen();
         }
         if (event.key == GLFW_KEY_ESCAPE && event.action == KeyAction::Press) {
-            toggleMenu();
+            if (debugPanelOpen_) {
+                toggleDebugPanel();
+            } else {
+                toggleMenu();
+            }
         }
-        if (event.key == GLFW_KEY_TAB && event.action == KeyAction::Press && !menuOpen_) {
+        if (event.key == GLFW_KEY_TAB && event.action == KeyAction::Press && !menuOpen_ && !debugPanelOpen_) {
             toggleInventory();
+        }
+        if (event.key == GLFW_KEY_GRAVE_ACCENT && event.action == KeyAction::Press) {
+            toggleDebugPanel();
         }
         if (event.action == KeyAction::Press && event.key >= GLFW_KEY_1 && event.key <= GLFW_KEY_5) {
             inventory_.select(static_cast<std::size_t>(event.key - GLFW_KEY_1));
@@ -191,7 +259,9 @@ void Application::registerEventHandlers() {
         if (event.button != GLFW_MOUSE_BUTTON_LEFT || event.action != KeyAction::Press) {
             return;
         }
-        if (menuOpen_) {
+        if (debugPanelOpen_) {
+            handleUiAction(ui_.debugActionAt(event.x, event.y));
+        } else if (menuOpen_) {
             handleUiAction(ui_.menuActionAt(event.x, event.y));
         } else if (inventoryOpen_) {
             return;
@@ -215,7 +285,7 @@ void Application::buildPipeline() {
         }
     });
     pipeline_.add(FrameStage::Input, "update physical player", [this](FrameContext& context) {
-        if (!menuOpen_ && !inventoryOpen_) {
+        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
             player_.update(registry_, input_, camera_, context.deltaTime);
         }
     });
@@ -266,7 +336,8 @@ void Application::buildPipeline() {
             renderer_->bloomEnabled(),
             weather_,
             inventory_,
-            inventoryOpen_);
+            inventoryOpen_,
+            debugPanelOpen_);
         ui_.updateTitle(window_, registry_, audio_, context.deltaTime, menuOpen_);
     });
     pipeline_.add(FrameStage::Present, "present frame", [this](FrameContext&) {
@@ -281,9 +352,14 @@ void Application::loadMap() {
 
     const Entity mapEntity = registry_.create();
     const Transform& transform = registry_.emplace<Transform>(mapEntity);
-    registry_.emplace<MeshRenderer>(mapEntity, map);
-    registry_.emplace<TerrainSurface>(mapEntity);
     registry_.emplace<TerrainCollider>(mapEntity, *map, transform);
+    for (auto& [chunk, mesh] : splitTerrain(*map)) {
+        const Entity chunkEntity = registry_.create();
+        registry_.emplace<Transform>(chunkEntity);
+        registry_.emplace<MeshRenderer>(chunkEntity, std::move(mesh));
+        registry_.emplace<TerrainSurface>(chunkEntity);
+        registry_.emplace<TerrainChunk>(chunkEntity, chunk);
+    }
 }
 
 void Application::createWorld() {
@@ -294,17 +370,20 @@ void Application::createWorld() {
         return MeshFactory::cube({0.75F, 0.12F, 0.1F});
     });
     const auto waterMesh = resources_.load<Mesh>("builtin/water", [] {
-        return MeshFactory::gridPlane(320.0F, 160, {0.02F, 0.24F, 0.42F});
+        return MeshFactory::gridPlane(640.0F, 224, {0.02F, 0.24F, 0.42F});
+    });
+    const auto lavaMesh = resources_.load<Mesh>("builtin/lava", [] {
+        return MeshFactory::disc(5.0F, 64, {1.0F, 0.12F, 0.005F});
     });
 
     const std::array<Transform, 8> obstacles = {
-        Transform{{-8.0F, 3.0F, -48.0F}, {}, {2.0F, 6.0F, 2.0F}},
-        Transform{{8.0F, 3.0F, -48.0F}, {}, {2.0F, 6.0F, 2.0F}},
-        Transform{{-8.0F, 3.0F, -36.0F}, {}, {2.0F, 6.0F, 2.0F}},
-        Transform{{8.0F, 3.0F, -36.0F}, {}, {2.0F, 6.0F, 2.0F}},
-        Transform{{0.0F, 2.6F, -42.0F}, {}, {1.2F, 5.2F, 1.2F}},
-        Transform{{45.0F, 2.5F, 10.0F}, {}, {8.0F, 5.0F, 8.0F}},
-        Transform{{-43.0F, 0.35F, 19.0F}, {}, {8.0F, 0.7F, 8.0F}},
+        Transform{{-8.0F, 3.0F, -90.0F}, {}, {2.0F, 6.0F, 2.0F}},
+        Transform{{8.0F, 3.0F, -90.0F}, {}, {2.0F, 6.0F, 2.0F}},
+        Transform{{-8.0F, 3.0F, -78.0F}, {}, {2.0F, 6.0F, 2.0F}},
+        Transform{{8.0F, 3.0F, -78.0F}, {}, {2.0F, 6.0F, 2.0F}},
+        Transform{{0.0F, 2.6F, -84.0F}, {}, {1.2F, 5.2F, 1.2F}},
+        Transform{{91.0F, 2.5F, 18.0F}, {}, {8.0F, 5.0F, 8.0F}},
+        Transform{{-82.0F, 0.35F, 38.0F}, {}, {8.0F, 0.7F, 8.0F}},
         Transform{{0.0F, 0.5F, -27.0F}, {}, {7.0F, 1.0F, 1.5F}},
     };
     for (const Transform& transform : obstacles) {
@@ -317,12 +396,17 @@ void Application::createWorld() {
     const Entity water = registry_.create();
     registry_.emplace<Transform>(water, Transform{{0.0F, -0.45F, 0.0F}});
     registry_.emplace<MeshRenderer>(water, waterMesh);
-    registry_.emplace<WaterSurface>(water, WaterSurface{{160.0F, 160.0F}});
+    registry_.emplace<WaterSurface>(water, WaterSurface{{320.0F, 320.0F}});
 
-    player_.create(registry_, {0.0F, 2.0F, 18.0F});
+    const Entity lava = registry_.create();
+    registry_.emplace<Transform>(lava, Transform{{0.0F, 13.4F, 0.0F}});
+    registry_.emplace<MeshRenderer>(lava, lavaMesh);
+    registry_.emplace<LavaSurface>(lava);
+
+    player_.create(registry_, {-25.0F, 2.0F, 75.0F});
     Enemy::create(registry_, {-14.0F, 1.0F, -22.0F}, enemyMesh);
-    Enemy::create(registry_, {20.0F, 1.0F, -30.0F}, enemyMesh);
-    Enemy::create(registry_, {38.0F, 1.0F, 25.0F}, enemyMesh);
+    Enemy::create(registry_, {45.0F, 3.0F, -45.0F}, enemyMesh);
+    Enemy::create(registry_, {-60.0F, 4.0F, 55.0F}, enemyMesh);
     Enemy::create(registry_, {-35.0F, 1.0F, 12.0F}, enemyMesh);
 }
 
@@ -367,6 +451,37 @@ void Application::handleUiAction(UiAction action) {
     case UiAction::ToggleBloom:
         renderer_->setBloomEnabled(!renderer_->bloomEnabled());
         break;
+    case UiAction::RespawnPlayer:
+        teleportPlayer({-25.0F, 2.0F, 75.0F});
+        break;
+    case UiAction::TeleportVolcano:
+        teleportPlayer({0.0F, 34.0F, 18.0F});
+        break;
+    case UiAction::TeleportNextGrotto: {
+        constexpr std::array grottos = {
+            glm::vec3{-72.0F, 4.0F, -61.0F},
+            glm::vec3{65.0F, 2.0F, 63.0F},
+            glm::vec3{-91.0F, 3.0F, 60.0F},
+        };
+        teleportPlayer(grottos[nextGrotto_ % grottos.size()]);
+        ++nextGrotto_;
+        break;
+    }
+    case UiAction::CycleWeather:
+        if (weather_.weatherName() == "CLEAR") {
+            weather_.setWeather(WeatherType::Cloudy);
+        } else if (weather_.weatherName() == "CLOUDY") {
+            weather_.setWeather(WeatherType::Storm);
+        } else {
+            weather_.setWeather(WeatherType::Clear);
+        }
+        break;
+    case UiAction::SetNoon:
+        weather_.setDayProgress(0.5F);
+        break;
+    case UiAction::SetNight:
+        weather_.setDayProgress(0.0F);
+        break;
     case UiAction::Quit:
         glfwSetWindowShouldClose(window_, GLFW_TRUE);
         break;
@@ -379,6 +494,7 @@ void Application::toggleMenu() {
     menuOpen_ = !menuOpen_;
     if (menuOpen_) {
         inventoryOpen_ = false;
+        debugPanelOpen_ = false;
     }
     input_.setCursorCaptured(!menuOpen_ && !inventoryOpen_);
     updateCursorMode();
@@ -386,8 +502,30 @@ void Application::toggleMenu() {
 
 void Application::toggleInventory() {
     inventoryOpen_ = !inventoryOpen_;
+    if (inventoryOpen_) {
+        debugPanelOpen_ = false;
+    }
     input_.setCursorCaptured(!inventoryOpen_);
     updateCursorMode();
+}
+
+void Application::toggleDebugPanel() {
+    debugPanelOpen_ = !debugPanelOpen_;
+    if (debugPanelOpen_) {
+        menuOpen_ = false;
+        inventoryOpen_ = false;
+    }
+    input_.setCursorCaptured(!debugPanelOpen_);
+    updateCursorMode();
+}
+
+void Application::teleportPlayer(glm::vec3 position) {
+    if (!registry_.alive(player_.entity())) {
+        return;
+    }
+    registry_.get<Transform>(player_.entity()).position = position;
+    registry_.get<RigidBody>(player_.entity()) = RigidBody{};
+    player_.syncCamera(registry_, camera_);
 }
 
 void Application::useSelectedTool() {
@@ -453,7 +591,7 @@ void Application::toggleFullscreen() {
 }
 
 void Application::updateCursorMode() {
-    if (menuOpen_ || inventoryOpen_) {
+    if (menuOpen_ || inventoryOpen_ || debugPanelOpen_) {
         input_.setCursorCaptured(false);
     }
     if (cursorCaptured_ == input_.cursorCaptured()) {

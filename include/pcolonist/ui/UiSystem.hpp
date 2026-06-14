@@ -18,6 +18,12 @@ enum class UiAction {
     CycleFrameLimit,
     ToggleShadows,
     ToggleBloom,
+    RespawnPlayer,
+    TeleportVolcano,
+    TeleportNextGrotto,
+    CycleWeather,
+    SetNoon,
+    SetNight,
     Quit,
 };
 
@@ -45,7 +51,8 @@ public:
         bool bloom,
         const WeatherSystem& weather,
         const Inventory& inventory,
-        bool inventoryOpen);
+        bool inventoryOpen,
+        bool debugPanelOpen);
     void updateTitle(
         GLFWwindow* window,
         const Registry& registry,
@@ -54,6 +61,7 @@ public:
         bool menuOpen);
     [[nodiscard]] bool fullscreenButtonContains(double x, double y) const;
     [[nodiscard]] UiAction menuActionAt(double x, double y) const;
+    [[nodiscard]] UiAction debugActionAt(double x, double y) const;
 
 private:
     void rectangle(float x, float y, float width, float height, const glm::vec4& color, float radius = 0.0F);

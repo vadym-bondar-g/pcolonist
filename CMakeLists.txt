@@ -74,19 +74,17 @@ target_link_libraries(pcolonist PRIVATE glfw glad_gl_core_33 glm::glm PNG::PNG T
 target_compile_features(pcolonist PRIVATE cxx_std_20)
 set_target_properties(pcolonist PROPERTIES CXX_EXTENSIONS OFF)
 
-set(PCOLONIST_RUNTIME_ASSET_DIR "${CMAKE_CURRENT_BINARY_DIR}/assets")
 target_compile_definitions(pcolonist PRIVATE
-    PCOLONIST_ASSET_DIR="${PCOLONIST_RUNTIME_ASSET_DIR}"
+    PCOLONIST_ASSET_DIR="assets"
 )
 
-add_custom_target(copy_assets ALL
+add_custom_command(TARGET pcolonist POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/assets"
-        "${PCOLONIST_RUNTIME_ASSET_DIR}"
+        "$<TARGET_FILE_DIR:pcolonist>/assets"
     COMMENT "Copying runtime assets"
     VERBATIM
 )
-add_dependencies(pcolonist copy_assets)
 
 set(PCOLONIST_SHADER_PROGRAMS
     basic

@@ -1,14 +1,22 @@
-#
-## Alias OBJ Material File
-# Exported from SketchUp, (c) 2000-2012 Trimble Navigation Limited
+# Blender 5.1.2 MTL File: 'None'
+# www.blender.org
 
 newmtl Light_Wood
-Ka 0.000000 0.000000 0.000000
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
 Kd 0.937255 0.764706 0.501961
 Ks 0.330000 0.330000 0.330000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
 
 newmtl Wood
-Ka 0.000000 0.000000 0.000000
+Ns 0.000000
+Ka 1.000000 1.000000 1.000000
 Kd 0.666667 0.545098 0.356863
 Ks 0.330000 0.330000 0.330000
-
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2

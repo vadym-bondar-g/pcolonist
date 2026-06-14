@@ -1,4 +1,7 @@
 # Minimal engine script.
 gravity 0 -9.81 0
+# Static invisible collision volumes can build walkable arches and interiors.
+# spawn_collider px py pz halfX halfY halfZ
+# Press ~ in game to open the developer testing panel.
 spawn_body 0 8 0 1 0 0
 spawn_body 3 12 -2 -1 0 0

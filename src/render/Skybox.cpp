@@ -23,7 +23,7 @@ void Skybox::render(Shader& shader, const Camera& camera, const WeatherSystem& w
     glDepthMask(GL_FALSE);
     glDisable(GL_DEPTH_TEST);
 
-    const glm::mat4 projection = glm::perspective(glm::radians(70.0F), aspectRatio, 0.1F, 250.0F);
+    const glm::mat4 projection = glm::perspective(glm::radians(70.0F), aspectRatio, 0.1F, 520.0F);
     const glm::mat4 rotationView = glm::mat4(glm::mat3(camera.viewMatrix()));
     shader.use();
     shader.setMat4("inverseProjection", glm::inverse(projection));

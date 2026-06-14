@@ -13,12 +13,23 @@ uniform float cloudiness;
 uniform int bloomEnabled;
 uniform int underwater;
 
+const float cameraNear = 0.1;
+const float cameraFar = 520.0;
+
 float luminance(vec3 color) {
     return dot(color, vec3(0.2126, 0.7152, 0.0722));
 }
 
+float linearDepth(float depth) {
+    float ndc = depth * 2.0 - 1.0;
+    return (2.0 * cameraNear * cameraFar)
+        / (cameraFar + cameraNear - ndc * (cameraFar - cameraNear));
+}
+
 vec3 bright(vec3 color) {
-    return color * smoothstep(0.82, 2.4, luminance(color));
+    float brightness = luminance(color);
+    float contribution = smoothstep(0.95, 2.8, brightness);
+    return color * contribution * contribution;
 }
 
 vec3 fxaa(vec2 uv, vec2 texel) {
@@ -83,25 +94,31 @@ float lightningFlash() {
 }
 
 float screenSpaceOcclusion(vec2 uv, vec2 texel) {
-    float center = texture(sceneDepth, uv).r;
-    if (center >= 0.9999) {
+    float rawCenter = texture(sceneDepth, uv).r;
+    if (rawCenter >= 0.9999) {
         return 1.0;
     }
+    float center = linearDepth(rawCenter);
     float occlusion = 0.0;
-    for (int x = -2; x <= 2; ++x) {
-        for (int y = -2; y <= 2; ++y) {
-            if (x == 0 && y == 0) {
-                continue;
-            }
-            float sampleDepth = texture(sceneDepth, uv + vec2(x, y) * texel * 2.0).r;
-            occlusion += smoothstep(0.0002, 0.004, center - sampleDepth);
-        }
+    const vec2 directions[12] = vec2[12](
+        vec2(1.0, 0.0), vec2(0.866, 0.5), vec2(0.5, 0.866),
+        vec2(0.0, 1.0), vec2(-0.5, 0.866), vec2(-0.866, 0.5),
+        vec2(-1.0, 0.0), vec2(-0.866, -0.5), vec2(-0.5, -0.866),
+        vec2(0.0, -1.0), vec2(0.5, -0.866), vec2(0.866, -0.5)
+    );
+    float radius = mix(2.0, 7.0, smoothstep(5.0, 100.0, center));
+    for (int index = 0; index < 12; ++index) {
+        float sampleDepth = linearDepth(texture(sceneDepth, uv + directions[index] * texel * radius).r);
+        float depthDifference = center - sampleDepth;
+        float rangeWeight = 1.0 - smoothstep(0.2, 4.5, abs(depthDifference));
+        occlusion += smoothstep(0.08, 1.4, depthDifference) * rangeWeight;
     }
-    return 1.0 - occlusion / 24.0 * 0.42;
+    float distanceFade = 1.0 - smoothstep(55.0, 180.0, center);
+    return 1.0 - occlusion / 12.0 * 0.5 * distanceFade;
 }
 
 vec3 multiScaleBloom(vec2 uv, vec2 texel) {
-    vec3 bloom = bright(texture(hdrScene, uv).rgb) * 0.18;
+    vec3 bloom = bright(texture(hdrScene, uv).rgb) * 0.14;
     const vec2 directions[4] = vec2[4](
         vec2(1.0, 0.0),
         vec2(0.0, 1.0),
@@ -110,10 +127,10 @@ vec3 multiScaleBloom(vec2 uv, vec2 texel) {
     );
     for (int directionIndex = 0; directionIndex < 4; ++directionIndex) {
         vec2 direction = directions[directionIndex] * texel;
-        bloom += bright(texture(hdrScene, uv + direction * 2.0).rgb) * 0.09;
-        bloom += bright(texture(hdrScene, uv - direction * 2.0).rgb) * 0.09;
-        bloom += bright(texture(hdrScene, uv + direction * 6.0).rgb) * 0.045;
-        bloom += bright(texture(hdrScene, uv - direction * 6.0).rgb) * 0.045;
+        bloom += bright(texture(hdrScene, uv + direction * 2.0).rgb) * 0.075;
+        bloom += bright(texture(hdrScene, uv - direction * 2.0).rgb) * 0.075;
+        bloom += bright(texture(hdrScene, uv + direction * 7.0).rgb) * 0.04;
+        bloom += bright(texture(hdrScene, uv - direction * 7.0).rgb) * 0.04;
     }
     return bloom;
 }
@@ -132,15 +149,18 @@ void main() {
         + texture(hdrScene, uv + vec2(0.0, texel.y)).rgb
         + texture(hdrScene, uv - vec2(0.0, texel.y)).rgb
     ) * 0.25;
-    color += (color - localBlur) * 0.11;
+    float rawDepth = texture(sceneDepth, uv).r;
+    float viewDepth = rawDepth < 0.9999 ? linearDepth(rawDepth) : cameraFar;
+    float geometryMask = 1.0 - smoothstep(0.9992, 0.99995, rawDepth);
+    float detailFade = 1.0 - smoothstep(45.0, 210.0, viewDepth);
+    color += (color - localBlur) * 0.14 * detailFade * geometryMask;
     color *= screenSpaceOcclusion(uv, texel);
     if (bloomEnabled != 0) {
-        color += multiScaleBloom(uv, texel) * 0.42;
+        color += multiScaleBloom(uv, texel) * 0.46;
     }
 
-    float sceneDepthValue = texture(sceneDepth, uv).r;
-    float aerialPerspective = sceneDepthValue < 0.9999
-        ? smoothstep(0.982, 0.9997, sceneDepthValue) * (0.06 + cloudiness * 0.12)
+    float aerialPerspective = rawDepth < 0.9999
+        ? smoothstep(75.0, 430.0, viewDepth) * (0.08 + cloudiness * 0.17)
         : 0.0;
     vec3 aerialColor = mix(vec3(0.12, 0.18, 0.28), vec3(0.42, 0.58, 0.72), daylight);
     color = mix(color, aerialColor, aerialPerspective);
