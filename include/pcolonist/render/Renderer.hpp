@@ -5,6 +5,7 @@
 
 #include <glm/mat4x4.hpp>
 
+#include <array>
 #include <cstddef>
 #include <filesystem>
 #include <unordered_map>
@@ -36,6 +37,7 @@ private:
         unsigned int vertexArray = 0;
         unsigned int vertexBuffer = 0;
         unsigned int indexBuffer = 0;
+        unsigned int instanceBuffer = 0;
         std::size_t indexCount = 0;
     };
 
@@ -54,10 +56,10 @@ private:
     unsigned int hdrFramebuffer_ = 0;
     unsigned int hdrColor_ = 0;
     unsigned int hdrDepth_ = 0;
-    unsigned int shadowFramebuffer_ = 0;
-    unsigned int shadowDepth_ = 0;
+    std::array<unsigned int, 2> shadowFramebuffers_{};
+    std::array<unsigned int, 2> shadowDepths_{};
     unsigned int screenVertexArray_ = 0;
-    glm::mat4 lightSpaceMatrix_{1.0F};
+    std::array<glm::mat4, 2> lightSpaceMatrices_{glm::mat4{1.0F}, glm::mat4{1.0F}};
     int width_ = 1280;
     int height_ = 720;
     bool shadowsEnabled_ = true;

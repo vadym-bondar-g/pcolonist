@@ -10,6 +10,7 @@ class MeshFactory {
 public:
     static Mesh cube(glm::vec3 color);
     static Mesh plane(float size, glm::vec3 color);
+    static Mesh gridPlane(float size, std::size_t subdivisions, glm::vec3 color);
 };
 
 } // namespace pcolonist

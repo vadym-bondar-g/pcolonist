@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 project(pcolonist VERSION 0.1.0 LANGUAGES C CXX)
 
+include(CTest)
 include(FetchContent)
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build GLFW documentation")
@@ -47,9 +48,12 @@ add_executable(pcolonist
     src/core/FramePipeline.cpp
     src/core/JobSystem.cpp
     src/gameplay/Enemy.cpp
+    src/gameplay/Inventory.cpp
     src/gameplay/Player.cpp
     src/memory/FrameArena.cpp
     src/physics/PhysicsSystem.cpp
+    src/physics/StaticColliderGrid.cpp
+    src/physics/TerrainCollider.cpp
     src/platform/Input.cpp
     src/render/Camera.cpp
     src/render/MeshFactory.cpp
@@ -62,6 +66,7 @@ add_executable(pcolonist
     src/serialization/SceneSerializer.cpp
     src/ui/UiSystem.cpp
     src/world/WeatherSystem.cpp
+    src/world/WaterWaves.cpp
 )
 
 target_include_directories(pcolonist PRIVATE include)
@@ -130,4 +135,34 @@ if(MSVC)
     target_compile_options(pcolonist PRIVATE /W4 /permissive-)
 else()
     target_compile_options(pcolonist PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+if(BUILD_TESTING)
+    add_executable(pcolonist_tests
+        tests/AssetSystemTests.cpp
+        tests/ObjLoaderTests.cpp
+        tests/InventoryTests.cpp
+        tests/TerrainColliderTests.cpp
+        tests/WorldSystemTests.cpp
+        src/assets/Assets.cpp
+        src/assets/ObjLoader.cpp
+        src/gameplay/Inventory.cpp
+        src/physics/PhysicsSystem.cpp
+        src/physics/StaticColliderGrid.cpp
+        src/physics/TerrainCollider.cpp
+        src/world/WaterWaves.cpp
+        src/world/WeatherSystem.cpp
+    )
+    target_include_directories(pcolonist_tests PRIVATE include)
+    target_link_libraries(pcolonist_tests PRIVATE glm::glm)
+    target_compile_features(pcolonist_tests PRIVATE cxx_std_20)
+    set_target_properties(pcolonist_tests PROPERTIES CXX_EXTENSIONS OFF)
+
+    if(MSVC)
+        target_compile_options(pcolonist_tests PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(pcolonist_tests PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+
+    add_test(NAME core_systems COMMAND pcolonist_tests)
 endif()

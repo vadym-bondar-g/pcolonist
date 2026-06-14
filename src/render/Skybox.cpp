@@ -28,6 +28,7 @@ void Skybox::render(Shader& shader, const Camera& camera, const WeatherSystem& w
     shader.use();
     shader.setMat4("inverseProjection", glm::inverse(projection));
     shader.setMat4("inverseView", glm::inverse(rotationView));
+    shader.setVec3("cameraPosition", camera.position());
     shader.setVec3("horizonColor", weather.horizonColor());
     shader.setVec3("zenithColor", weather.skyColor());
     shader.setVec3("sunDirection", weather.sunDirection());

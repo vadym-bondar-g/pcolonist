@@ -2,6 +2,7 @@
 
 #include "pcolonist/audio/AudioSystem.hpp"
 #include "pcolonist/ecs/Registry.hpp"
+#include "pcolonist/gameplay/Inventory.hpp"
 #include "pcolonist/world/WeatherSystem.hpp"
 
 #include <glad/gl.h>
@@ -117,7 +118,9 @@ void UiSystem::render(
     int frameLimit,
     bool shadows,
     bool bloom,
-    const WeatherSystem& weather) {
+    const WeatherSystem& weather,
+    const Inventory& inventory,
+    bool inventoryOpen) {
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -151,7 +154,8 @@ void UiSystem::render(
     std::ostringstream clock;
     clock << std::setfill('0') << std::setw(2) << hours << ':' << std::setw(2) << minutes;
     text(timePanelX + 34.0F, 31.0F, clock.str(), 3.0F, textPrimary);
-    statusPill(timePanelX + 145.0F, 35.0F, weather.daylight() > 0.2F ? "DAY" : "NIGHT", weather.daylight() > 0.2F ? amber : cyan);
+    const std::string dayLabel = "DAY " + std::to_string(weather.dayNumber());
+    statusPill(timePanelX + 145.0F, 35.0F, dayLabel, weather.daylight() > 0.2F ? amber : cyan);
     statusPill(timePanelX + 230.0F, 35.0F, weather.weatherName(), cyan);
 
     const float centerX = static_cast<float>(width_) * 0.5F;
@@ -161,6 +165,24 @@ void UiSystem::render(
     rectangle(centerX - 13.0F, centerY - 1.0F, 7.0F, 2.0F, {0.85F, 0.95F, 1.0F, 0.82F}, 1.0F);
     rectangle(centerX + 6.0F, centerY - 1.0F, 7.0F, 2.0F, {0.85F, 0.95F, 1.0F, 0.82F}, 1.0F);
     rectangle(centerX - 1.5F, centerY - 1.5F, 3.0F, 3.0F, cyan, 1.5F);
+
+    constexpr float slotSize = 62.0F;
+    constexpr float slotGap = 8.0F;
+    constexpr float hotbarWidth = slotSize * static_cast<float>(Inventory::hotbarSize)
+        + slotGap * static_cast<float>(Inventory::hotbarSize - 1);
+    const float hotbarX = centerX - hotbarWidth * 0.5F;
+    const float hotbarY = static_cast<float>(height_) - 82.0F;
+    for (std::size_t slot = 0; slot < Inventory::hotbarSize; ++slot) {
+        const float x = hotbarX + static_cast<float>(slot) * (slotSize + slotGap);
+        const bool selected = inventory.selectedSlot() == slot;
+        rectangle(x + 2.0F, hotbarY + 3.0F, slotSize, slotSize, {0.0F, 0.0F, 0.0F, 0.32F}, 10.0F);
+        rectangle(x, hotbarY, slotSize, slotSize, selected ? amber : border, 10.0F);
+        rectangle(x + 2.0F, hotbarY + 2.0F, slotSize - 4.0F, slotSize - 4.0F, panelRaised, 8.0F);
+        text(x + 7.0F, hotbarY + 6.0F, std::to_string(slot + 1), 1.5F, selected ? amber : textMuted);
+        if (!inventory.toolName(slot).empty()) {
+            text(x + 14.0F, hotbarY + 34.0F, inventory.toolName(slot), 1.5F, textPrimary);
+        }
+    }
 
     const float fullscreenX = static_cast<float>(width_ - 72);
     const bool fullscreenHovered = !cursorCaptured && contains(pointerX_, pointerY_, fullscreenX, 18.0F, 54.0F, 44.0F);
@@ -177,6 +199,31 @@ void UiSystem::render(
         card(18.0F, 18.0F, 216.0F, 40.0F, 10.0F);
         rectangle(31.0F, 32.0F, 8.0F, 8.0F, cyan, 4.0F);
         text(51.0F, 30.0F, "F1 CAPTURE CURSOR", 1.5F, textPrimary);
+    }
+
+    if (inventoryOpen) {
+        rectangle(0.0F, 0.0F, static_cast<float>(width_), static_cast<float>(height_), {0.005F, 0.009F, 0.016F, 0.62F});
+        const float left = centerX - 310.0F;
+        const float top = centerY - 220.0F;
+        rectangle(left + 8.0F, top + 10.0F, 620.0F, 440.0F, {0.0F, 0.0F, 0.0F, 0.4F}, 18.0F);
+        rectangle(left, top, 620.0F, 440.0F, border, 18.0F);
+        rectangle(left + 2.0F, top + 2.0F, 616.0F, 436.0F, panel, 16.0F);
+        text(left + 30.0F, top + 28.0F, "INVENTORY", 3.0F, textPrimary);
+        text(left + 420.0F, top + 34.0F, "TAB CLOSE", 1.5F, textMuted);
+        rectangle(left + 30.0F, top + 76.0F, 560.0F, 1.0F, border);
+        text(left + 34.0F, top + 105.0F, "RESOURCES", 1.5F, cyan);
+        text(left + 34.0F, top + 138.0F, "WOOD", 2.0F, textPrimary);
+        text(left + 180.0F, top + 138.0F, std::to_string(inventory.wood()), 2.0F, amber);
+        text(left + 34.0F, top + 205.0F, "TOOLS", 1.5F, cyan);
+        for (std::size_t slot = 0; slot < Inventory::hotbarSize; ++slot) {
+            const float x = left + 34.0F + static_cast<float>(slot) * 106.0F;
+            rectangle(x, top + 240.0F, 88.0F, 88.0F, inventory.selectedSlot() == slot ? amber : border, 10.0F);
+            rectangle(x + 2.0F, top + 242.0F, 84.0F, 84.0F, panelRaised, 8.0F);
+            text(x + 10.0F, top + 251.0F, std::to_string(slot + 1), 1.5F, textMuted);
+            if (!inventory.toolName(slot).empty()) {
+                text(x + 22.0F, top + 288.0F, inventory.toolName(slot), 1.5F, textPrimary);
+            }
+        }
     }
 
     if (menuOpen) {

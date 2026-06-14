@@ -20,6 +20,7 @@ public:
 
     [[nodiscard]] glm::mat4 viewMatrix() const;
     [[nodiscard]] const glm::vec3& position() const;
+    [[nodiscard]] const glm::vec3& front() const;
     [[nodiscard]] glm::vec3 horizontalFront() const;
     [[nodiscard]] glm::vec3 horizontalRight() const;
 

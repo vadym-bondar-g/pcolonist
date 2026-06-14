@@ -21,6 +21,9 @@ struct MeshDraw {
     std::size_t firstIndex = 0;
     std::size_t indexCount = 0;
     std::filesystem::path diffuseTexture;
+    float roughness = 0.72F;
+    float specularStrength = 0.2F;
+    glm::vec3 emissive{0.0F};
 };
 
 struct Mesh {

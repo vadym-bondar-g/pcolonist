@@ -6,7 +6,9 @@
 #include <glm/geometric.hpp>
 #include <glm/vec2.hpp>
 
+#include <algorithm>
 #include <charconv>
+#include <cmath>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -83,6 +85,9 @@ glm::vec3 colorFromPosition(const glm::vec3& position) {
 struct ObjMaterial {
     glm::vec3 color{1.0F};
     std::filesystem::path diffuseTexture;
+    float roughness = 0.72F;
+    float specularStrength = 0.2F;
+    glm::vec3 emissive{0.0F};
 };
 
 std::unordered_map<std::string, ObjMaterial> loadMaterials(
@@ -104,6 +109,27 @@ std::unordered_map<std::string, ObjMaterial> loadMaterials(
             glm::vec3 color;
             if (row >> color.r >> color.g >> color.b) {
                 materials[current].color = glm::clamp(color, 0.0F, 1.0F);
+            }
+        } else if (command == "Ks" && !current.empty()) {
+            glm::vec3 specular;
+            if (row >> specular.r >> specular.g >> specular.b) {
+                materials[current].specularStrength = glm::clamp(
+                    (specular.r + specular.g + specular.b) / 3.0F,
+                    0.0F,
+                    1.0F);
+            }
+        } else if (command == "Ns" && !current.empty()) {
+            float shininess = 0.0F;
+            if (row >> shininess) {
+                materials[current].roughness = glm::clamp(
+                    std::sqrt(2.0F / (std::max(shininess, 0.0F) + 2.0F)),
+                    0.04F,
+                    1.0F);
+            }
+        } else if (command == "Ke" && !current.empty()) {
+            glm::vec3 emissive;
+            if (row >> emissive.r >> emissive.g >> emissive.b) {
+                materials[current].emissive = glm::max(emissive, glm::vec3{0.0F});
             }
         } else if (command == "map_Kd" && !current.empty()) {
             std::string texture;
@@ -132,6 +158,9 @@ Mesh ObjLoader::load(const AssetSystem& assets, const std::filesystem::path& rel
     std::vector<glm::vec3> normals;
     std::vector<glm::vec3> materialColors{glm::vec3{1.0F}};
     std::vector<std::filesystem::path> materialTextures(1);
+    std::vector<float> materialRoughness{0.72F};
+    std::vector<float> materialSpecularStrength{0.2F};
+    std::vector<glm::vec3> materialEmissive{glm::vec3{0.0F}};
     std::vector<std::vector<std::uint32_t>> materialDrawIndices(1);
     std::unordered_map<std::string, std::uint32_t> materialLookup;
     std::vector<bool> explicitNormals;
@@ -171,6 +200,9 @@ Mesh ObjLoader::load(const AssetSystem& assets, const std::filesystem::path& rel
                     materialLookup[name] = index;
                     materialColors.push_back(material.color);
                     materialTextures.push_back(material.diffuseTexture);
+                    materialRoughness.push_back(material.roughness);
+                    materialSpecularStrength.push_back(material.specularStrength);
+                    materialEmissive.push_back(material.emissive);
                     materialDrawIndices.emplace_back();
                 }
             }
@@ -257,7 +289,14 @@ Mesh ObjLoader::load(const AssetSystem& assets, const std::filesystem::path& rel
         if (indices.empty()) {
             continue;
         }
-        mesh.draws.push_back({mesh.indices.size(), indices.size(), materialTextures[material]});
+        mesh.draws.push_back({
+            mesh.indices.size(),
+            indices.size(),
+            materialTextures[material],
+            materialRoughness[material],
+            materialSpecularStrength[material],
+            materialEmissive[material],
+        });
         mesh.indices.insert(mesh.indices.end(), indices.begin(), indices.end());
     }
     return mesh;

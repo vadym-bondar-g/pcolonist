@@ -2,10 +2,13 @@
 
 #include "pcolonist/ecs/Components.hpp"
 #include "pcolonist/ecs/Registry.hpp"
+#include "pcolonist/world/WaterWaves.hpp"
 
 #include <glm/common.hpp>
+#include <glm/geometric.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <optional>
@@ -14,73 +17,83 @@ namespace pcolonist {
 
 namespace {
 
-std::optional<float> triangleHeight(
-    glm::vec2 point,
-    const glm::vec3& a,
-    const glm::vec3& b,
-    const glm::vec3& c) {
-    const glm::vec2 ab{b.x - a.x, b.z - a.z};
-    const glm::vec2 ac{c.x - a.x, c.z - a.z};
-    const glm::vec2 ap{point.x - a.x, point.y - a.z};
-    const float denominator = ab.x * ac.y - ac.x * ab.y;
-    if (std::abs(denominator) < 0.00001F) {
-        return std::nullopt;
-    }
-    const float u = (ap.x * ac.y - ac.x * ap.y) / denominator;
-    const float v = (ab.x * ap.y - ap.x * ab.y) / denominator;
-    if (u < -0.001F || v < -0.001F || u + v > 1.001F) {
-        return std::nullopt;
-    }
-    return a.y + (b.y - a.y) * u + (c.y - a.y) * v;
-}
-
-std::optional<float> terrainHeight(Registry& registry, glm::vec2 point, float maximumHeight) {
-    std::optional<float> result;
-    registry.each<Transform, MeshRenderer, TerrainSurface>(
-        [&result, point, maximumHeight](Entity, const Transform& transform, const MeshRenderer& renderer, const TerrainSurface&) {
-            if (!renderer.mesh) {
-                return;
-            }
-            const Mesh& mesh = *renderer.mesh;
-            for (std::size_t index = 0; index + 2 < mesh.indices.size(); index += 3) {
-                const auto worldPosition = [&transform](const glm::vec3& local) {
-                    return transform.position + local * transform.scale;
-                };
-                const glm::vec3 a = worldPosition(mesh.vertices[mesh.indices[index]].position);
-                const glm::vec3 b = worldPosition(mesh.vertices[mesh.indices[index + 1]].position);
-                const glm::vec3 c = worldPosition(mesh.vertices[mesh.indices[index + 2]].position);
-                if (const auto height = triangleHeight(point, a, b, c);
-                    height && *height <= maximumHeight && (!result || *height > *result)) {
-                    result = *height;
-                }
+std::optional<TerrainHit> terrainSurface(Registry& registry, glm::vec2 point, float maximumHeight) {
+    std::optional<TerrainHit> result;
+    registry.each<TerrainCollider>(
+        [&result, point, maximumHeight](Entity, const TerrainCollider& collider) {
+            if (const auto hit = collider.surfaceAt(point, maximumHeight);
+                hit && (!result || hit->height > result->height)) {
+                result = hit;
             }
         });
     return result;
 }
 
-std::optional<float> waterLevel(Registry& registry, glm::vec2 point) {
-    std::optional<float> result;
-    registry.each<Transform, MeshRenderer, WaterSurface>(
-        [&result, point](Entity, const Transform& transform, const MeshRenderer& renderer, const WaterSurface&) {
-            if (!renderer.mesh || renderer.mesh->vertices.empty()) {
-                return;
-            }
-            float minimumX = std::numeric_limits<float>::max();
-            float maximumX = std::numeric_limits<float>::lowest();
-            float minimumZ = std::numeric_limits<float>::max();
-            float maximumZ = std::numeric_limits<float>::lowest();
-            for (const Vertex& vertex : renderer.mesh->vertices) {
-                const glm::vec3 world = transform.position + vertex.position * transform.scale;
-                minimumX = std::min(minimumX, world.x);
-                maximumX = std::max(maximumX, world.x);
-                minimumZ = std::min(minimumZ, world.z);
-                maximumZ = std::max(maximumZ, world.z);
-            }
-            if (point.x >= minimumX && point.x <= maximumX && point.y >= minimumZ && point.y <= maximumZ) {
-                result = transform.position.y;
+struct WaterHit {
+    float level = 0.0F;
+    WaterWaveSample wave;
+};
+
+std::optional<WaterHit> waterSurface(Registry& registry, glm::vec2 point, float time) {
+    std::optional<WaterHit> result;
+    registry.each<Transform, WaterSurface>(
+        [&result, point, time](Entity, const Transform& transform, const WaterSurface& surface) {
+            const glm::vec2 half = surface.halfExtents * glm::vec2{transform.scale.x, transform.scale.z};
+            if (std::abs(point.x - transform.position.x) <= half.x
+                && std::abs(point.y - transform.position.z) <= half.y) {
+                const WaterWaveSample wave = WaterWaves::sample(point, time);
+                result = WaterHit{transform.position.y + wave.height, wave};
             }
         });
     return result;
+}
+
+std::optional<float> horizontalSweep(
+    glm::vec3 start,
+    glm::vec3 end,
+    glm::vec3 half,
+    const StaticBox& obstacle) {
+    const float bodyBottom = std::min(start.y, end.y) - half.y;
+    const float bodyTop = std::max(start.y, end.y) + half.y;
+    if (bodyTop <= obstacle.center.y - obstacle.halfExtents.y
+        || bodyBottom >= obstacle.center.y + obstacle.halfExtents.y) {
+        return std::nullopt;
+    }
+
+    const glm::vec2 expandedHalf{
+        obstacle.halfExtents.x + half.x,
+        obstacle.halfExtents.z + half.z,
+    };
+    const glm::vec2 minimum{obstacle.center.x - expandedHalf.x, obstacle.center.z - expandedHalf.y};
+    const glm::vec2 maximum{obstacle.center.x + expandedHalf.x, obstacle.center.z + expandedHalf.y};
+    const glm::vec2 origin{start.x, start.z};
+    const glm::vec2 movement{end.x - start.x, end.z - start.z};
+    if (origin.x > minimum.x && origin.x < maximum.x
+        && origin.y > minimum.y && origin.y < maximum.y) {
+        return std::nullopt;
+    }
+
+    float entry = 0.0F;
+    float exit = 1.0F;
+    for (int axis = 0; axis < 2; ++axis) {
+        if (std::abs(movement[axis]) < 0.000001F) {
+            if (origin[axis] < minimum[axis] || origin[axis] > maximum[axis]) {
+                return std::nullopt;
+            }
+            continue;
+        }
+        float near = (minimum[axis] - origin[axis]) / movement[axis];
+        float far = (maximum[axis] - origin[axis]) / movement[axis];
+        if (near > far) {
+            std::swap(near, far);
+        }
+        entry = std::max(entry, near);
+        exit = std::min(exit, far);
+        if (entry > exit) {
+            return std::nullopt;
+        }
+    }
+    return entry >= 0.0F && entry <= 1.0F ? std::optional<float>{entry} : std::nullopt;
 }
 
 } // namespace
@@ -92,11 +105,14 @@ void PhysicsSystem::update(Registry& registry, float deltaTime) const {
                 return;
             }
             const glm::vec3 half = collider.halfExtents * transform.scale;
-            const std::optional<float> water = waterLevel(registry, {transform.position.x, transform.position.z});
+            const std::optional<WaterHit> water = waterSurface(
+                registry,
+                {transform.position.x, transform.position.z},
+                time_);
             const float bottom = transform.position.y - half.y;
             const float top = transform.position.y + half.y;
             const float submerged = water
-                ? glm::clamp((*water - bottom) / std::max(top - bottom, 0.001F), 0.0F, 1.0F)
+                ? glm::clamp((water->level - bottom) / std::max(top - bottom, 0.001F), 0.0F, 1.0F)
                 : 0.0F;
             body.inWater = submerged > 0.05F;
             if (body.useGravity) {
@@ -106,32 +122,88 @@ void PhysicsSystem::update(Registry& registry, float deltaTime) const {
                 const float damping = std::exp(-2.2F * submerged * deltaTime);
                 body.velocity *= damping;
                 body.velocity.y += submerged * 2.2F * deltaTime;
+                body.velocity.y += water->wave.verticalVelocity * submerged * 0.65F * deltaTime;
+                body.velocity.x += water->wave.horizontalVelocity.x * submerged * 0.35F * deltaTime;
+                body.velocity.z += water->wave.horizontalVelocity.y * submerged * 0.35F * deltaTime;
             }
+            const bool wasGrounded = body.grounded;
+            const glm::vec3 previousPosition = transform.position;
             transform.position += body.velocity * deltaTime;
 
             const float lowestPoint = transform.position.y - half.y;
-            const std::optional<float> terrain = terrainHeight(
-                registry,
-                {transform.position.x, transform.position.z},
-                lowestPoint + 0.8F);
-            if (terrain && lowestPoint < *terrain) {
-                transform.position.y += *terrain - lowestPoint;
-                body.velocity.y = 0.0F;
+            const float previousLowestPoint = previousPosition.y - half.y;
+            const float sweepTop = std::max(previousLowestPoint, lowestPoint) + 0.8F;
+            const std::array<glm::vec2, 5> samples = {
+                glm::vec2{0.0F, 0.0F},
+                glm::vec2{-half.x * 0.75F, -half.z * 0.75F},
+                glm::vec2{half.x * 0.75F, -half.z * 0.75F},
+                glm::vec2{-half.x * 0.75F, half.z * 0.75F},
+                glm::vec2{half.x * 0.75F, half.z * 0.75F},
+            };
+            std::optional<TerrainHit> terrain;
+            for (const glm::vec2 offset : samples) {
+                const auto hit = terrainSurface(
+                    registry,
+                    {transform.position.x + offset.x, transform.position.z + offset.y},
+                    sweepTop);
+                if (hit && (!terrain || hit->height > terrain->height)) {
+                    terrain = hit;
+                }
+            }
+            constexpr float maximumWalkSlope = 0.62F;
+            constexpr float groundSnapDistance = 0.28F;
+            const bool penetratingTerrain = terrain && lowestPoint < terrain->height;
+            const bool snapToTerrain = terrain
+                && wasGrounded
+                && body.velocity.y <= 0.0F
+                && lowestPoint - terrain->height <= groundSnapDistance;
+            if ((penetratingTerrain || snapToTerrain) && terrain->normal.y >= maximumWalkSlope) {
+                transform.position.y += terrain->height - lowestPoint;
+                body.velocity -= terrain->normal * std::min(glm::dot(body.velocity, terrain->normal), 0.0F);
                 body.grounded = true;
+                body.groundNormal = terrain->normal;
             } else {
                 body.grounded = false;
+                body.groundNormal = {0.0F, 1.0F, 0.0F};
+                if (penetratingTerrain) {
+                    const glm::vec3 downhill = glm::normalize(glm::vec3{
+                        terrain->normal.x,
+                        -std::sqrt(terrain->normal.x * terrain->normal.x + terrain->normal.z * terrain->normal.z),
+                        terrain->normal.z,
+                    });
+                    body.velocity += downhill * 5.0F * deltaTime;
+                    transform.position.x = previousPosition.x;
+                    transform.position.z = previousPosition.z;
+                }
             }
 
-            registry.each<Transform, BoxCollider>(
-                [entity, &transform, &body, half](Entity other, const Transform& obstacle, const BoxCollider& otherCollider) {
-                    if (other == entity || !otherCollider.isStatic) {
-                        return;
-                    }
-                    const glm::vec3 otherHalf = otherCollider.halfExtents * obstacle.scale;
-                    const glm::vec3 delta = transform.position - obstacle.position;
-                    const glm::vec3 overlap = half + otherHalf - glm::abs(delta);
+            const glm::vec3 horizontalDelta{
+                transform.position.x - previousPosition.x,
+                0.0F,
+                transform.position.z - previousPosition.z,
+            };
+            const glm::vec3 sweepCenter = previousPosition + horizontalDelta * 0.5F;
+            const glm::vec3 sweepHalf = half + glm::abs(horizontalDelta) * 0.5F;
+            float earliestHit = std::numeric_limits<float>::infinity();
+            for (const StaticBox* obstacle : staticColliders_.query(sweepCenter, sweepHalf)) {
+                if (const auto hit = horizontalSweep(previousPosition, transform.position, half, *obstacle)) {
+                    earliestHit = std::min(earliestHit, *hit);
+                }
+            }
+            if (std::isfinite(earliestHit)) {
+                const float stop = std::max(0.0F, earliestHit - 0.001F);
+                transform.position.x = previousPosition.x + horizontalDelta.x * stop;
+                transform.position.z = previousPosition.z + horizontalDelta.z * stop;
+                body.velocity.x = 0.0F;
+                body.velocity.z = 0.0F;
+            }
+
+            static_cast<void>(entity);
+            for (const StaticBox* obstacle : staticColliders_.query(transform.position, half)) {
+                    const glm::vec3 delta = transform.position - obstacle->center;
+                    const glm::vec3 overlap = half + obstacle->halfExtents - glm::abs(delta);
                     if (overlap.x <= 0.0F || overlap.y <= 0.0F || overlap.z <= 0.0F) {
-                        return;
+                        continue;
                     }
 
                     if (overlap.x < overlap.y && overlap.x < overlap.z) {
@@ -145,7 +217,7 @@ void PhysicsSystem::update(Registry& registry, float deltaTime) const {
                         body.velocity.y = 0.0F;
                         body.grounded = delta.y > 0.0F;
                     }
-                });
+            }
         });
 }
 
@@ -153,8 +225,20 @@ void PhysicsSystem::setGravity(glm::vec3 gravity) {
     gravity_ = gravity;
 }
 
+void PhysicsSystem::setTime(float time) {
+    time_ = time;
+}
+
+void PhysicsSystem::rebuildStaticIndex(Registry& registry) {
+    staticColliders_.rebuild(registry);
+}
+
 const glm::vec3& PhysicsSystem::gravity() const {
     return gravity_;
+}
+
+const StaticColliderGrid& PhysicsSystem::staticColliders() const {
+    return staticColliders_;
 }
 
 } // namespace pcolonist

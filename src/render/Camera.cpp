@@ -22,6 +22,10 @@ const glm::vec3& Camera::position() const {
     return position_;
 }
 
+const glm::vec3& Camera::front() const {
+    return front_;
+}
+
 glm::vec3 Camera::horizontalFront() const {
     return glm::normalize(glm::vec3{front_.x, 0.0F, front_.z});
 }

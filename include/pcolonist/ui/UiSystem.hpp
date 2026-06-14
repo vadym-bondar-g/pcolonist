@@ -22,6 +22,7 @@ enum class UiAction {
 };
 
 class AudioSystem;
+class Inventory;
 class Registry;
 class WeatherSystem;
 
@@ -42,7 +43,9 @@ public:
         int frameLimit,
         bool shadows,
         bool bloom,
-        const WeatherSystem& weather);
+        const WeatherSystem& weather,
+        const Inventory& inventory,
+        bool inventoryOpen);
     void updateTitle(
         GLFWwindow* window,
         const Registry& registry,

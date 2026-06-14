@@ -4,10 +4,12 @@ in vec2 textureCoordinate;
 out vec4 fragmentColor;
 
 uniform sampler2D hdrScene;
+uniform sampler2D sceneDepth;
 uniform vec3 resolution;
 uniform float exposure;
 uniform float daylight;
 uniform float time;
+uniform float cloudiness;
 uniform int bloomEnabled;
 uniform int underwater;
 
@@ -16,7 +18,7 @@ float luminance(vec3 color) {
 }
 
 vec3 bright(vec3 color) {
-    return color * smoothstep(0.9, 2.2, luminance(color));
+    return color * smoothstep(0.82, 2.4, luminance(color));
 }
 
 vec3 fxaa(vec2 uv, vec2 texel) {
@@ -55,6 +57,67 @@ float noise(vec2 position) {
     return fract(sin(dot(position, vec2(12.9898, 78.233)) + time) * 43758.5453);
 }
 
+float stableHash(vec2 position) {
+    return fract(sin(dot(position, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float smoothNoise(vec2 position) {
+    vec2 cell = floor(position);
+    vec2 local = smoothstep(0.0, 1.0, fract(position));
+    return mix(
+        mix(noise(cell), noise(cell + vec2(1.0, 0.0)), local.x),
+        mix(noise(cell + vec2(0.0, 1.0)), noise(cell + vec2(1.0)), local.x),
+        local.y
+    );
+}
+
+float lightningFlash() {
+    float cycle = floor(time / 7.0);
+    float phase = fract(time / 7.0);
+    float flashActive = step(0.82, stableHash(vec2(cycle, 19.7)))
+        * smoothstep(0.78, 0.9, cloudiness);
+    return flashActive * (
+        exp(-pow((phase - 0.08) * 90.0, 2.0))
+        + exp(-pow((phase - 0.14) * 120.0, 2.0)) * 0.65
+    );
+}
+
+float screenSpaceOcclusion(vec2 uv, vec2 texel) {
+    float center = texture(sceneDepth, uv).r;
+    if (center >= 0.9999) {
+        return 1.0;
+    }
+    float occlusion = 0.0;
+    for (int x = -2; x <= 2; ++x) {
+        for (int y = -2; y <= 2; ++y) {
+            if (x == 0 && y == 0) {
+                continue;
+            }
+            float sampleDepth = texture(sceneDepth, uv + vec2(x, y) * texel * 2.0).r;
+            occlusion += smoothstep(0.0002, 0.004, center - sampleDepth);
+        }
+    }
+    return 1.0 - occlusion / 24.0 * 0.42;
+}
+
+vec3 multiScaleBloom(vec2 uv, vec2 texel) {
+    vec3 bloom = bright(texture(hdrScene, uv).rgb) * 0.18;
+    const vec2 directions[4] = vec2[4](
+        vec2(1.0, 0.0),
+        vec2(0.0, 1.0),
+        vec2(0.7071, 0.7071),
+        vec2(0.7071, -0.7071)
+    );
+    for (int directionIndex = 0; directionIndex < 4; ++directionIndex) {
+        vec2 direction = directions[directionIndex] * texel;
+        bloom += bright(texture(hdrScene, uv + direction * 2.0).rgb) * 0.09;
+        bloom += bright(texture(hdrScene, uv - direction * 2.0).rgb) * 0.09;
+        bloom += bright(texture(hdrScene, uv + direction * 6.0).rgb) * 0.045;
+        bloom += bright(texture(hdrScene, uv - direction * 6.0).rgb) * 0.045;
+    }
+    return bloom;
+}
+
 void main() {
     vec2 uv = textureCoordinate;
     if (underwater != 0) {
@@ -63,29 +126,42 @@ void main() {
     }
     vec2 texel = 1.0 / resolution.xy;
     vec3 color = fxaa(uv, texel);
+    vec3 localBlur = (
+        texture(hdrScene, uv + vec2(texel.x, 0.0)).rgb
+        + texture(hdrScene, uv - vec2(texel.x, 0.0)).rgb
+        + texture(hdrScene, uv + vec2(0.0, texel.y)).rgb
+        + texture(hdrScene, uv - vec2(0.0, texel.y)).rgb
+    ) * 0.25;
+    color += (color - localBlur) * 0.11;
+    color *= screenSpaceOcclusion(uv, texel);
     if (bloomEnabled != 0) {
-        vec3 bloom = vec3(0.0);
-        float weight = 0.0;
-        for (int x = -3; x <= 3; ++x) {
-            for (int y = -3; y <= 3; ++y) {
-                float sampleWeight = 1.0 / (1.0 + float(x * x + y * y));
-                bloom += bright(texture(hdrScene, uv + vec2(x, y) * texel * 2.0).rgb) * sampleWeight;
-                weight += sampleWeight;
-            }
-        }
-        color += bloom / weight * 0.38;
+        color += multiScaleBloom(uv, texel) * 0.42;
     }
 
+    float sceneDepthValue = texture(sceneDepth, uv).r;
+    float aerialPerspective = sceneDepthValue < 0.9999
+        ? smoothstep(0.982, 0.9997, sceneDepthValue) * (0.06 + cloudiness * 0.12)
+        : 0.0;
+    vec3 aerialColor = mix(vec3(0.12, 0.18, 0.28), vec3(0.42, 0.58, 0.72), daylight);
+    color = mix(color, aerialColor, aerialPerspective);
     color = acesToneMap(color * exposure);
     vec3 shadows = vec3(0.94, 0.97, 1.06);
     vec3 highlights = mix(vec3(1.02, 0.96, 0.9), vec3(1.03, 1.0, 0.94), daylight);
     color *= mix(shadows, highlights, smoothstep(0.15, 0.85, luminance(color)));
-    color = mix(vec3(luminance(color)), color, 1.08);
+    color = mix(vec3(luminance(color)), color, mix(1.04, 1.11, daylight));
+    color = (color - 0.5) * 1.035 + 0.5;
     if (underwater != 0) {
         float depthHaze = smoothstep(0.0, 1.0, uv.y);
         color = mix(color, vec3(0.015, 0.16, 0.2), 0.46 + depthHaze * 0.12);
         color *= vec3(0.66, 0.92, 1.02);
+        float causticsA = abs(sin((uv.x + uv.y * 0.62) * 92.0 + time * 1.8));
+        float causticsB = abs(sin((uv.x * 0.71 - uv.y) * 117.0 - time * 1.35));
+        float caustics = pow(max(causticsA * causticsB, 0.0), 7.0);
+        color += vec3(0.04, 0.18, 0.16) * caustics * daylight * (1.0 - depthHaze) * 0.45;
+        float particles = step(0.992, smoothNoise(gl_FragCoord.xy * 0.09 + vec2(0.0, time * 0.7)));
+        color += vec3(0.15, 0.28, 0.25) * particles * 0.18;
     }
+    color += vec3(0.54, 0.62, 0.9) * lightningFlash() * 0.18;
     float vignette = smoothstep(0.95, 0.25, length(uv - 0.5));
     color *= mix(0.78, 1.0, vignette);
     color += (noise(gl_FragCoord.xy) - 0.5) / 255.0;

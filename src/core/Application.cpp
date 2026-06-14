@@ -11,9 +11,13 @@
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
+#include <glm/geometric.hpp>
 
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <limits>
+#include <optional>
 #include <stdexcept>
 
 namespace {
@@ -30,6 +34,38 @@ pcolonist::KeyAction toKeyAction(int action) {
         return pcolonist::KeyAction::Repeat;
     }
     return pcolonist::KeyAction::Release;
+}
+
+std::optional<float> rayBoxDistance(
+    glm::vec3 origin,
+    glm::vec3 direction,
+    glm::vec3 center,
+    glm::vec3 halfExtents,
+    float maximumDistance) {
+    float near = 0.0F;
+    float far = maximumDistance;
+    for (int axis = 0; axis < 3; ++axis) {
+        const float minimum = center[axis] - halfExtents[axis];
+        const float maximum = center[axis] + halfExtents[axis];
+        if (std::abs(direction[axis]) < 0.00001F) {
+            if (origin[axis] < minimum || origin[axis] > maximum) {
+                return std::nullopt;
+            }
+            continue;
+        }
+        const float inverse = 1.0F / direction[axis];
+        float first = (minimum - origin[axis]) * inverse;
+        float second = (maximum - origin[axis]) * inverse;
+        if (first > second) {
+            std::swap(first, second);
+        }
+        near = std::max(near, first);
+        far = std::min(far, second);
+        if (near > far) {
+            return std::nullopt;
+        }
+    }
+    return near <= maximumDistance ? std::optional<float>{near} : std::nullopt;
 }
 
 } // namespace
@@ -144,6 +180,12 @@ void Application::registerEventHandlers() {
         if (event.key == GLFW_KEY_ESCAPE && event.action == KeyAction::Press) {
             toggleMenu();
         }
+        if (event.key == GLFW_KEY_TAB && event.action == KeyAction::Press && !menuOpen_) {
+            toggleInventory();
+        }
+        if (event.action == KeyAction::Press && event.key >= GLFW_KEY_1 && event.key <= GLFW_KEY_5) {
+            inventory_.select(static_cast<std::size_t>(event.key - GLFW_KEY_1));
+        }
     });
     events_.subscribe<MouseButtonEvent>([this](const MouseButtonEvent& event) {
         if (event.button != GLFW_MOUSE_BUTTON_LEFT || event.action != KeyAction::Press) {
@@ -151,8 +193,12 @@ void Application::registerEventHandlers() {
         }
         if (menuOpen_) {
             handleUiAction(ui_.menuActionAt(event.x, event.y));
+        } else if (inventoryOpen_) {
+            return;
         } else if (ui_.fullscreenButtonContains(event.x, event.y)) {
             toggleFullscreen();
+        } else if (input_.cursorCaptured()) {
+            useSelectedTool();
         }
     });
 }
@@ -169,23 +215,27 @@ void Application::buildPipeline() {
         }
     });
     pipeline_.add(FrameStage::Input, "update physical player", [this](FrameContext& context) {
-        if (!menuOpen_) {
+        if (!menuOpen_ && !inventoryOpen_) {
             player_.update(registry_, input_, camera_, context.deltaTime);
         }
     });
     pipeline_.add(FrameStage::Update, "update enemies", [this](FrameContext& context) {
-        if (!menuOpen_) {
+        if (!menuOpen_ && !inventoryOpen_) {
             enemies_.update(registry_, player_.entity(), context.deltaTime);
         }
     });
     pipeline_.add(FrameStage::Update, "update physics", [this](FrameContext& context) {
-        if (!menuOpen_) {
-            physics_.update(registry_, context.deltaTime);
+        if (!menuOpen_ && !inventoryOpen_) {
+            physicsTimestep_.advance(context.deltaTime, [this](float step) {
+                physicsTime_ += step;
+                physics_.setTime(physicsTime_);
+                physics_.update(registry_, step);
+            });
             player_.syncCamera(registry_, camera_);
         }
     });
     pipeline_.add(FrameStage::Update, "update animations", [this](FrameContext& context) {
-        if (!menuOpen_) {
+        if (!menuOpen_ && !inventoryOpen_) {
             animations_.update(registry_, context.deltaTime);
         }
     });
@@ -194,7 +244,7 @@ void Application::buildPipeline() {
             audio_.update(deltaTime);
         });
         auto weatherUpdate = jobs_.submit([this, deltaTime = context.deltaTime] {
-            if (!menuOpen_) {
+            if (!menuOpen_ && !inventoryOpen_) {
                 weather_.update(deltaTime);
             }
         });
@@ -214,7 +264,9 @@ void Application::buildPipeline() {
             frameLimiter_.limit(),
             renderer_->shadowsEnabled(),
             renderer_->bloomEnabled(),
-            weather_);
+            weather_,
+            inventory_,
+            inventoryOpen_);
         ui_.updateTitle(window_, registry_, audio_, context.deltaTime, menuOpen_);
     });
     pipeline_.add(FrameStage::Present, "present frame", [this](FrameContext&) {
@@ -228,9 +280,10 @@ void Application::loadMap() {
     });
 
     const Entity mapEntity = registry_.create();
-    registry_.emplace<Transform>(mapEntity);
+    const Transform& transform = registry_.emplace<Transform>(mapEntity);
     registry_.emplace<MeshRenderer>(mapEntity, map);
     registry_.emplace<TerrainSurface>(mapEntity);
+    registry_.emplace<TerrainCollider>(mapEntity, *map, transform);
 }
 
 void Application::createWorld() {
@@ -241,7 +294,7 @@ void Application::createWorld() {
         return MeshFactory::cube({0.75F, 0.12F, 0.1F});
     });
     const auto waterMesh = resources_.load<Mesh>("builtin/water", [] {
-        return MeshFactory::plane(320.0F, {0.02F, 0.24F, 0.42F});
+        return MeshFactory::gridPlane(320.0F, 160, {0.02F, 0.24F, 0.42F});
     });
 
     const std::array<Transform, 8> obstacles = {
@@ -264,7 +317,7 @@ void Application::createWorld() {
     const Entity water = registry_.create();
     registry_.emplace<Transform>(water, Transform{{0.0F, -0.45F, 0.0F}});
     registry_.emplace<MeshRenderer>(water, waterMesh);
-    registry_.emplace<WaterSurface>(water);
+    registry_.emplace<WaterSurface>(water, WaterSurface{{160.0F, 160.0F}});
 
     player_.create(registry_, {0.0F, 2.0F, 18.0F});
     Enemy::create(registry_, {-14.0F, 1.0F, -22.0F}, enemyMesh);
@@ -276,6 +329,8 @@ void Application::createWorld() {
 void Application::initializeSystems() {
     scripts_.execute(assets_, "scripts/startup.script", registry_, physics_, resources_, jobs_);
     scripts_.execute(assets_, "scripts/models.scene", registry_, physics_, resources_, jobs_);
+    physics_.rebuildStaticIndex(registry_);
+    physicsTime_ = weather_.time();
 
     const AudioHandle ambient = audio_.createSource("audio/ambient.ogg", true);
     audio_.play(ambient);
@@ -322,8 +377,55 @@ void Application::handleUiAction(UiAction action) {
 
 void Application::toggleMenu() {
     menuOpen_ = !menuOpen_;
-    input_.setCursorCaptured(!menuOpen_);
+    if (menuOpen_) {
+        inventoryOpen_ = false;
+    }
+    input_.setCursorCaptured(!menuOpen_ && !inventoryOpen_);
     updateCursorMode();
+}
+
+void Application::toggleInventory() {
+    inventoryOpen_ = !inventoryOpen_;
+    input_.setCursorCaptured(!inventoryOpen_);
+    updateCursorMode();
+}
+
+void Application::useSelectedTool() {
+    if (inventory_.selectedTool() != Tool::Axe) {
+        return;
+    }
+
+    constexpr float reach = 4.5F;
+    Entity target = nullEntity;
+    float nearest = reach;
+    registry_.each<Transform, ResourceNode, BoxCollider>(
+        [this, &target, &nearest](
+            Entity entity,
+            const Transform& transform,
+            const ResourceNode&,
+            const BoxCollider& collider) {
+            const auto distance = rayBoxDistance(
+                camera_.position(),
+                camera_.front(),
+                transform.position,
+                collider.halfExtents * transform.scale,
+                nearest);
+            if (distance) {
+                target = entity;
+                nearest = *distance;
+            }
+        });
+    if (target == nullEntity) {
+        return;
+    }
+
+    ResourceNode& resource = registry_.get<ResourceNode>(target);
+    --resource.health;
+    if (resource.health <= 0) {
+        inventory_.addWood(resource.woodYield);
+        registry_.destroy(target);
+        physics_.rebuildStaticIndex(registry_);
+    }
 }
 
 void Application::toggleFullscreen() {
@@ -351,7 +453,7 @@ void Application::toggleFullscreen() {
 }
 
 void Application::updateCursorMode() {
-    if (menuOpen_) {
+    if (menuOpen_ || inventoryOpen_) {
         input_.setCursorCaptured(false);
     }
     if (cursorCaptured_ == input_.cursorCaptured()) {

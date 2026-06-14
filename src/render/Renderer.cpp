@@ -10,13 +10,18 @@
 #include <glad/gl.h>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <filesystem>
 #include <stdexcept>
+#include <unordered_map>
+#include <vector>
 
 namespace {
 
 constexpr int shadowSize = 2048;
+constexpr std::array<float, 2> shadowRanges = {38.0F, 105.0F};
 
 glm::mat4 modelMatrix(const pcolonist::Transform& transform) {
     glm::mat4 model = glm::translate(glm::mat4(1.0F), transform.position);
@@ -24,6 +29,45 @@ glm::mat4 modelMatrix(const pcolonist::Transform& transform) {
     model = glm::rotate(model, transform.rotation.y, {0.0F, 1.0F, 0.0F});
     model = glm::rotate(model, transform.rotation.z, {0.0F, 0.0F, 1.0F});
     return glm::scale(model, transform.scale);
+}
+
+struct RenderBatch {
+    const pcolonist::Mesh* mesh = nullptr;
+    std::vector<glm::mat4> models;
+    bool water = false;
+    bool terrain = false;
+};
+
+std::vector<RenderBatch> collectBatches(
+    pcolonist::Registry& registry,
+    const glm::vec3& cameraPosition,
+    bool shadows) {
+    std::vector<RenderBatch> batches;
+    registry.each<pcolonist::Transform, pcolonist::MeshRenderer>(
+        [&batches, &registry, cameraPosition, shadows](
+            pcolonist::Entity entity,
+            const pcolonist::Transform& transform,
+            const pcolonist::MeshRenderer& renderer) {
+            if (!renderer.mesh || (shadows && registry.has<pcolonist::WaterSurface>(entity))) {
+                return;
+            }
+            const bool water = registry.has<pcolonist::WaterSurface>(entity);
+            const bool terrain = registry.has<pcolonist::TerrainSurface>(entity);
+            const float distance = glm::length(transform.position - cameraPosition);
+            const float scale = std::max({transform.scale.x, transform.scale.y, transform.scale.z});
+            if (!terrain && !water && distance > 115.0F + scale * 8.0F) {
+                return;
+            }
+            auto batch = std::find_if(batches.begin(), batches.end(), [&](const RenderBatch& candidate) {
+                return candidate.mesh == renderer.mesh.get() && candidate.water == water && candidate.terrain == terrain;
+            });
+            if (batch == batches.end()) {
+                batches.push_back({renderer.mesh.get(), {}, water, terrain});
+                batch = std::prev(batches.end());
+            }
+            batch->models.push_back(modelMatrix(transform));
+        });
+    return batches;
 }
 
 } // namespace
@@ -40,11 +84,12 @@ Renderer::Renderer()
 
 Renderer::~Renderer() {
     releaseRenderTargets();
-    glDeleteTextures(1, &shadowDepth_);
-    glDeleteFramebuffers(1, &shadowFramebuffer_);
+    glDeleteTextures(static_cast<int>(shadowDepths_.size()), shadowDepths_.data());
+    glDeleteFramebuffers(static_cast<int>(shadowFramebuffers_.size()), shadowFramebuffers_.data());
     glDeleteVertexArrays(1, &screenVertexArray_);
     for (const auto& [mesh, gpuMesh] : meshes_) {
         static_cast<void>(mesh);
+        glDeleteBuffers(1, &gpuMesh.instanceBuffer);
         glDeleteBuffers(1, &gpuMesh.indexBuffer);
         glDeleteBuffers(1, &gpuMesh.vertexBuffer);
         glDeleteVertexArrays(1, &gpuMesh.vertexArray);
@@ -78,7 +123,8 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
     shader.use();
     shader.setMat4("projection", glm::perspective(glm::radians(70.0F), aspectRatio, 0.1F, 250.0F));
     shader.setMat4("view", camera.viewMatrix());
-    shader.setMat4("lightSpaceMatrix", lightSpaceMatrix_);
+    shader.setMat4("lightSpaceMatrices[0]", lightSpaceMatrices_[0]);
+    shader.setMat4("lightSpaceMatrices[1]", lightSpaceMatrices_[1]);
     shader.setVec3("cameraPosition", camera.position());
     shader.setVec3("fogColor", weather.fogColor());
     shader.setVec3("sunDirection", weather.sunDirection());
@@ -89,41 +135,56 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
     shader.setFloat("fogDensity", weather.fogDensity());
     shader.setFloat("daylight", weather.daylight());
     shader.setFloat("nightFactor", weather.nightFactor());
+    shader.setFloat("cloudiness", weather.cloudiness());
     shader.setFloat("time", weather.time());
-    shader.setInt("shadowMap", 3);
+    shader.setInt("shadowMapNear", 3);
+    shader.setInt("shadowMapFar", 4);
     shader.setInt("diffuseTexture", 0);
     shader.setInt("shadowsEnabled", shadowsEnabled_ ? 1 : 0);
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, shadowDepth_);
+    glBindTexture(GL_TEXTURE_2D, shadowDepths_[0]);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, shadowDepths_[1]);
 
-    registry.each<Transform, MeshRenderer>(
-        [this, &registry, &shader](Entity entity, const Transform& transform, const MeshRenderer& renderer) {
-            if (!renderer.mesh) {
-                return;
-            }
-            const GpuMesh& gpuMesh = upload(*renderer.mesh);
-            shader.setMat4("model", modelMatrix(transform));
-            shader.setFloat("water", registry.has<WaterSurface>(entity) ? 1.0F : 0.0F);
+    for (const RenderBatch& batch : collectBatches(registry, camera.position(), false)) {
+            const GpuMesh& gpuMesh = upload(*batch.mesh);
+            shader.setFloat("water", batch.water ? 1.0F : 0.0F);
+            shader.setFloat("terrain", batch.terrain ? 1.0F : 0.0F);
             glBindVertexArray(gpuMesh.vertexArray);
-            if (renderer.mesh->draws.empty()) {
+            glBindBuffer(GL_ARRAY_BUFFER, gpuMesh.instanceBuffer);
+            glBufferData(
+                GL_ARRAY_BUFFER,
+                static_cast<GLsizeiptr>(batch.models.size() * sizeof(glm::mat4)),
+                batch.models.data(),
+                GL_STREAM_DRAW);
+            if (batch.mesh->draws.empty()) {
                 shader.setInt("hasDiffuseTexture", 0);
-                glDrawElements(GL_TRIANGLES, static_cast<int>(gpuMesh.indexCount), GL_UNSIGNED_INT, nullptr);
-                return;
+                shader.setFloat("roughness", 0.72F);
+                shader.setFloat("specularStrength", 0.2F);
+                shader.setVec3("emissiveColor", {0.0F, 0.0F, 0.0F});
+                glDrawElementsInstanced(
+                    GL_TRIANGLES, static_cast<int>(gpuMesh.indexCount), GL_UNSIGNED_INT, nullptr,
+                    static_cast<int>(batch.models.size()));
+                continue;
             }
-            for (const MeshDraw& draw : renderer.mesh->draws) {
+            for (const MeshDraw& draw : batch.mesh->draws) {
                 const bool textured = !draw.diffuseTexture.empty();
                 shader.setInt("hasDiffuseTexture", textured ? 1 : 0);
+                shader.setFloat("roughness", draw.roughness);
+                shader.setFloat("specularStrength", draw.specularStrength);
+                shader.setVec3("emissiveColor", draw.emissive);
                 if (textured) {
                     glActiveTexture(GL_TEXTURE0);
                     glBindTexture(GL_TEXTURE_2D, loadTexture(draw.diffuseTexture));
                 }
-                glDrawElements(
+                glDrawElementsInstanced(
                     GL_TRIANGLES,
                     static_cast<int>(draw.indexCount),
                     GL_UNSIGNED_INT,
-                    reinterpret_cast<void*>(draw.firstIndex * sizeof(std::uint32_t)));
+                    reinterpret_cast<void*>(draw.firstIndex * sizeof(std::uint32_t)),
+                    static_cast<int>(batch.models.size()));
             }
-        });
+    }
 
     bool underwater = false;
     registry.each<Transform, WaterSurface>(
@@ -164,10 +225,14 @@ void Renderer::createRenderTargets() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, hdrColor_, 0);
 
-    glGenRenderbuffers(1, &hdrDepth_);
-    glBindRenderbuffer(GL_RENDERBUFFER, hdrDepth_);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width_, height_);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, hdrDepth_);
+    glGenTextures(1, &hdrDepth_);
+    glBindTexture(GL_TEXTURE_2D, hdrDepth_);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width_, height_, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, hdrDepth_, 0);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
         throw std::runtime_error("HDR framebuffer is incomplete");
     }
@@ -175,7 +240,7 @@ void Renderer::createRenderTargets() {
 }
 
 void Renderer::releaseRenderTargets() {
-    glDeleteRenderbuffers(1, &hdrDepth_);
+    glDeleteTextures(1, &hdrDepth_);
     glDeleteTextures(1, &hdrColor_);
     glDeleteFramebuffers(1, &hdrFramebuffer_);
     hdrDepth_ = 0;
@@ -184,22 +249,24 @@ void Renderer::releaseRenderTargets() {
 }
 
 void Renderer::createShadowMap() {
-    glGenFramebuffers(1, &shadowFramebuffer_);
-    glGenTextures(1, &shadowDepth_);
-    glBindTexture(GL_TEXTURE_2D, shadowDepth_);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, shadowSize, shadowSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    constexpr float border[] = {1.0F, 1.0F, 1.0F, 1.0F};
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border);
-    glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffer_);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowDepth_, 0);
-    glDrawBuffer(GL_NONE);
-    glReadBuffer(GL_NONE);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        throw std::runtime_error("Shadow framebuffer is incomplete");
+    glGenFramebuffers(static_cast<int>(shadowFramebuffers_.size()), shadowFramebuffers_.data());
+    glGenTextures(static_cast<int>(shadowDepths_.size()), shadowDepths_.data());
+    for (std::size_t cascade = 0; cascade < shadowDepths_.size(); ++cascade) {
+        glBindTexture(GL_TEXTURE_2D, shadowDepths_[cascade]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, shadowSize, shadowSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        constexpr float border[] = {1.0F, 1.0F, 1.0F, 1.0F};
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border);
+        glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffers_[cascade]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowDepths_[cascade], 0);
+        glDrawBuffer(GL_NONE);
+        glReadBuffer(GL_NONE);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            throw std::runtime_error("Shadow framebuffer is incomplete");
+        }
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -207,31 +274,47 @@ void Renderer::createShadowMap() {
 void Renderer::renderShadowMap(const Camera& camera, Registry& registry, const WeatherSystem& weather) {
     const glm::vec3 lightDirection = weather.daylight() > 0.05F ? weather.sunDirection() : weather.moonDirection();
     const glm::vec3 center = camera.position();
-    const glm::mat4 lightProjection = glm::ortho(-42.0F, 42.0F, -42.0F, 42.0F, 1.0F, 120.0F);
-    const glm::mat4 lightView = glm::lookAt(center + lightDirection * 55.0F, center, {0.0F, 1.0F, 0.0F});
-    lightSpaceMatrix_ = lightProjection * lightView;
+    for (std::size_t cascade = 0; cascade < shadowRanges.size(); ++cascade) {
+        const float range = shadowRanges[cascade];
+        const float texelSize = range * 2.0F / static_cast<float>(shadowSize);
+        const glm::vec3 stableCenter{
+            std::floor(center.x / texelSize) * texelSize,
+            center.y,
+            std::floor(center.z / texelSize) * texelSize,
+        };
+        const glm::mat4 lightProjection = glm::ortho(-range, range, -range, range, 1.0F, range * 3.0F);
+        const glm::mat4 lightView = glm::lookAt(
+            stableCenter + lightDirection * range * 1.4F, stableCenter, {0.0F, 1.0F, 0.0F});
+        lightSpaceMatrices_[cascade] = lightProjection * lightView;
+    }
     if (!shadowsEnabled_) {
         return;
     }
 
     glViewport(0, 0, shadowSize, shadowSize);
-    glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffer_);
-    glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_FRONT);
     Shader& shader = shaders_.get("shadow");
     shader.use();
-    shader.setMat4("lightSpaceMatrix", lightSpaceMatrix_);
-    registry.each<Transform, MeshRenderer>(
-        [this, &registry, &shader](Entity entity, const Transform& transform, const MeshRenderer& renderer) {
-            if (!renderer.mesh || registry.has<WaterSurface>(entity)) {
-                return;
-            }
-            const GpuMesh& gpuMesh = upload(*renderer.mesh);
-            shader.setMat4("model", modelMatrix(transform));
+    const std::vector<RenderBatch> batches = collectBatches(registry, camera.position(), true);
+    for (std::size_t cascade = 0; cascade < shadowFramebuffers_.size(); ++cascade) {
+        glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffers_[cascade]);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        shader.setMat4("lightSpaceMatrix", lightSpaceMatrices_[cascade]);
+        for (const RenderBatch& batch : batches) {
+            const GpuMesh& gpuMesh = upload(*batch.mesh);
             glBindVertexArray(gpuMesh.vertexArray);
-            glDrawElements(GL_TRIANGLES, static_cast<int>(gpuMesh.indexCount), GL_UNSIGNED_INT, nullptr);
-        });
+            glBindBuffer(GL_ARRAY_BUFFER, gpuMesh.instanceBuffer);
+            glBufferData(
+                GL_ARRAY_BUFFER,
+                static_cast<GLsizeiptr>(batch.models.size() * sizeof(glm::mat4)),
+                batch.models.data(),
+                GL_STREAM_DRAW);
+            glDrawElementsInstanced(
+                GL_TRIANGLES, static_cast<int>(gpuMesh.indexCount), GL_UNSIGNED_INT, nullptr,
+                static_cast<int>(batch.models.size()));
+        }
+    }
     glCullFace(GL_BACK);
     glDisable(GL_CULL_FACE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -245,14 +328,18 @@ void Renderer::postProcess(const WeatherSystem& weather, bool underwater) {
     Shader& shader = shaders_.get("post");
     shader.use();
     shader.setInt("hdrScene", 0);
+    shader.setInt("sceneDepth", 1);
     shader.setInt("bloomEnabled", bloomEnabled_ ? 1 : 0);
     shader.setInt("underwater", underwater ? 1 : 0);
-    shader.setFloat("exposure", 1.08F + weather.daylight() * 0.12F);
+    shader.setFloat("exposure", 1.08F + weather.daylight() * 0.12F + weather.cloudiness() * 0.055F);
     shader.setFloat("daylight", weather.daylight());
+    shader.setFloat("cloudiness", weather.cloudiness());
     shader.setFloat("time", weather.time());
     shader.setVec3("resolution", {static_cast<float>(width_), static_cast<float>(height_), 0.0F});
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, hdrColor_);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, hdrDepth_);
     glBindVertexArray(screenVertexArray_);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glEnable(GL_DEPTH_TEST);
@@ -270,6 +357,7 @@ const Renderer::GpuMesh& Renderer::upload(const Mesh& mesh) {
     glGenVertexArrays(1, &gpuMesh.vertexArray);
     glGenBuffers(1, &gpuMesh.vertexBuffer);
     glGenBuffers(1, &gpuMesh.indexBuffer);
+    glGenBuffers(1, &gpuMesh.instanceBuffer);
     glBindVertexArray(gpuMesh.vertexArray);
     glBindBuffer(GL_ARRAY_BUFFER, gpuMesh.vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(mesh.vertices.size() * sizeof(Vertex)), mesh.vertices.data(), GL_STATIC_DRAW);
@@ -283,6 +371,18 @@ const Renderer::GpuMesh& Renderer::upload(const Mesh& mesh) {
     glEnableVertexAttribArray(2);
     glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, textureCoordinate)));
     glEnableVertexAttribArray(3);
+    glBindBuffer(GL_ARRAY_BUFFER, gpuMesh.instanceBuffer);
+    for (unsigned int column = 0; column < 4; ++column) {
+        glVertexAttribPointer(
+            4 + column,
+            4,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(glm::mat4),
+            reinterpret_cast<void*>(sizeof(glm::vec4) * column));
+        glEnableVertexAttribArray(4 + column);
+        glVertexAttribDivisor(4 + column, 1);
+    }
     return meshes_.emplace(&mesh, gpuMesh).first->second;
 }
 

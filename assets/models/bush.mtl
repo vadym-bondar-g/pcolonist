@@ -1,0 +1,8 @@
+newmtl BushDark
+Kd 0.07 0.22 0.06
+Ks 0.02 0.02 0.02
+Ns 4
+newmtl BushLight
+Kd 0.18 0.38 0.09
+Ks 0.03 0.03 0.03
+Ns 5

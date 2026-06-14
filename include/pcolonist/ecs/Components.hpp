@@ -2,6 +2,7 @@
 
 #include "pcolonist/render/Mesh.hpp"
 
+#include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
 #include <memory>
@@ -18,7 +19,14 @@ struct MeshRenderer {
     std::shared_ptr<Mesh> mesh;
 };
 
-struct WaterSurface {};
+struct WaterSurface {
+    glm::vec2 halfExtents{160.0F};
+};
 struct TerrainSurface {};
+
+struct ResourceNode {
+    int health = 3;
+    int woodYield = 5;
+};
 
 } // namespace pcolonist

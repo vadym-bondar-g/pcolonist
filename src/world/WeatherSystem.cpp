@@ -14,7 +14,7 @@ constexpr float pi = 3.14159265358979323846F;
 }
 
 void WeatherSystem::update(float deltaTime) {
-    time_ += deltaTime;
+    time_ += static_cast<double>(deltaTime);
     const int phase = static_cast<int>(time_ / 60.0F) % 3;
     weather_ = phase == 0 ? WeatherType::Clear : phase == 1 ? WeatherType::Cloudy : WeatherType::Storm;
 }
@@ -46,7 +46,11 @@ glm::vec3 WeatherSystem::horizonColor() const {
 
 glm::vec3 WeatherSystem::sunDirection() const {
     const float angle = dayProgress() * 2.0F * pi - pi * 0.5F;
-    return glm::normalize(glm::vec3{std::cos(angle), std::sin(angle), 0.28F});
+    return glm::normalize(glm::vec3{
+        std::cos(angle),
+        std::sin(angle),
+        std::cos(angle + 0.35F) * 0.32F,
+    });
 }
 
 glm::vec3 WeatherSystem::sunColor() const {
@@ -85,7 +89,11 @@ float WeatherSystem::nightFactor() const {
 }
 
 float WeatherSystem::dayProgress() const {
-    return std::fmod(time_, dayDuration) / dayDuration;
+    return static_cast<float>(std::fmod(time_, static_cast<double>(dayDuration)) / dayDuration);
+}
+
+std::uint32_t WeatherSystem::dayNumber() const {
+    return static_cast<std::uint32_t>(time_ / dayDuration) + 1U;
 }
 
 std::string_view WeatherSystem::weatherName() const {
@@ -98,7 +106,7 @@ std::string_view WeatherSystem::weatherName() const {
 }
 
 float WeatherSystem::time() const {
-    return time_;
+    return static_cast<float>(time_);
 }
 
 } // namespace pcolonist

@@ -100,6 +100,7 @@ void ScriptSystem::execute(
                   >> collider.halfExtents.x >> collider.halfExtents.y >> collider.halfExtents.z)) {
                 throw std::runtime_error("Script spawn_model expects id, position, scale and collider");
             }
+            row >> transform.rotation.y;
             auto iterator = models.find(id);
             if (iterator == models.end()) {
                 throw std::runtime_error("Script model id is not loaded: " + id);
@@ -109,6 +110,28 @@ void ScriptSystem::execute(
             registry.emplace<Transform>(entity, transform);
             registry.emplace<MeshRenderer>(entity, model);
             registry.emplace<BoxCollider>(entity, collider);
+            if (id == "tree" || id == "oak") {
+                registry.emplace<ResourceNode>(entity);
+            }
+            continue;
+        }
+
+        if (command == "spawn_decor") {
+            std::string id;
+            Transform transform;
+            if (!(row >> id
+                  >> transform.position.x >> transform.position.y >> transform.position.z
+                  >> transform.scale.x >> transform.scale.y >> transform.scale.z)) {
+                throw std::runtime_error("Script spawn_decor expects id, position and scale");
+            }
+            row >> transform.rotation.y;
+            auto iterator = models.find(id);
+            if (iterator == models.end()) {
+                throw std::runtime_error("Script model id is not loaded: " + id);
+            }
+            const Entity entity = registry.create();
+            registry.emplace<Transform>(entity, transform);
+            registry.emplace<MeshRenderer>(entity, resolveModel(iterator->second));
             continue;
         }
 

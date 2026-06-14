@@ -2,6 +2,7 @@
 
 #include <glm/vec3.hpp>
 
+#include <cstdint>
 #include <string_view>
 
 namespace pcolonist {
@@ -30,12 +31,13 @@ public:
     [[nodiscard]] float daylight() const;
     [[nodiscard]] float nightFactor() const;
     [[nodiscard]] float dayProgress() const;
+    [[nodiscard]] std::uint32_t dayNumber() const;
     [[nodiscard]] std::string_view weatherName() const;
     [[nodiscard]] float time() const;
 
 private:
     WeatherType weather_ = WeatherType::Clear;
-    float time_ = 45.0F;
+    double time_ = 45.0;
 };
 
 } // namespace pcolonist
