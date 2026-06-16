@@ -203,6 +203,12 @@ Every frame executes ordered tasks:
 - The same run exports `assets/maps/walkability.pgm`, a grayscale traversal
   mask where dark pixels are blocked/steep/wet and bright pixels are easier to
   cross.
+- The generator also writes `assets/maps/heightmap.pgm`,
+  `assets/maps/biomes.ppm`, `assets/maps/slope.pgm`,
+  `assets/maps/moisture.pgm` and `assets/maps/terrain_report.json`. These
+  debug outputs make terrain height, biome distribution, slope, moisture,
+  walkability stats and decoration tuning values visible without opening the
+  full OBJ mesh.
 - Navigation points are written to `assets/maps/landmarks.json`, including the
   camp, harbor, lake, river endpoints, waterfall shelves, volcano, ruins,
   grottos, tributary sources and offshore islets.

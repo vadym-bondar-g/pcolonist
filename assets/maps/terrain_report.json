@@ -1,0 +1,168 @@
+{
+  "biomes": {
+    "beach": {
+      "ratio": 0.3832,
+      "samples": 223
+    },
+    "coastal_jungle": {
+      "ratio": 0.0086,
+      "samples": 5
+    },
+    "highland": {
+      "ratio": 0.1426,
+      "samples": 83
+    },
+    "temperate_forest": {
+      "ratio": 0.2302,
+      "samples": 134
+    },
+    "volcanic": {
+      "ratio": 0.1237,
+      "samples": 72
+    },
+    "wetland": {
+      "ratio": 0.1117,
+      "samples": 65
+    }
+  },
+  "decoration_rules": {
+    "coastal_rocks": {
+      "allowed_biomes": [
+        "beach",
+        "highland",
+        "volcanic"
+      ],
+      "count": 120,
+      "height": [
+        -8.0,
+        3.0
+      ],
+      "max_slope": 10.0,
+      "min_moisture": 0.0,
+      "radius": [
+        0.7,
+        1.04
+      ]
+    },
+    "forest": {
+      "allowed_biomes": [
+        "coastal_jungle",
+        "temperate_forest",
+        "wetland"
+      ],
+      "count": 280,
+      "height": [
+        0.1,
+        15.0
+      ],
+      "max_slope": 0.82,
+      "min_moisture": 0.18,
+      "radius": [
+        0.0,
+        0.88
+      ]
+    },
+    "mushrooms": {
+      "allowed_biomes": [
+        "wetland"
+      ],
+      "count": 64,
+      "height": [
+        -0.3,
+        4.0
+      ],
+      "max_slope": 0.45,
+      "min_moisture": 0.7,
+      "radius": [
+        0.0,
+        0.9
+      ]
+    },
+    "palms": {
+      "allowed_biomes": [
+        "beach",
+        "coastal_jungle",
+        "wetland"
+      ],
+      "count": 95,
+      "height": [
+        -0.45,
+        2.2
+      ],
+      "max_slope": 0.45,
+      "min_moisture": 0.36,
+      "radius": [
+        0.0,
+        0.95
+      ]
+    },
+    "understory": {
+      "allowed_biomes": [
+        "wetland",
+        "coastal_jungle",
+        "temperate_forest",
+        "highland"
+      ],
+      "count": 260,
+      "height": [
+        -0.2,
+        12.0
+      ],
+      "max_slope": 0.72,
+      "min_moisture": 0.25,
+      "radius": [
+        0.0,
+        0.9
+      ]
+    }
+  },
+  "generated_by": "tools/generate_island.py",
+  "grid": {
+    "debug_samples_per_side": 61,
+    "spacing": 2.0,
+    "terrain_vertices_per_side": 241
+  },
+  "height": {
+    "average": 5.729,
+    "max": 35.358,
+    "min": -0.246
+  },
+  "outputs": {
+    "biome_map": "assets/maps/biomes.ppm",
+    "heightmap": "assets/maps/heightmap.pgm",
+    "landmarks": "assets/maps/landmarks.json",
+    "moisture_map": "assets/maps/moisture.pgm",
+    "slope_map": "assets/maps/slope.pgm",
+    "walkability": "assets/maps/walkability.pgm"
+  },
+  "seed": 1847,
+  "slope": {
+    "average": 0.428,
+    "max": 4.235,
+    "steep_sample_ratio": 0.1942
+  },
+  "walkability": {
+    "average": 0.758,
+    "good_sample_ratio": 0.7491
+  },
+  "water": {
+    "harbor_center": {
+      "x": 104.0,
+      "z": 25.0
+    },
+    "lake_center": {
+      "x": 31.0,
+      "z": -24.0
+    },
+    "river_points": 26,
+    "river_source": {
+      "x": 39.0,
+      "z": -20.0
+    },
+    "tributary_points": [
+      29,
+      12,
+      6
+    ]
+  }
+}
