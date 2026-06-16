@@ -238,12 +238,50 @@ def generate_grotto() -> None:
     )
 
 
+def generate_palm() -> None:
+    obj = Obj("coastal_palm", "palm.mtl")
+    obj.material("PalmTrunk")
+    obj.tapered_cylinder((0.0, 0.0, 0.0), 0.34, 0.18, 5.8, 24, 0.1, 12)
+    obj.material("PalmLeafDark")
+    for index in range(10):
+        angle = index / 10.0 * math.tau
+        for segment in range(5):
+            progress = segment / 4.0
+            length = 1.0 + progress * 2.5
+            width = 0.28 * (1.0 - progress * 0.72)
+            center_x = math.cos(angle) * length
+            center_z = math.sin(angle) * length
+            y = 5.75 + math.sin(progress * math.pi) * 0.35 - progress * progress * 0.8
+            side_x = -math.sin(angle) * width
+            side_z = math.cos(angle) * width
+            a = obj.vertex(center_x - side_x, y, center_z - side_z)
+            b = obj.vertex(center_x + side_x, y, center_z + side_z)
+            next_progress = (segment + 1) / 4.0
+            next_length = 1.0 + next_progress * 2.5
+            next_width = 0.28 * (1.0 - next_progress * 0.72)
+            next_x = math.cos(angle) * next_length
+            next_z = math.sin(angle) * next_length
+            next_y = 5.75 + math.sin(next_progress * math.pi) * 0.35 - next_progress * next_progress * 0.8
+            next_side_x = -math.sin(angle) * next_width
+            next_side_z = math.cos(angle) * next_width
+            c = obj.vertex(next_x + next_side_x, next_y, next_z + next_side_z)
+            d = obj.vertex(next_x - next_side_x, next_y, next_z - next_side_z)
+            obj.face(a, b, c, d)
+    obj.write(MODEL_DIR / "palm.obj")
+    (MODEL_DIR / "palm.mtl").write_text(
+        "newmtl PalmTrunk\nKd 0.31 0.19 0.08\nKs 0.04 0.04 0.04\nNs 7\n"
+        "newmtl PalmLeafDark\nKd 0.055 0.28 0.09\nKs 0.03 0.03 0.03\nNs 5\n",
+        encoding="utf-8",
+    )
+
+
 def main() -> None:
     generate_tree()
     generate_bush()
     generate_rock()
     generate_grotto()
-    print("Generated tree.obj, bush.obj, rock.obj and grotto.obj")
+    generate_palm()
+    print("Generated tree.obj, bush.obj, rock.obj, grotto.obj and palm.obj")
 
 
 if __name__ == "__main__":

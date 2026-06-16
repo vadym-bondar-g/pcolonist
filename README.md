@@ -26,9 +26,12 @@ include/pcolonist/
 Implementations mirror this layout under `src/`. Runtime content is stored
 under `assets/maps`, `assets/models`, `assets/scripts` and `assets/shaders`.
 
-The generated world is a large mysterious island with an arrival camp,
-forests, coastal rocks, an eastern marsh, a western standing-stone circle, a
-sunken northern temple and a ruined watchtower above the eastern bay. Rebuild
+The generated world is a large survival-adventure island inspired by Jules
+Verne's *The Mysterious Island*. It has a dominant dormant volcano, Grant Lake,
+Mercy River, waterfall shelves, a sheltered natural harbor, a high Granite
+House cliff and plateau, hidden stone grottos, dense temperate forest and
+palm-lined beaches. A western standing-stone circle, sunken northern temple
+and ruined watchtower preserve the project's mysterious atmosphere. Rebuild
 the deterministic map and scenery placement with:
 
 ```bash
@@ -145,8 +148,12 @@ Every frame executes ordered tasks:
   modes while preserving the previous window position and size.
 - `~` opens a developer testing panel with respawn, landmark teleports,
   weather and time-of-day controls, plus shadow and bloom toggles.
+- Use `NEXT LANDMARK` in that panel to cycle through Granite House, the natural
+  harbor, Grant Lake, Mercy River and the hidden grottos.
 - Original low-poly tree and rock OBJ models are included under
   `assets/models` and placed as physical scenery.
+- A generated coastal palm model forms a tropical shoreline belt around the
+  harbor and southern beaches, while denser temperate trees remain inland.
 - Deterministic smooth higher-poly layered tree, bush and rock models use
   dense radial and vertical geometry and can be rebuilt with
   `python3 tools/generate_nature_models.py`. Imported Kenney props can be
@@ -156,11 +163,39 @@ Every frame executes ordered tasks:
   pores and fine cloth grain in addition to their MTL colors and PNG textures.
 - The island uses a denser terrain mesh, multi-scale procedural ground detail
   and understory bushes to improve silhouettes and forest depth. Its generated
-  height field combines broad ridges, valleys and walkable terraces, with
-  alternating triangle diagonals to avoid a visible directional grid. The
-  expanded island is centered around a volcanic cone with an animated magma
-  crater, and is divided into a northern plateau, inland lake, river valley,
-  eastern bay, marsh and southern peninsula.
+  height field combines broad ridges, valleys, walkable terraces, deterministic
+  fractal detail, erosion channels, coastal rock shelves and a weathered
+  volcanic rim. Alternating triangle diagonals avoid a visible directional
+  grid. The expanded island is centered around a volcanic cone with an animated
+  magma crater, and is divided into a northern plateau, inland lake, river
+  valley, eastern bay, marsh and southern peninsula.
+- Mercy River is traced downhill across the generated base terrain and receives
+  a descending carved channel profile before the final mesh is emitted. Grant
+  Lake has a level basin and both waters are emitted as a separate render mesh.
+- The river system includes configurable tributaries, wet banks, a flattened
+  floodplain and local waterfall shelves, so the drainage reads as a connected
+  terrain feature instead of a single straight strip.
+- Irregular granite needles and coastal rock stacks break up the height-field
+  silhouette around exposed shores and mountain approaches.
+- The shoreline is shaped by configurable coves, headlands, reef fields and
+  small offshore islets instead of a single oval outline.
+- Hidden grottos have configurable entrance direction, chamber size and carved
+  terrain approaches, so their entrances sit in the island surface rather than
+  only being placed as separate props.
+- The island generator exposes grouped tuning blocks near the top of
+  `tools/generate_island.py` for terrain scale, water levels, river width, the
+  volcano profile, shoreline features, Granite House, grottos and rock-spire
+  placement. Start there when adjusting the island model shape.
+- Biome rules are also configurable there. Beach, wetland, coastal jungle,
+  temperate forest, highland and volcanic biomes drive terrain vertex colors
+  and vegetation density.
+- The generator writes explicit OBJ vertex normals and two lighter terrain LOD
+  meshes, `assets/maps/demo_map_lod1.obj` and `assets/maps/demo_map_lod2.obj`,
+  so terrain chunks use the full mesh nearby, LOD1 at mid range and LOD2 in the
+  distance.
+- Vegetation placement uses local elevation, slope, moisture and distance to
+  water, keeping steep dry ridges exposed and concentrating forest and
+  understory in sheltered wet valleys.
 - Terrain rendering is split into seamless 64-unit chunks. The complete
   collider remains resident, while chunk GPU meshes are uploaded lazily as
   they enter the camera's streaming radius.
@@ -208,9 +243,8 @@ The bottom hotbar contains five selectable tool slots. The axe starts in slot
 one. Trees loaded as `tree` or `oak` resource nodes can be chopped for wood,
 which is displayed in the inventory opened with `Tab`.
 
-Dependencies (`GLFW`, `GLAD`, `GLM`) are downloaded by CMake through
-`FetchContent`. PNG texture decoding uses the system `libpng` development
-package.
+Dependencies (`GLFW`, `GLAD`, `GLM`, `zlib` and `libpng`) are downloaded and
+built by CMake through `FetchContent`.
 
 ## Tests
 
@@ -225,8 +259,7 @@ ctest --test-dir build/debug --output-on-failure
 ## Windows build
 
 Install Visual Studio 2022 with the Desktop development with C++ workload,
-CMake and [vcpkg](https://github.com/microsoft/vcpkg), or let the build script
-bootstrap them through `winget`:
+CMake and Git, or let the build script bootstrap them through `winget`:
 
 ```bat
 build-windows.bat Release
@@ -235,13 +268,20 @@ build-windows.bat --bootstrap-only
 build-windows.bat Debug --clean --no-package
 ```
 
-Use `Debug` instead of `Release` for a debug build. The vcpkg manifest installs
-`libpng` automatically. Runtime assets are copied next to the executable. The
-build script runs tests before creating a portable
+Use `Debug` instead of `Release` for a debug build. CMake downloads and builds
+all library dependencies automatically. Runtime assets are copied next to the
+executable. The build script runs tests before creating a portable
 `dist\pcolonist-windows-x64-<configuration>.zip` archive.
-Bootstrap mode installs Git, CMake and Visual Studio Build Tools when missing,
-then creates a local `.tools\vcpkg` checkout. It requires `winget` and may
-request administrator permission from Windows.
+Bootstrap mode installs Git, CMake and Visual Studio Build Tools when missing.
+It requires `winget` and may request administrator permission from Windows.
+
+Every script invocation writes its complete output to
+`build\logs\build-windows.log`. The log is overwritten by the next invocation
+and its path is printed after success or failure.
+
+When changing dependency versions or recovering from an old dependency build,
+run `build-windows.bat Release --clean` to regenerate the CMake dependency
+cache.
 
 Windows build options:
 

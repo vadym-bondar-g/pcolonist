@@ -20,7 +20,7 @@ enum class UiAction {
     ToggleBloom,
     RespawnPlayer,
     TeleportVolcano,
-    TeleportNextGrotto,
+    TeleportNextLandmark,
     CycleWeather,
     SetNoon,
     SetNight,

@@ -44,7 +44,15 @@ glm::vec3 WeatherSystem::skyColor() const {
 }
 
 glm::vec3 WeatherSystem::fogColor() const {
-    return weather_ == WeatherType::Storm ? glm::vec3{0.16F, 0.18F, 0.2F} : skyColor();
+    const float light = daylight();
+    const glm::vec3 clearHaze = glm::mix(glm::vec3{0.035F, 0.055F, 0.085F}, glm::vec3{0.46F, 0.62F, 0.78F}, light);
+    if (weather_ == WeatherType::Storm) {
+        return glm::mix(glm::vec3{0.10F, 0.12F, 0.14F}, glm::vec3{0.24F, 0.27F, 0.30F}, light);
+    }
+    if (weather_ == WeatherType::Cloudy) {
+        return glm::mix(clearHaze, glm::vec3{0.43F, 0.49F, 0.54F}, 0.5F);
+    }
+    return clearHaze;
 }
 
 glm::vec3 WeatherSystem::horizonColor() const {
@@ -80,7 +88,9 @@ glm::vec3 WeatherSystem::ambientColor() const {
 }
 
 float WeatherSystem::fogDensity() const {
-    return weather_ == WeatherType::Storm ? 0.045F : weather_ == WeatherType::Cloudy ? 0.025F : 0.012F;
+    const float dawnDuskMist = (1.0F - std::abs(daylight() * 2.0F - 1.0F)) * 0.0018F;
+    const float base = weather_ == WeatherType::Storm ? 0.0125F : weather_ == WeatherType::Cloudy ? 0.0075F : 0.0038F;
+    return base + dawnDuskMist;
 }
 
 float WeatherSystem::cloudiness() const {

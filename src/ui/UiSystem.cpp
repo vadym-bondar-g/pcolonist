@@ -278,7 +278,7 @@ void UiSystem::render(
 
         debugButton(0, 0, "RESPAWN", "ARRIVAL CAMP", cyan);
         debugButton(1, 0, "VOLCANO", "TELEPORT", cyan);
-        debugButton(0, 1, "NEXT GROTTO", "TELEPORT", cyan);
+        debugButton(0, 1, "NEXT LANDMARK", "TELEPORT", cyan);
         debugButton(1, 1, "WEATHER", weather.weatherName(), cyan);
         debugButton(0, 2, "SET NOON", "DAY LIGHT", cyan);
         debugButton(1, 2, "SET NIGHT", "MOON LIGHT", cyan);
@@ -398,7 +398,7 @@ UiAction UiSystem::debugActionAt(double x, double y) const {
     constexpr std::array actions = {
         UiAction::RespawnPlayer,
         UiAction::TeleportVolcano,
-        UiAction::TeleportNextGrotto,
+        UiAction::TeleportNextLandmark,
         UiAction::CycleWeather,
         UiAction::SetNoon,
         UiAction::SetNight,

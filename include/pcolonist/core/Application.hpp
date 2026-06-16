@@ -90,7 +90,7 @@ private:
     bool inventoryOpen_ = false;
     bool debugPanelOpen_ = false;
     bool vsync_ = true;
-    std::size_t nextGrotto_ = 0;
+    std::size_t nextLandmark_ = 0;
     int windowedX_ = 100;
     int windowedY_ = 100;
     int windowedWidth_ = 1280;

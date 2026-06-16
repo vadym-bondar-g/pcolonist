@@ -349,17 +349,30 @@ void Application::loadMap() {
     const auto map = resources_.load<Mesh>("maps/demo_map.obj", [this] {
         return MeshLoader::load(assets_, "maps/demo_map.obj");
     });
+    const auto mapLod1 = resources_.load<Mesh>("maps/demo_map_lod1.obj", [this] {
+        return MeshLoader::load(assets_, "maps/demo_map_lod1.obj");
+    });
+    const auto mapLod2 = resources_.load<Mesh>("maps/demo_map_lod2.obj", [this] {
+        return MeshLoader::load(assets_, "maps/demo_map_lod2.obj");
+    });
 
     const Entity mapEntity = registry_.create();
     const Transform& transform = registry_.emplace<Transform>(mapEntity);
     registry_.emplace<TerrainCollider>(mapEntity, *map, transform);
-    for (auto& [chunk, mesh] : splitTerrain(*map)) {
-        const Entity chunkEntity = registry_.create();
-        registry_.emplace<Transform>(chunkEntity);
-        registry_.emplace<MeshRenderer>(chunkEntity, std::move(mesh));
-        registry_.emplace<TerrainSurface>(chunkEntity);
-        registry_.emplace<TerrainChunk>(chunkEntity, chunk);
-    }
+
+    const auto addTerrainLod = [this](const Mesh& source, TerrainLod lod) {
+        for (auto& [chunk, mesh] : splitTerrain(source)) {
+            const Entity chunkEntity = registry_.create();
+            registry_.emplace<Transform>(chunkEntity);
+            registry_.emplace<MeshRenderer>(chunkEntity, std::move(mesh));
+            registry_.emplace<TerrainSurface>(chunkEntity);
+            registry_.emplace<TerrainChunk>(chunkEntity, chunk);
+            registry_.emplace<TerrainLod>(chunkEntity, lod);
+        }
+    };
+    addTerrainLod(*map, TerrainLod{0.0F, 145.0F});
+    addTerrainLod(*mapLod1, TerrainLod{145.0F, 280.0F});
+    addTerrainLod(*mapLod2, TerrainLod{280.0F, 100000.0F});
 }
 
 void Application::createWorld() {
@@ -374,6 +387,9 @@ void Application::createWorld() {
     });
     const auto lavaMesh = resources_.load<Mesh>("builtin/lava", [] {
         return MeshFactory::disc(5.0F, 64, {1.0F, 0.12F, 0.005F});
+    });
+    const auto internalWaterMesh = resources_.load<Mesh>("maps/internal_water.obj", [this] {
+        return MeshLoader::load(assets_, "maps/internal_water.obj");
     });
 
     const std::array<Transform, 8> obstacles = {
@@ -397,6 +413,11 @@ void Application::createWorld() {
     registry_.emplace<Transform>(water, Transform{{0.0F, -0.45F, 0.0F}});
     registry_.emplace<MeshRenderer>(water, waterMesh);
     registry_.emplace<WaterSurface>(water, WaterSurface{{320.0F, 320.0F}});
+
+    const Entity internalWater = registry_.create();
+    registry_.emplace<Transform>(internalWater);
+    registry_.emplace<MeshRenderer>(internalWater, internalWaterMesh);
+    registry_.emplace<WaterSurface>(internalWater, WaterSurface{{0.0F, 0.0F}, false});
 
     const Entity lava = registry_.create();
     registry_.emplace<Transform>(lava, Transform{{0.0F, 13.4F, 0.0F}});
@@ -457,14 +478,18 @@ void Application::handleUiAction(UiAction action) {
     case UiAction::TeleportVolcano:
         teleportPlayer({0.0F, 34.0F, 18.0F});
         break;
-    case UiAction::TeleportNextGrotto: {
-        constexpr std::array grottos = {
+    case UiAction::TeleportNextLandmark: {
+        constexpr std::array landmarks = {
+            glm::vec3{-104.0F, 11.0F, -2.0F},
+            glm::vec3{104.0F, 3.0F, 25.0F},
+            glm::vec3{31.0F, 10.0F, -24.0F},
+            glm::vec3{56.0F, 4.0F, -11.0F},
             glm::vec3{-72.0F, 4.0F, -61.0F},
             glm::vec3{65.0F, 2.0F, 63.0F},
             glm::vec3{-91.0F, 3.0F, 60.0F},
         };
-        teleportPlayer(grottos[nextGrotto_ % grottos.size()]);
-        ++nextGrotto_;
+        teleportPlayer(landmarks[nextLandmark_ % landmarks.size()]);
+        ++nextLandmark_;
         break;
     }
     case UiAction::CycleWeather:

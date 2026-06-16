@@ -12,6 +12,7 @@ void runTerrainColliderTests();
 void runObjLoaderTests();
 void runWorldSystemTests();
 void runInventoryTests();
+void runPngLoaderTests();
 
 namespace {
 
@@ -116,6 +117,7 @@ int main() {
         runObjLoaderTests();
         runWorldSystemTests();
         runInventoryTests();
+        runPngLoaderTests();
     } catch (const std::exception& error) {
         std::cerr << "AssetSystem test failed: " << error.what() << '\n';
         return EXIT_FAILURE;

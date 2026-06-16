@@ -8,6 +8,7 @@
 #include "pcolonist/world/WeatherSystem.hpp"
 
 #include <glad/gl.h>
+#include <glm/common.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
@@ -22,6 +23,9 @@ namespace {
 
 constexpr int shadowSize = 2048;
 constexpr std::array<float, 2> shadowRanges = {48.0F, 190.0F};
+constexpr float cameraFarPlane = 760.0F;
+constexpr float terrainStreamingDistance = 340.0F;
+constexpr float objectDrawDistance = 310.0F;
 
 glm::mat4 modelMatrix(const pcolonist::Transform& transform) {
     glm::mat4 model = glm::translate(glm::mat4(1.0F), transform.position);
@@ -59,13 +63,24 @@ std::vector<RenderBatch> collectBatches(
             const bool lava = registry.has<pcolonist::LavaSurface>(entity);
             if (registry.has<pcolonist::TerrainChunk>(entity)) {
                 const pcolonist::TerrainChunk& chunk = registry.get<pcolonist::TerrainChunk>(entity);
-                if (glm::distance(glm::vec2{cameraPosition.x, cameraPosition.z}, chunk.center) > chunk.radius + 210.0F) {
+                const float chunkDistance = glm::distance(glm::vec2{cameraPosition.x, cameraPosition.z}, chunk.center);
+                if (chunkDistance > chunk.radius + terrainStreamingDistance) {
+                    return;
+                }
+                if (registry.has<pcolonist::TerrainLod>(entity)) {
+                    const pcolonist::TerrainLod& lod = registry.get<pcolonist::TerrainLod>(entity);
+                    if (chunkDistance < lod.minDistance || chunkDistance >= lod.maxDistance) {
+                        return;
+                    }
+                }
+                if (shadows && registry.has<pcolonist::TerrainLod>(entity)
+                    && registry.get<pcolonist::TerrainLod>(entity).minDistance > 0.0F) {
                     return;
                 }
             }
             const float distance = glm::length(transform.position - cameraPosition);
             const float scale = std::max({transform.scale.x, transform.scale.y, transform.scale.z});
-            if (!terrain && !water && distance > 190.0F + scale * 8.0F) {
+            if (!terrain && !water && distance > objectDrawDistance + scale * 10.0F) {
                 return;
             }
             auto batch = std::find_if(batches.begin(), batches.end(), [&](const RenderBatch& candidate) {
@@ -134,7 +149,7 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
 
     Shader& shader = shaders_.get("scene");
     shader.use();
-    shader.setMat4("projection", glm::perspective(glm::radians(70.0F), aspectRatio, 0.1F, 520.0F));
+    shader.setMat4("projection", glm::perspective(glm::radians(70.0F), aspectRatio, 0.1F, cameraFarPlane));
     shader.setMat4("view", camera.viewMatrix());
     shader.setMat4("lightSpaceMatrices[0]", lightSpaceMatrices_[0]);
     shader.setMat4("lightSpaceMatrices[1]", lightSpaceMatrices_[1]);
@@ -213,8 +228,16 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
 
     bool underwater = false;
     registry.each<Transform, WaterSurface>(
-        [&underwater, &camera](Entity, const Transform& transform, const WaterSurface&) {
-            underwater = underwater || camera.position().y < transform.position.y;
+        [&underwater, &camera](Entity, const Transform& transform, const WaterSurface& surface) {
+            const glm::vec2 distance = glm::abs(glm::vec2{
+                camera.position().x - transform.position.x,
+                camera.position().z - transform.position.z,
+            });
+            underwater = underwater
+                || (surface.affectsPhysics
+                    && distance.x <= surface.halfExtents.x * transform.scale.x
+                    && distance.y <= surface.halfExtents.y * transform.scale.z
+                    && camera.position().y < transform.position.y);
         });
     postProcess(weather, underwater);
 }

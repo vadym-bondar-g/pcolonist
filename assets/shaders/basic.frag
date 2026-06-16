@@ -291,8 +291,14 @@ void main() {
         color = mix(color, foam, clamp(foamAmount, 0.0, 0.72));
     }
 
-    float distanceToCamera = length(cameraPosition - worldPosition);
-    float fog = clamp(1.0 - exp(-fogDensity * distanceToCamera), 0.0, 0.94);
+    vec3 cameraToFragment = worldPosition - cameraPosition;
+    float distanceToCamera = length(cameraToFragment);
+    float horizontalDistance = length(cameraToFragment.xz);
+    float heightFog = exp(-max(worldPosition.y + 2.0, 0.0) * 0.035);
+    float horizonFog = smoothstep(95.0, 620.0, horizontalDistance);
+    float weatherFog = 1.0 - exp(-fogDensity * horizontalDistance);
+    float lowMist = heightFog * smoothstep(18.0, 170.0, horizontalDistance) * (0.05 + cloudiness * 0.14);
+    float fog = clamp(weatherFog * (0.34 + horizonFog * 0.72) + lowMist, 0.0, 0.78 + cloudiness * 0.12);
     color = mix(color, fogColor, fog);
     fragmentColor = vec4(color, 1.0);
 }

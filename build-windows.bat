@@ -1,6 +1,23 @@
 @echo off
 setlocal EnableExtensions
 
+if /I "%~1"=="--internal" (
+    shift
+    goto initialize
+)
+
+set "LOG_DIR=%~dp0build\logs"
+set "LOG_FILE=%LOG_DIR%\build-windows.log"
+if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+echo Running Windows build. Full log: %LOG_FILE%
+call "%~f0" --internal %* > "%LOG_FILE%" 2>&1
+set "BUILD_ERROR=%ERRORLEVEL%"
+type "%LOG_FILE%"
+echo.
+echo Full build log: %LOG_FILE%
+exit /b %BUILD_ERROR%
+
+:initialize
 set "CONFIG=Release"
 set "BOOTSTRAP=0"
 set "BOOTSTRAP_ONLY=0"
@@ -62,6 +79,8 @@ echo   --clean           Remove the Windows build directory before configuring.
 echo   --no-tests        Skip automated tests.
 echo   --no-package      Skip portable ZIP creation.
 echo   --help, -h        Show this help.
+echo.
+echo Complete output is written to build\logs\build-windows.log.
 exit /b 0
 
 :show_help_error
@@ -80,6 +99,14 @@ if "%BOOTSTRAP_ONLY%"=="1" (
 
 if exist "%ProgramFiles%\CMake\bin\cmake.exe" set "PATH=%ProgramFiles%\CMake\bin;%PATH%"
 if exist "%ProgramFiles%\Git\cmd\git.exe" set "PATH=%ProgramFiles%\Git\cmd;%PATH%"
+
+where git >nul 2>nul
+if errorlevel 1 (
+    echo Error: Git is not available in PATH.
+    echo CMake requires Git to download project dependencies.
+    echo Re-run with --bootstrap to install build dependencies.
+    exit /b 2
+)
 
 where cmake >nul 2>nul
 if errorlevel 1 (
@@ -104,23 +131,18 @@ if "%PACKAGE%"=="1" (
     )
 )
 
-if "%VCPKG_ROOT%"=="" if exist "%~dp0.tools\vcpkg\scripts\buildsystems\vcpkg.cmake" set "VCPKG_ROOT=%~dp0.tools\vcpkg"
-
-if "%VCPKG_ROOT%"=="" (
-    echo Error: VCPKG_ROOT is not set.
-    echo Re-run with --bootstrap to install a local vcpkg copy.
-    exit /b 1
-)
-
-if not exist "%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" (
-    echo Error: vcpkg toolchain was not found under VCPKG_ROOT.
-    exit /b 1
-)
-
 call :find_visual_studio
 if errorlevel 1 exit /b 1
 
 set "BUILD_DIR=%~dp0build\windows"
+if exist "%BUILD_DIR%\CMakeCache.txt" (
+    findstr /I /C:"vcpkg.cmake" "%BUILD_DIR%\CMakeCache.txt" >nul 2>nul
+    if not errorlevel 1 (
+        echo Removing previous vcpkg-based Windows build...
+        cmake -E remove_directory "%BUILD_DIR%"
+        if errorlevel 1 exit /b 1
+    )
+)
 if "%CLEAN%"=="1" (
     echo Removing previous Windows build...
     cmake -E remove_directory "%BUILD_DIR%"
@@ -134,8 +156,6 @@ echo Configuring %CONFIG% build...
 cmake -S "%~dp0." -B "%BUILD_DIR%" ^
     -G "Visual Studio 17 2022" ^
     -A x64 ^
-    -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" ^
-    -DVCPKG_TARGET_TRIPLET=x64-windows ^
     -DBUILD_TESTING=%BUILD_TESTING%
 if errorlevel 1 exit /b 1
 
@@ -261,25 +281,6 @@ if errorlevel 1 (
 )
 
 if exist "%ProgramFiles%\Git\cmd\git.exe" set "PATH=%ProgramFiles%\Git\cmd;%PATH%"
-if exist "%~dp0.tools\vcpkg" if not exist "%~dp0.tools\vcpkg\scripts\buildsystems\vcpkg.cmake" (
-    echo Error: Local .tools\vcpkg checkout is incomplete.
-    echo Remove it and re-run this command.
-    exit /b 1
-)
-if not exist "%~dp0.tools\vcpkg\scripts\buildsystems\vcpkg.cmake" (
-    where git >nul 2>nul
-    if errorlevel 1 (
-        echo Error: Git installation completed, but git is not available in PATH yet.
-        echo Open a new terminal and run this command again.
-        exit /b 1
-    )
-    if not exist "%~dp0.tools" mkdir "%~dp0.tools"
-    git clone --depth 1 https://github.com/microsoft/vcpkg.git "%~dp0.tools\vcpkg"
-    if errorlevel 1 exit /b 1
-)
-call "%~dp0.tools\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
-if errorlevel 1 exit /b 1
-set "VCPKG_ROOT=%~dp0.tools\vcpkg"
 call :find_visual_studio
 if errorlevel 1 exit /b 1
 exit /b 0

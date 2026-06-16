@@ -38,6 +38,9 @@ std::optional<WaterHit> waterSurface(Registry& registry, glm::vec2 point, float 
     std::optional<WaterHit> result;
     registry.each<Transform, WaterSurface>(
         [&result, point, time](Entity, const Transform& transform, const WaterSurface& surface) {
+            if (!surface.affectsPhysics) {
+                return;
+            }
             const glm::vec2 half = surface.halfExtents * glm::vec2{transform.scale.x, transform.scale.z};
             if (std::abs(point.x - transform.position.x) <= half.x
                 && std::abs(point.y - transform.position.z) <= half.y) {

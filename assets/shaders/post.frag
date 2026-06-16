@@ -14,7 +14,7 @@ uniform int bloomEnabled;
 uniform int underwater;
 
 const float cameraNear = 0.1;
-const float cameraFar = 520.0;
+const float cameraFar = 760.0;
 
 float luminance(vec3 color) {
     return dot(color, vec3(0.2126, 0.7152, 0.0722));
@@ -152,7 +152,7 @@ void main() {
     float rawDepth = texture(sceneDepth, uv).r;
     float viewDepth = rawDepth < 0.9999 ? linearDepth(rawDepth) : cameraFar;
     float geometryMask = 1.0 - smoothstep(0.9992, 0.99995, rawDepth);
-    float detailFade = 1.0 - smoothstep(45.0, 210.0, viewDepth);
+    float detailFade = 1.0 - smoothstep(55.0, 260.0, viewDepth);
     color += (color - localBlur) * 0.14 * detailFade * geometryMask;
     color *= screenSpaceOcclusion(uv, texel);
     if (bloomEnabled != 0) {
@@ -160,7 +160,7 @@ void main() {
     }
 
     float aerialPerspective = rawDepth < 0.9999
-        ? smoothstep(75.0, 430.0, viewDepth) * (0.08 + cloudiness * 0.17)
+        ? smoothstep(120.0, 620.0, viewDepth) * (0.045 + cloudiness * 0.13)
         : 0.0;
     vec3 aerialColor = mix(vec3(0.12, 0.18, 0.28), vec3(0.42, 0.58, 0.72), daylight);
     color = mix(color, aerialColor, aerialPerspective);

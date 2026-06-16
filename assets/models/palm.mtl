@@ -1,0 +1,8 @@
+newmtl PalmTrunk
+Kd 0.31 0.19 0.08
+Ks 0.04 0.04 0.04
+Ns 7
+newmtl PalmLeafDark
+Kd 0.055 0.28 0.09
+Ks 0.03 0.03 0.03
+Ns 5

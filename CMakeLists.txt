@@ -8,6 +8,13 @@ set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build GLFW documentation")
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build GLFW tests")
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "Build GLFW examples")
 set(GLM_BUILD_TESTS OFF CACHE BOOL "Build GLM tests")
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build dependencies as static libraries")
+set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "Build zlib examples")
+set(PNG_SHARED OFF CACHE BOOL "Build shared libpng")
+set(PNG_STATIC ON CACHE BOOL "Build static libpng")
+set(PNG_TESTS OFF CACHE BOOL "Build libpng tests")
+set(PNG_TOOLS OFF CACHE BOOL "Build libpng tools")
+set(SKIP_INSTALL_ALL ON CACHE BOOL "Skip dependency install rules")
 
 FetchContent_Declare(
     glfw
@@ -31,10 +38,37 @@ FetchContent_Declare(
     SOURCE_SUBDIR cmake
 )
 
-FetchContent_MakeAvailable(glfw glm glad)
+FetchContent_Declare(
+    ZLIB
+    GIT_REPOSITORY https://github.com/madler/zlib.git
+    GIT_TAG v1.3.1
+    GIT_SHALLOW TRUE
+    OVERRIDE_FIND_PACKAGE
+)
+
+FetchContent_Declare(
+    libpng
+    GIT_REPOSITORY https://github.com/pnggroup/libpng.git
+    GIT_TAG v1.6.44
+    GIT_SHALLOW TRUE
+)
+
+FetchContent_MakeAvailable(glfw glm glad ZLIB)
+if(NOT TARGET ZLIB::ZLIB)
+    add_library(ZLIB::ZLIB ALIAS zlibstatic)
+endif()
+
+# Libpng's generated pnglibconf.h can detect a different zlib.h than the one
+# propagated by ZLIB::ZLIB on Windows. Use libpng's supported prebuilt config
+# so PNG_ZLIB_VERNUM does not depend on the host's include path or AWK.
+set(AWK "" CACHE FILEPATH "Disable libpng AWK config generation" FORCE)
+FetchContent_MakeAvailable(libpng)
+if(NOT TARGET PNG::PNG)
+    add_library(PNG::PNG ALIAS png_static)
+endif()
+
 glad_add_library(glad_gl_core_33 REPRODUCIBLE API gl:core=3.3)
 find_package(Threads REQUIRED)
-find_package(PNG REQUIRED)
 
 add_executable(pcolonist
     main.cpp
@@ -78,13 +112,14 @@ target_compile_definitions(pcolonist PRIVATE
     PCOLONIST_ASSET_DIR="assets"
 )
 
-add_custom_command(TARGET pcolonist POST_BUILD
+add_custom_target(pcolonist_runtime_assets ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/assets"
         "$<TARGET_FILE_DIR:pcolonist>/assets"
-    COMMENT "Copying runtime assets"
+    COMMENT "Synchronizing runtime assets"
     VERBATIM
 )
+add_dependencies(pcolonist_runtime_assets pcolonist)
 
 set(PCOLONIST_SHADER_PROGRAMS
     basic
@@ -142,19 +177,24 @@ if(BUILD_TESTING)
         tests/InventoryTests.cpp
         tests/TerrainColliderTests.cpp
         tests/WorldSystemTests.cpp
+        tests/PngLoaderTests.cpp
         src/assets/Assets.cpp
         src/assets/ObjLoader.cpp
         src/gameplay/Inventory.cpp
         src/physics/PhysicsSystem.cpp
         src/physics/StaticColliderGrid.cpp
         src/physics/TerrainCollider.cpp
+        src/render/PngLoader.cpp
         src/world/WaterWaves.cpp
         src/world/WeatherSystem.cpp
     )
     target_include_directories(pcolonist_tests PRIVATE include)
-    target_link_libraries(pcolonist_tests PRIVATE glm::glm)
+    target_link_libraries(pcolonist_tests PRIVATE glm::glm PNG::PNG)
     target_compile_features(pcolonist_tests PRIVATE cxx_std_20)
     set_target_properties(pcolonist_tests PROPERTIES CXX_EXTENSIONS OFF)
+    target_compile_definitions(pcolonist_tests PRIVATE
+        PCOLONIST_TEST_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    )
 
     if(MSVC)
         target_compile_options(pcolonist_tests PRIVATE /W4 /permissive-)
