@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import math
 import random
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -15,12 +16,20 @@ MAP_LOD_PATHS = (
     ROOT / "assets" / "maps" / "demo_map_lod1.obj",
     ROOT / "assets" / "maps" / "demo_map_lod2.obj",
 )
+SPLIT_MAP_PATHS = {
+    "terrain": ROOT / "assets" / "maps" / "demo_map_terrain.obj",
+    "structures": ROOT / "assets" / "maps" / "demo_map_structures.obj",
+    "rocks": ROOT / "assets" / "maps" / "demo_map_rocks.obj",
+}
 INTERNAL_WATER_PATH = ROOT / "assets" / "maps" / "internal_water.obj"
+LANDMARKS_PATH = ROOT / "assets" / "maps" / "landmarks.json"
+WALKABILITY_PATH = ROOT / "assets" / "maps" / "walkability.pgm"
 SCENE_PATH = ROOT / "assets" / "scripts" / "models.scene"
 SEED = 1847
 GRID = 241
 SPACING = 2.0
 LOD_STEPS = (2, 4)
+WALKABILITY_GRID = 121
 
 
 @dataclass(frozen=True)
@@ -126,6 +135,21 @@ class BiomeConfig:
 
 
 @dataclass(frozen=True)
+class DecorationRuleConfig:
+    name: str
+    count: int
+    allowed_biomes: tuple[str, ...]
+    min_height: float
+    max_height: float
+    max_slope: float
+    min_moisture: float = 0.0
+    min_radius: float = 0.0
+    max_radius: float = 1.0
+    avoid_path_width: float = 0.0
+    avoid_grotto_radius: float = 0.0
+
+
+@dataclass(frozen=True)
 class IslandModelConfig:
     terrain: TerrainConfig = field(default_factory=TerrainConfig)
     water: WaterConfig = field(default_factory=WaterConfig)
@@ -171,6 +195,13 @@ class IslandModelConfig:
         RockSpireConfig((119.0, 50.0), 5.2, 14.0),
         RockSpireConfig((-72.0, -79.0), 4.0, 12.0),
     )
+    decoration_rules: tuple[DecorationRuleConfig, ...] = (
+        DecorationRuleConfig("forest", 280, ("coastal_jungle", "temperate_forest", "wetland"), 0.1, 15.0, 0.82, 0.18, 0.0, 0.88, 7.0, 18.0),
+        DecorationRuleConfig("understory", 260, ("wetland", "coastal_jungle", "temperate_forest", "highland"), -0.2, 12.0, 0.72, 0.25, 0.0, 0.90, 5.0, 14.0),
+        DecorationRuleConfig("coastal_rocks", 120, ("beach", "highland", "volcanic"), -8.0, 3.0, 10.0, 0.0, 0.70, 1.04),
+        DecorationRuleConfig("palms", 95, ("beach", "coastal_jungle", "wetland"), -0.45, 2.2, 0.45, 0.36, 0.0, 0.95),
+        DecorationRuleConfig("mushrooms", 64, ("wetland",), -0.3, 4.0, 0.45, 0.70, 0.0, 0.90),
+    )
 
 
 CONFIG = IslandModelConfig()
@@ -182,6 +213,7 @@ VOLCANO = CONFIG.volcano
 GROTTOS = CONFIG.grottos
 GROTTO_POSITIONS = tuple(grotto.position for grotto in CONFIG.grottos)
 BIOMES = {biome.name: biome for biome in CONFIG.biomes}
+DECORATION_RULES = {rule.name: rule for rule in CONFIG.decoration_rules}
 GRANITE_HOUSE = CONFIG.granite_house
 HARBOR_CENTER = WATER.harbor_center
 LAKE_CENTER = WATER.lake_center
@@ -632,6 +664,27 @@ def terrain_color(x: float, y: float, z: float) -> tuple[float, float, float]:
     return color
 
 
+def walkability_score(x: float, z: float) -> float:
+    height, slope, moisture = biome_metrics(x, z)
+    radius = island_radius(x, z)
+    distance_to_water = water_distance(x, z)
+    volcano_x, volcano_z = VOLCANO.center
+    crater_distance = math.hypot(x - volcano_x, z - volcano_z)
+    if radius > 1.0 or height < -0.25:
+        return 0.0
+    if crater_distance < VOLCANO.rim_radius + 1.0 and height > 8.0:
+        return 0.08
+
+    slope_score = 1.0 - smoothstep(0.28, 0.95, slope)
+    beach_score = 0.25 * smoothstep(0.78, 0.93, radius) * (1.0 - smoothstep(0.45, 0.9, slope))
+    river_bank_score = 0.18 * (1.0 - smoothstep(8.0, WATER.wet_bank_width, distance_to_water))
+    plateau_score = 0.14 * smoothstep(1.5, 4.0, height) * (1.0 - smoothstep(0.16, 0.42, slope))
+    path_score = 0.18 * (1.0 - smoothstep(3.5, 8.0, abs(x + 0.15 * z + 14.0)))
+    wet_penalty = 0.35 * moisture * (1.0 - smoothstep(0.0, 7.0, distance_to_water))
+    score = slope_score + beach_score + river_bank_score + plateau_score + path_score - wet_penalty
+    return max(0.0, min(1.0, score))
+
+
 def add_box(
     vertices: list[tuple[float, float, float, float, float, float]],
     faces: list[tuple[int, ...]],
@@ -846,7 +899,7 @@ def build_terrain_mesh(
     return vertices, faces
 
 
-def add_landmark_geometry(
+def add_structure_geometry(
     vertices: list[tuple[float, float, float, float, float, float]],
     faces: list[tuple[int, ...]],
 ) -> None:
@@ -900,6 +953,11 @@ def add_landmark_geometry(
         for x in (-28.0, -22.0):
             add_box(vertices, faces, (x, -1.1, z), (1.0, 2.6, 1.0), stone)
 
+
+def add_rock_geometry(
+    vertices: list[tuple[float, float, float, float, float, float]],
+    faces: list[tuple[int, ...]],
+) -> None:
     # Irregular granite needles and coastal stacks break up the height-field silhouette.
     for index, spire in enumerate(ROCK_SPIRES):
         x, z = spire.position
@@ -927,10 +985,31 @@ def add_landmark_geometry(
         add_islet(vertices, faces, x, z, radius_x, radius_z, 1.6 + index * 0.35, index * 7.1 + 2.0)
 
 
+def add_landmark_geometry(
+    vertices: list[tuple[float, float, float, float, float, float]],
+    faces: list[tuple[int, ...]],
+) -> None:
+    add_structure_geometry(vertices, faces)
+    add_rock_geometry(vertices, faces)
+
+
 def generate_map() -> None:
     vertices, faces = build_terrain_mesh(1)
+    write_obj(SPLIT_MAP_PATHS["terrain"], "mysterious_island_terrain", vertices, faces)
     add_landmark_geometry(vertices, faces)
     write_obj(MAP_PATH, "mysterious_island", vertices, faces)
+
+
+def generate_split_maps() -> None:
+    structure_vertices: list[tuple[float, float, float, float, float, float]] = []
+    structure_faces: list[tuple[int, ...]] = []
+    add_structure_geometry(structure_vertices, structure_faces)
+    write_obj(SPLIT_MAP_PATHS["structures"], "mysterious_island_structures", structure_vertices, structure_faces)
+
+    rock_vertices: list[tuple[float, float, float, float, float, float]] = []
+    rock_faces: list[tuple[int, ...]] = []
+    add_rock_geometry(rock_vertices, rock_faces)
+    write_obj(SPLIT_MAP_PATHS["rocks"], "mysterious_island_rocks", rock_vertices, rock_faces)
 
 
 def generate_lod_maps() -> None:
@@ -1005,6 +1084,83 @@ def generate_internal_water() -> None:
     write_obj(INTERNAL_WATER_PATH, "grant_lake_and_mercy_river", vertices, faces)
 
 
+def generate_walkability_map() -> None:
+    half = (GRID - 1) * SPACING * 0.5
+    step = (half * 2.0) / (WALKABILITY_GRID - 1)
+    rows: list[list[int]] = []
+    for row in range(WALKABILITY_GRID):
+        z = half - row * step
+        values: list[int] = []
+        for column in range(WALKABILITY_GRID):
+            x = column * step - half
+            values.append(round(walkability_score(x, z) * 255.0))
+        rows.append(values)
+
+    lines = [
+        "P2",
+        "# Generated by tools/generate_island.py. 0=blocked, 255=easy traversal.",
+        f"{WALKABILITY_GRID} {WALKABILITY_GRID}",
+        "255",
+    ]
+    lines.extend(" ".join(str(value) for value in row) for row in rows)
+    WALKABILITY_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def landmark_entry(
+    name: str,
+    category: str,
+    x: float,
+    z: float,
+    y_offset: float = 1.6,
+    radius: float = 6.0,
+) -> dict[str, object]:
+    return {
+        "name": name,
+        "category": category,
+        "position": {
+            "x": round(x, 2),
+            "y": round(terrain_height(x, z) + y_offset, 2),
+            "z": round(z, 2),
+        },
+        "radius": radius,
+        "walkability": round(walkability_score(x, z), 3),
+    }
+
+
+def generate_landmarks() -> None:
+    landmarks: list[dict[str, object]] = [
+        landmark_entry("arrival_camp", "camp", -32.0, 77.0, 1.2, 10.0),
+        landmark_entry("granite_house", "shelter", GRANITE_HOUSE[0], GRANITE_HOUSE[1], 2.0, 12.0),
+        landmark_entry("natural_harbor", "harbor", HARBOR_CENTER[0], HARBOR_CENTER[1], 1.2, 18.0),
+        landmark_entry("grant_lake", "water", LAKE_CENTER[0], LAKE_CENTER[1], 1.2, 18.0),
+        landmark_entry("mercy_river_source", "water", RIVER_PATH[0][0], RIVER_PATH[0][1], 1.0, 7.0),
+        landmark_entry("mercy_river_mouth", "water", RIVER_PATH[-1][0], RIVER_PATH[-1][1], 1.0, 9.0),
+        landmark_entry("volcano_crater", "volcano", VOLCANO.center[0], VOLCANO.center[1], 8.0, 20.0),
+        landmark_entry("sunken_temple", "ruin", 0.0, -84.0, 1.3, 12.0),
+        landmark_entry("watchtower", "ruin", 91.0, 18.0, 2.0, 10.0),
+        landmark_entry("standing_stones", "ruin", -82.0, 38.0, 1.5, 12.0),
+    ]
+    for index, grotto in enumerate(GROTTOS, start=1):
+        x, z = grotto.position
+        landmarks.append(landmark_entry(f"hidden_grotto_{index}", "grotto", x, z, 1.4, grotto.chamber_radius))
+    for index, progress in enumerate(WATER.waterfall_progresses, start=1):
+        x, z = path_point(RIVER_PATH, progress)
+        landmarks.append(landmark_entry(f"mercy_falls_{index}", "waterfall", x, z, 1.0, 7.0))
+    for index, path in enumerate(TRIBUTARY_PATHS, start=1):
+        x, z = path[0]
+        landmarks.append(landmark_entry(f"tributary_source_{index}", "water", x, z, 1.0, 6.0))
+    for index, (x, z, radius_x, radius_z) in enumerate(CONFIG.islets, start=1):
+        landmarks.append(landmark_entry(f"offshore_islet_{index}", "islet", x, z, 1.2, max(radius_x, radius_z)))
+
+    payload = {
+        "generated_by": "tools/generate_island.py",
+        "seed": SEED,
+        "coordinate_system": "OBJ world coordinates, y sampled from generated terrain",
+        "landmarks": landmarks,
+    }
+    LANDMARKS_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def spawn(
     lines: list[str],
     model: str,
@@ -1077,12 +1233,13 @@ def generate_scene() -> None:
         spawn_collider(lines, (grotto_x, ground + 4.0, grotto_z), (3.1, 0.45, 5.0))
 
     lines.extend(("", "# Dense forest, with clearings around landmarks and the main trail."))
-    for _ in range(280):
+    forest_rule = DECORATION_RULES["forest"]
+    for _ in range(forest_rule.count):
         for _attempt in range(100):
             x = random.uniform(-116.0, 116.0)
             z = random.uniform(-98.0, 104.0)
             radius = island_radius(x, z)
-            near_path = abs(x + 0.15 * z + 14.0) < 7.0
+            near_path = abs(x + 0.15 * z + 14.0) < forest_rule.avoid_path_width
             near_landmark = min(
                 math.hypot(x, z),
                 math.hypot(x, z + 84.0),
@@ -1095,10 +1252,13 @@ def generate_scene() -> None:
             biome = classify_biome(x, height, z, slope, moisture)
             forest_chance = biome.tree_density * moisture * (1.0 - smoothstep(0.32, 0.82, slope))
             if (
-                radius < 0.88
+                forest_rule.min_radius < radius < forest_rule.max_radius
                 and not near_path
                 and not near_landmark
-                and 0.1 < height < 15.0
+                and forest_rule.min_height < height < forest_rule.max_height
+                and slope < forest_rule.max_slope
+                and moisture >= forest_rule.min_moisture
+                and biome.name in forest_rule.allowed_biomes
                 and biome.tree_density > 0.0
                 and random.random() < forest_chance
             ):
@@ -1108,21 +1268,24 @@ def generate_scene() -> None:
         spawn(lines, model, x, z, scale, (0.78, 2.7, 0.78), random.uniform(0.0, math.tau))
 
     lines.extend(("", "# Low understory creates depth between the larger trees."))
-    for _ in range(260):
+    understory_rule = DECORATION_RULES["understory"]
+    for _ in range(understory_rule.count):
         for _attempt in range(100):
             x = random.uniform(-116.0, 116.0)
             z = random.uniform(-98.0, 104.0)
             radius = island_radius(x, z)
-            near_path = abs(x + 0.15 * z + 14.0) < 5.0
-            near_grotto = min(math.hypot(x - gx, z - gz) for gx, gz in GROTTO_POSITIONS) < 14.0
+            near_path = abs(x + 0.15 * z + 14.0) < understory_rule.avoid_path_width
+            near_grotto = min(math.hypot(x - gx, z - gz) for gx, gz in GROTTO_POSITIONS) < understory_rule.avoid_grotto_radius
             height, slope, moisture = biome_metrics(x, z)
             biome = classify_biome(x, height, z, slope, moisture)
             if (
-                radius < 0.9
+                understory_rule.min_radius < radius < understory_rule.max_radius
                 and not near_path
                 and not near_grotto
-                and -0.2 < height < 12.0
-                and slope < 0.72
+                and understory_rule.min_height < height < understory_rule.max_height
+                and slope < understory_rule.max_slope
+                and moisture >= understory_rule.min_moisture
+                and biome.name in understory_rule.allowed_biomes
                 and biome.bush_density > 0.0
                 and random.random() < biome.bush_density * max(moisture, 0.35)
             ):
@@ -1130,19 +1293,28 @@ def generate_scene() -> None:
         spawn_decor(lines, "bush", x, z, random.uniform(0.55, 1.25), random.uniform(0.0, math.tau))
 
     lines.extend(("", "# Rocks mark the coast and dangerous approaches."))
-    for _ in range(120):
+    rock_rule = DECORATION_RULES["coastal_rocks"]
+    for _ in range(rock_rule.count):
         angle = random.uniform(0.0, math.tau)
         radius = random.uniform(98.0, 126.0)
         x = math.cos(angle) * radius
         z = math.sin(angle) * radius * 0.86
-        height, slope, _ = biome_metrics(x, z)
+        height, slope, moisture = biome_metrics(x, z)
+        biome = classify_biome(x, height, z, slope, moisture)
+        if (
+            not (rock_rule.min_radius < island_radius(x, z) < rock_rule.max_radius)
+            or not (rock_rule.min_height < height < rock_rule.max_height)
+            or biome.name not in rock_rule.allowed_biomes
+        ):
+            continue
         if height > 3.0 and slope < 0.35:
             continue
         scale = random.uniform(0.7, 1.8)
         spawn(lines, "rock", x, z, scale, (1.3, 0.9, 1.1), random.uniform(0.0, math.tau))
 
     lines.extend(("", "# Palms frame beaches and the sheltered natural harbor."))
-    for _ in range(95):
+    palm_rule = DECORATION_RULES["palms"]
+    for _ in range(palm_rule.count):
         for _attempt in range(100):
             angle = random.uniform(0.0, math.tau)
             radius = random.uniform(88.0, 119.0)
@@ -1152,11 +1324,11 @@ def generate_scene() -> None:
             biome = classify_biome(x, height, z, slope, moisture)
             near_harbor = math.hypot(x - HARBOR_CENTER[0], z - HARBOR_CENTER[1]) < 38.0
             if (
-                island_radius(x, z) < 0.95
-                and -0.45 < height < 2.2
-                and slope < 0.45
-                and moisture > 0.36
-                and biome.name in {"beach", "coastal_jungle", "wetland"}
+                palm_rule.min_radius < island_radius(x, z) < palm_rule.max_radius
+                and palm_rule.min_height < height < palm_rule.max_height
+                and slope < palm_rule.max_slope
+                and moisture > palm_rule.min_moisture
+                and biome.name in palm_rule.allowed_biomes
                 and (near_harbor or z > 35.0)
             ):
                 break
@@ -1164,13 +1336,19 @@ def generate_scene() -> None:
         spawn_decor(lines, "palm", x, z, scale, random.uniform(0.0, math.tau))
 
     lines.extend(("", "# Mushrooms gather in the eastern marsh."))
-    for _ in range(64):
+    mushroom_rule = DECORATION_RULES["mushrooms"]
+    for _ in range(mushroom_rule.count):
         for _attempt in range(100):
             x = random.uniform(45.0, 108.0)
             z = random.uniform(-5.0, 70.0)
             height, slope, moisture = biome_metrics(x, z)
             biome = classify_biome(x, height, z, slope, moisture)
-            if biome.name == "wetland" and -0.3 < height < 4.0 and slope < 0.45 and moisture > 0.7:
+            if (
+                biome.name in mushroom_rule.allowed_biomes
+                and mushroom_rule.min_height < height < mushroom_rule.max_height
+                and slope < mushroom_rule.max_slope
+                and moisture > mushroom_rule.min_moisture
+            ):
                 break
         spawn(lines, "mushroom", x, z, random.uniform(0.8, 1.8), (0.35, 0.45, 0.35))
 
@@ -1179,14 +1357,21 @@ def generate_scene() -> None:
 
 def main() -> None:
     generate_map()
+    generate_split_maps()
     generate_lod_maps()
     generate_internal_water()
+    generate_walkability_map()
+    generate_landmarks()
     generate_scene()
     lod_outputs = ", ".join(path.relative_to(ROOT).as_posix() for path in MAP_LOD_PATHS)
+    split_outputs = ", ".join(path.relative_to(ROOT).as_posix() for path in SPLIT_MAP_PATHS.values())
     print(
         f"Generated {MAP_PATH.relative_to(ROOT)}, "
+        f"{split_outputs}, "
         f"{lod_outputs}, "
-        f"{INTERNAL_WATER_PATH.relative_to(ROOT)} and {SCENE_PATH.relative_to(ROOT)}"
+        f"{INTERNAL_WATER_PATH.relative_to(ROOT)}, "
+        f"{WALKABILITY_PATH.relative_to(ROOT)}, "
+        f"{LANDMARKS_PATH.relative_to(ROOT)} and {SCENE_PATH.relative_to(ROOT)}"
     )
 
 

@@ -189,10 +189,23 @@ Every frame executes ordered tasks:
 - Biome rules are also configurable there. Beach, wetland, coastal jungle,
   temperate forest, highland and volcanic biomes drive terrain vertex colors
   and vegetation density.
+- Decoration placement uses configurable rules for forests, understory, coastal
+  rocks, palms and mushrooms. Each rule controls count, allowed biomes, height,
+  slope, moisture and avoidance ranges.
 - The generator writes explicit OBJ vertex normals and two lighter terrain LOD
   meshes, `assets/maps/demo_map_lod1.obj` and `assets/maps/demo_map_lod2.obj`,
   so terrain chunks use the full mesh nearby, LOD1 at mid range and LOD2 in the
   distance.
+- It also emits split OBJ layers for downstream tools:
+  `assets/maps/demo_map_terrain.obj`, `assets/maps/demo_map_structures.obj` and
+  `assets/maps/demo_map_rocks.obj`, while keeping `demo_map.obj` as the
+  combined runtime-compatible mesh.
+- The same run exports `assets/maps/walkability.pgm`, a grayscale traversal
+  mask where dark pixels are blocked/steep/wet and bright pixels are easier to
+  cross.
+- Navigation points are written to `assets/maps/landmarks.json`, including the
+  camp, harbor, lake, river endpoints, waterfall shelves, volcano, ruins,
+  grottos, tributary sources and offshore islets.
 - Vegetation placement uses local elevation, slope, moisture and distance to
   water, keeping steep dry ridges exposed and concentrating forest and
   understory in sheltered wet valleys.
