@@ -209,6 +209,10 @@ Every frame executes ordered tasks:
   debug outputs make terrain height, biome distribution, slope, moisture,
   walkability stats and decoration tuning values visible without opening the
   full OBJ mesh.
+- Generated OBJ maps include planar UV coordinates, so external tools can
+  apply terrain textures without reconstructing UVs. The generator also emits
+  grayscale material masks for `sand`, `grass`, `rock`, `volcanic` and
+  `wetness` under `assets/maps/material_*.pgm`.
 - Navigation points are written to `assets/maps/landmarks.json`, including the
   camp, harbor, lake, river endpoints, waterfall shelves, volcano, ruins,
   grottos, tributary sources and offshore islets.

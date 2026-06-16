@@ -131,6 +131,13 @@
     "biome_map": "assets/maps/biomes.ppm",
     "heightmap": "assets/maps/heightmap.pgm",
     "landmarks": "assets/maps/landmarks.json",
+    "material_masks": {
+      "grass": "assets/maps/material_grass.pgm",
+      "rock": "assets/maps/material_rock.pgm",
+      "sand": "assets/maps/material_sand.pgm",
+      "volcanic": "assets/maps/material_volcanic.pgm",
+      "wetness": "assets/maps/material_wetness.pgm"
+    },
     "moisture_map": "assets/maps/moisture.pgm",
     "slope_map": "assets/maps/slope.pgm",
     "walkability": "assets/maps/walkability.pgm"
