@@ -69,6 +69,10 @@ endif()
 
 glad_add_library(glad_gl_core_33 REPRODUCIBLE API gl:core=3.3)
 find_package(Threads REQUIRED)
+option(PCOLONIST_ENABLE_FREETYPE_UI "Render UI text with FreeType TTF fonts" OFF)
+if(PCOLONIST_ENABLE_FREETYPE_UI)
+    find_package(Freetype REQUIRED)
+endif()
 
 add_executable(pcolonist
     main.cpp
@@ -106,6 +110,10 @@ add_executable(pcolonist
 
 target_include_directories(pcolonist PRIVATE include)
 target_link_libraries(pcolonist PRIVATE glfw glad_gl_core_33 glm::glm PNG::PNG Threads::Threads)
+if(PCOLONIST_ENABLE_FREETYPE_UI)
+    target_link_libraries(pcolonist PRIVATE Freetype::Freetype)
+    target_compile_definitions(pcolonist PRIVATE PCOLONIST_ENABLE_FREETYPE_UI=1)
+endif()
 target_compile_features(pcolonist PRIVATE cxx_std_20)
 set_target_properties(pcolonist PROPERTIES CXX_EXTENSIONS OFF)
 

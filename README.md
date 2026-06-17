@@ -275,12 +275,17 @@ Every frame executes ordered tasks:
 - `Escape`: open/close pause and settings menu
 - Top-right HUD button: toggle fullscreen when the cursor is released
 
-The settings menu pauses gameplay and provides Resume, Fullscreen, VSync,
-FPS Limit, Shadows, Bloom and Quit buttons. The limiter supports `30`, `60`,
-`120`, `144` and `UNLIMITED`.
+The main menu pauses gameplay and opens as a standalone splash screen. It has
+separate Play, Load Game, Settings and Exit entries. Load Game currently opens
+a save-slot screen and reports that no saves exist until persistence is added.
+Settings opens a separate page for Fullscreen, VSync, FPS Limit, Shadows and
+Bloom. The limiter supports `30`, `60`, `120`, `144` and `UNLIMITED`.
 
-UI text uses a built-in 5x7 bitmap font, so it renders consistently without
-external font files.
+UI text uses a built-in 5x7 bitmap font by default, so the runtime does not
+need external font libraries. TTF rendering can be enabled with
+`PCOLONIST_ENABLE_FREETYPE_UI=ON`; then the runtime prefers
+`assets/fonts/ComicSansMS.ttf`, `assets/fonts/NotoSans-Regular.ttf` and common
+system Sans fonts. The bitmap font remains as a fallback.
 
 The HUD uses a strict graphite visual system with flat surfaces, compact
 square controls, thin dividers and a single cold accent for active states.

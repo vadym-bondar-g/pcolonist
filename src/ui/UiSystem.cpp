@@ -7,14 +7,21 @@
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
+#if defined(PCOLONIST_ENABLE_FREETYPE_UI)
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#endif
 
 #include <filesystem>
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <vector>
 
 namespace {
 
@@ -121,6 +128,13 @@ char32_t nextCodepoint(std::string_view text, std::size_t& index) {
     return U'?';
 }
 
+#if defined(PCOLONIST_ENABLE_FREETYPE_UI)
+std::uint64_t glyphKey(char32_t character, int pixelSize) {
+    return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(character)) << 32U)
+        | static_cast<std::uint32_t>(pixelSize);
+}
+#endif
+
 } // namespace
 
 namespace pcolonist {
@@ -130,6 +144,7 @@ UiSystem::~UiSystem() {
 }
 
 void UiSystem::shutdown() {
+    shutdownFont();
     shader_.reset();
     if (vertexArray_ != 0) {
         glDeleteVertexArrays(1, &vertexArray_);
@@ -144,6 +159,10 @@ void UiSystem::initialize() {
     if (!shader_->validate()) {
         throw std::runtime_error("UI shader validation failed");
     }
+    shader_->setInt("glyphTexture", 0);
+#if defined(PCOLONIST_ENABLE_FREETYPE_UI)
+    static_cast<void>(initializeFont());
+#endif
     glGenVertexArrays(1, &vertexArray_);
 }
 
@@ -413,7 +432,7 @@ bool UiSystem::fullscreenButtonContains(double x, double y) const {
     return contains(x, y, static_cast<float>(width_ - 72), 18.0F, 54.0F, 44.0F);
 }
 
-UiAction UiSystem::menuActionAt(double x, double y) const {
+UiAction UiSystem::menuActionAt(double x, double y) {
     switch (mainMenu_.actionAt(x, y, width_, height_)) {
     case MainMenuAction::Play:
         return UiAction::Resume;
@@ -429,8 +448,6 @@ UiAction UiSystem::menuActionAt(double x, double y) const {
         return UiAction::ToggleBloom;
     case MainMenuAction::Quit:
         return UiAction::Quit;
-    case MainMenuAction::LoadGame:
-    case MainMenuAction::Settings:
     case MainMenuAction::None:
         return UiAction::None;
     }
@@ -463,7 +480,156 @@ UiAction UiSystem::debugActionAt(double x, double y) const {
     return UiAction::None;
 }
 
+bool UiSystem::initializeFont() {
+#if !defined(PCOLONIST_ENABLE_FREETYPE_UI)
+    return false;
+#else
+    FT_Library library = nullptr;
+    if (FT_Init_FreeType(&library) != 0) {
+        return false;
+    }
+
+    const std::vector<std::filesystem::path> candidates{
+        "assets/fonts/ComicSansMS.ttf",
+        "assets/fonts/NotoSans-Regular.ttf",
+        "/usr/share/fonts/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+    };
+    for (const auto& path : candidates) {
+        FT_Face face = nullptr;
+        if (std::filesystem::exists(path) && FT_New_Face(library, path.string().c_str(), 0, &face) == 0) {
+            fontLibrary_ = library;
+            fontFace_ = face;
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+            return true;
+        }
+    }
+
+    FT_Done_FreeType(library);
+    return false;
+#endif
+}
+
+void UiSystem::shutdownFont() {
+    for (const auto& [key, glyph] : ttfGlyphs_) {
+        static_cast<void>(key);
+        if (glyph.texture != 0) {
+            glDeleteTextures(1, &glyph.texture);
+        }
+    }
+    ttfGlyphs_.clear();
+
+#if defined(PCOLONIST_ENABLE_FREETYPE_UI)
+    if (fontFace_ != nullptr) {
+        FT_Done_Face(static_cast<FT_Face>(fontFace_));
+        fontFace_ = nullptr;
+    }
+    if (fontLibrary_ != nullptr) {
+        FT_Done_FreeType(static_cast<FT_Library>(fontLibrary_));
+        fontLibrary_ = nullptr;
+    }
+#else
+    fontFace_ = nullptr;
+    fontLibrary_ = nullptr;
+#endif
+    fontPixelSize_ = 0;
+}
+
+const UiSystem::TtfGlyph* UiSystem::glyphTexture(char32_t character, int pixelSize) {
+#if !defined(PCOLONIST_ENABLE_FREETYPE_UI)
+    static_cast<void>(character);
+    static_cast<void>(pixelSize);
+    return nullptr;
+#else
+    if (fontFace_ == nullptr) {
+        return nullptr;
+    }
+
+    const std::uint64_t key = glyphKey(character, pixelSize);
+    if (const auto iterator = ttfGlyphs_.find(key); iterator != ttfGlyphs_.end()) {
+        return &iterator->second;
+    }
+
+    auto face = static_cast<FT_Face>(fontFace_);
+    if (fontPixelSize_ != pixelSize) {
+        if (FT_Set_Pixel_Sizes(face, 0, static_cast<FT_UInt>(pixelSize)) != 0) {
+            return nullptr;
+        }
+        fontPixelSize_ = pixelSize;
+    }
+    if (FT_Load_Char(face, static_cast<FT_ULong>(character), FT_LOAD_RENDER) != 0) {
+        return nullptr;
+    }
+
+    const FT_GlyphSlot slot = face->glyph;
+    unsigned int texture = 0;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_RED,
+        static_cast<int>(slot->bitmap.width),
+        static_cast<int>(slot->bitmap.rows),
+        0,
+        GL_RED,
+        GL_UNSIGNED_BYTE,
+        slot->bitmap.buffer);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    const TtfGlyph glyph{
+        texture,
+        static_cast<int>(slot->bitmap.width),
+        static_cast<int>(slot->bitmap.rows),
+        slot->bitmap_left,
+        slot->bitmap_top,
+        static_cast<unsigned int>(slot->advance.x),
+    };
+    return &ttfGlyphs_.emplace(key, glyph).first->second;
+#endif
+}
+
 void UiSystem::text(float x, float y, std::string_view value, float scale, const glm::vec4& color) {
+    if (fontFace_ != nullptr) {
+        ttfText(x, y, value, scale, color);
+        return;
+    }
+    bitmapText(x, y, value, scale, color);
+}
+
+void UiSystem::ttfText(float x, float y, std::string_view value, float scale, const glm::vec4& color) {
+    const int pixelSize = std::max(10, static_cast<int>(std::lround(scale * 8.0F)));
+    float cursor = x;
+    shader_->use();
+    shader_->setInt("useTexture", 1);
+    shader_->setVec4("color", color);
+    glActiveTexture(GL_TEXTURE0);
+    for (std::size_t index = 0; index < value.size();) {
+        const char32_t character = nextCodepoint(value, index);
+        if (character == U' ') {
+            cursor += static_cast<float>(pixelSize) * 0.38F;
+            continue;
+        }
+        const TtfGlyph* glyph = glyphTexture(character, pixelSize);
+        if (glyph == nullptr || glyph->texture == 0) {
+            continue;
+        }
+        const float left = cursor + static_cast<float>(glyph->bearingX);
+        const float top = y + static_cast<float>(pixelSize - glyph->bearingY);
+        shader_->setVec4("rect", {left, top, static_cast<float>(glyph->width), static_cast<float>(glyph->height)});
+        shader_->setVec4("viewportRadius", {static_cast<float>(width_), static_cast<float>(height_), 0.0F, 0.0F});
+        glBindTexture(GL_TEXTURE_2D, glyph->texture);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        cursor += static_cast<float>(glyph->advance >> 6U);
+    }
+    shader_->setInt("useTexture", 0);
+}
+
+void UiSystem::bitmapText(float x, float y, std::string_view value, float scale, const glm::vec4& color) {
     float cursor = x;
     for (std::size_t index = 0; index < value.size();) {
         const char32_t character = nextCodepoint(value, index);
@@ -481,6 +647,7 @@ void UiSystem::text(float x, float y, std::string_view value, float scale, const
 
 void UiSystem::rectangle(float x, float y, float width, float height, const glm::vec4& color, float radius) {
     shader_->use();
+    shader_->setInt("useTexture", 0);
     shader_->setVec4("rect", {x, y, width, height});
     shader_->setVec4("color", color);
     shader_->setVec4("viewportRadius", {static_cast<float>(width_), static_cast<float>(height_), std::min(radius, 2.0F), 0.0F});

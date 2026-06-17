@@ -10,8 +10,6 @@ namespace pcolonist {
 enum class MainMenuAction {
     None,
     Play,
-    LoadGame,
-    Settings,
     ToggleFullscreen,
     ToggleVsync,
     CycleFrameLimit,
@@ -38,9 +36,15 @@ public:
     using Text = std::function<void(float, float, std::string_view, float, const glm::vec4&)>;
 
     void render(const MainMenuState& state, const Rectangle& rectangle, const Text& text) const;
-    [[nodiscard]] MainMenuAction actionAt(double x, double y, int width, int height) const;
+    [[nodiscard]] MainMenuAction actionAt(double x, double y, int width, int height);
 
 private:
+    enum class Screen {
+        Home,
+        LoadGame,
+        Settings,
+    };
+
     struct Layout {
         float left = 0.0F;
         float top = 0.0F;
@@ -53,6 +57,8 @@ private:
 
     [[nodiscard]] static Layout layout(int width, int height);
     [[nodiscard]] static bool contains(double x, double y, float left, float top, float width, float height);
+
+    Screen screen_ = Screen::Home;
 };
 
 } // namespace pcolonist

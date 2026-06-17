@@ -333,6 +333,9 @@ void Application::buildPipeline() {
     });
     pipeline_.add(FrameStage::Render, "render scene", [this](FrameContext& context) {
         static_cast<void>(context);
+        if (menuOpen_) {
+            return;
+        }
         renderer_->render(camera_, registry_, weather_);
     });
     pipeline_.add(FrameStage::Render, "render UI", [this](FrameContext& context) {
