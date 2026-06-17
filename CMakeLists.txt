@@ -98,6 +98,7 @@ add_executable(pcolonist
     src/render/Skybox.cpp
     src/scripting/ScriptSystem.cpp
     src/serialization/SceneSerializer.cpp
+    src/ui/MainMenu.cpp
     src/ui/UiSystem.cpp
     src/world/WeatherSystem.cpp
     src/world/WaterWaves.cpp

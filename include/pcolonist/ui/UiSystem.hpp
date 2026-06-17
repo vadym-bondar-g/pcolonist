@@ -1,6 +1,9 @@
 #pragma once
 
 #include "pcolonist/render/Shader.hpp"
+#include "pcolonist/ui/MainMenu.hpp"
+
+#include <glm/vec3.hpp>
 
 #include <cstdint>
 #include <memory>
@@ -32,6 +35,17 @@ class Inventory;
 class Registry;
 class WeatherSystem;
 
+struct ObjectiveHudState {
+    glm::vec3 playerPosition{0.0F};
+    bool hasWood = false;
+    bool hasStone = false;
+    bool hasWater = false;
+    bool fireLit = false;
+    bool nearShelter = false;
+    bool nearRuin = false;
+    std::string_view contextHint;
+};
+
 class UiSystem {
 public:
     UiSystem() = default;
@@ -51,6 +65,7 @@ public:
         bool bloom,
         const WeatherSystem& weather,
         const Inventory& inventory,
+        const ObjectiveHudState& objectives,
         bool inventoryOpen,
         bool debugPanelOpen);
     void updateTitle(
@@ -75,6 +90,7 @@ private:
     std::uint32_t frames_ = 0;
     double pointerX_ = 0.0;
     double pointerY_ = 0.0;
+    MainMenu mainMenu_;
 };
 
 } // namespace pcolonist

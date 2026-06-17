@@ -6,11 +6,24 @@ from __future__ import annotations
 import math
 import random
 import json
+import html
+import base64
+import struct
+import zlib
 from dataclasses import dataclass, field
+from functools import cache
 from pathlib import Path
+from typing import Sequence
+
+from island_generator.cli import RuntimeOptions, parse_args
+from island_generator.pipeline import run_generation_group
+from island_generator.runtime import OutputLayout
 
 
-ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_SEED = 1847
+DEFAULT_GRID = 241
+ROOT = DEFAULT_ROOT
 MAP_PATH = ROOT / "assets" / "maps" / "demo_map.obj"
 MAP_LOD_PATHS = (
     ROOT / "assets" / "maps" / "demo_map_lod1.obj",
@@ -36,13 +49,78 @@ MATERIAL_MASK_PATHS = {
     "wetness": ROOT / "assets" / "maps" / "material_wetness.pgm",
 }
 TERRAIN_REPORT_PATH = ROOT / "assets" / "maps" / "terrain_report.json"
+QUALITY_REPORT_PATH = ROOT / "assets" / "maps" / "generation_quality.json"
+DEBUG_PREVIEW_PATH = ROOT / "assets" / "maps" / "debug_preview.html"
 SCENE_PATH = ROOT / "assets" / "scripts" / "models.scene"
-SEED = 1847
-GRID = 241
+GAMEPLAY_GOALS_PATH = ROOT / "assets" / "scripts" / "gameplay_goals.json"
+SEED = DEFAULT_SEED
+GRID = DEFAULT_GRID
 SPACING = 2.0
 LOD_STEPS = (2, 4)
 WALKABILITY_GRID = 121
 DEBUG_MAP_GRID = 61
+
+
+def configure_output_root(output_root: Path) -> None:
+    global ROOT
+    global MAP_PATH, MAP_LOD_PATHS, SPLIT_MAP_PATHS, INTERNAL_WATER_PATH
+    global LANDMARKS_PATH, WALKABILITY_PATH, HEIGHTMAP_PATH, BIOME_MAP_PATH
+    global SLOPE_MAP_PATH, MOISTURE_MAP_PATH, MATERIAL_MASK_PATHS
+    global TERRAIN_REPORT_PATH, QUALITY_REPORT_PATH, DEBUG_PREVIEW_PATH, SCENE_PATH, GAMEPLAY_GOALS_PATH
+
+    layout = OutputLayout.from_root(output_root)
+    ROOT = layout.root
+    MAP_PATH = layout.map_path
+    MAP_LOD_PATHS = layout.map_lod_paths
+    SPLIT_MAP_PATHS = layout.split_map_paths
+    INTERNAL_WATER_PATH = layout.internal_water_path
+    LANDMARKS_PATH = layout.landmarks_path
+    WALKABILITY_PATH = layout.walkability_path
+    HEIGHTMAP_PATH = layout.heightmap_path
+    BIOME_MAP_PATH = layout.biome_map_path
+    SLOPE_MAP_PATH = layout.slope_map_path
+    MOISTURE_MAP_PATH = layout.moisture_map_path
+    MATERIAL_MASK_PATHS = layout.material_mask_paths
+    TERRAIN_REPORT_PATH = layout.terrain_report_path
+    QUALITY_REPORT_PATH = layout.quality_report_path
+    DEBUG_PREVIEW_PATH = layout.debug_preview_path
+    SCENE_PATH = layout.scene_path
+    GAMEPLAY_GOALS_PATH = layout.gameplay_goals_path
+
+
+def configure_runtime(options: RuntimeOptions) -> None:
+    global SEED, GRID, RIVER_PATH, TRIBUTARY_PATHS
+
+    SEED = options.seed
+    GRID = options.grid
+    clear_generation_caches()
+    configure_output_root(options.output_dir)
+    RIVER_PATH = trace_river()
+    TRIBUTARY_PATHS = trace_tributaries()
+    clear_generation_caches()
+
+
+PLACEMENT_STATS: dict[str, dict[str, int]] = {}
+
+
+def reset_placement_stats() -> None:
+    PLACEMENT_STATS.clear()
+
+
+def begin_placement_rule(name: str, requested: int) -> None:
+    PLACEMENT_STATS[name] = {"requested": requested, "spawned": 0, "skipped": 0}
+
+
+def record_placement(name: str, spawned: bool) -> None:
+    stats = PLACEMENT_STATS.setdefault(name, {"requested": 0, "spawned": 0, "skipped": 0})
+    stats["spawned" if spawned else "skipped"] += 1
+
+
+def relative_output(path: Path) -> str:
+    try:
+        return path.relative_to(ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 @dataclass(frozen=True)
@@ -311,6 +389,7 @@ def segment_distance(x: float, z: float, start: tuple[float, float], end: tuple[
     return math.hypot(x - (ax + (bx - ax) * progress), z - (az + (bz - az) * progress))
 
 
+@cache
 def island_radius(x: float, z: float) -> float:
     angle = math.atan2(z / TERRAIN.island_radius_z, x / TERRAIN.island_radius_x)
     shoreline = (
@@ -356,6 +435,7 @@ def flattening_profile(x: float, z: float) -> tuple[float, float]:
     return max(profiles, key=lambda profile: profile[0])
 
 
+@cache
 def base_terrain_height(x: float, z: float) -> float:
     radius = island_radius(x, z)
     coast = max(0.0, radius - TERRAIN.coast_start)
@@ -537,6 +617,7 @@ def river_sample(x: float, z: float) -> tuple[float, float]:
     return path_sample(RIVER_PATH, x, z)
 
 
+@cache
 def river_network_sample(x: float, z: float) -> tuple[float, float, float, float, tuple[float, float]]:
     distance, progress = river_sample(x, z)
     width = WATER.river_width_start * (1.0 - progress) + WATER.river_width_end * progress
@@ -554,6 +635,7 @@ def river_network_sample(x: float, z: float) -> tuple[float, float, float, float
     return distance, progress, width, source_cut, source
 
 
+@cache
 def river_distance(x: float, z: float) -> float:
     return river_network_sample(x, z)[0]
 
@@ -565,6 +647,7 @@ def waterfall_offset(progress: float) -> float:
     )
 
 
+@cache
 def raw_terrain_height(x: float, z: float) -> float:
     height = base_terrain_height(x, z)
     distance, progress, width, source_cut, source = river_network_sample(x, z)
@@ -593,6 +676,7 @@ def terraced_height(height: float) -> float:
     return height * (1.0 - strength) + level * strength
 
 
+@cache
 def terrain_height(x: float, z: float) -> float:
     height = raw_terrain_height(x, z)
     height = terraced_height(height)
@@ -602,6 +686,7 @@ def terrain_height(x: float, z: float) -> float:
     return max(TERRAIN.floor_height, height)
 
 
+@cache
 def biome_metrics(x: float, z: float) -> tuple[float, float, float]:
     height = terrain_height(x, z)
     sample = 2.0
@@ -621,6 +706,7 @@ def biome_metrics(x: float, z: float) -> tuple[float, float, float]:
     return height, slope, moisture
 
 
+@cache
 def water_distance(x: float, z: float) -> float:
     return min(
         river_distance(x, z),
@@ -629,8 +715,38 @@ def water_distance(x: float, z: float) -> float:
     )
 
 
+@cache
 def approximate_moisture(x: float, z: float) -> float:
     return max(0.0, min(1.0, 1.0 - water_distance(x, z) / 52.0 + fractal_noise(x + 71.0, z - 29.0, 3) * 0.22))
+
+
+CACHED_FUNCTIONS = (
+    island_radius,
+    base_terrain_height,
+    river_network_sample,
+    river_distance,
+    raw_terrain_height,
+    terrain_height,
+    biome_metrics,
+    water_distance,
+    approximate_moisture,
+)
+
+
+def clear_generation_caches() -> None:
+    for function in CACHED_FUNCTIONS:
+        function.cache_clear()
+
+
+def generation_cache_stats() -> dict[str, dict[str, int]]:
+    return {
+        function.__name__: {
+            "hits": function.cache_info().hits,
+            "misses": function.cache_info().misses,
+            "size": function.cache_info().currsize,
+        }
+        for function in CACHED_FUNCTIONS
+    }
 
 
 def classify_biome(
@@ -1367,6 +1483,221 @@ def generate_debug_maps_and_report() -> None:
     generate_terrain_report(rows)
 
 
+def read_ascii_pnm(path: Path) -> tuple[str, int, int, int, list[int]]:
+    tokens: list[str] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            content = line.split("#", 1)[0].strip()
+            if content:
+                tokens.extend(content.split())
+    if len(tokens) < 4:
+        raise ValueError(f"{relative_output(path)} is not a valid ASCII PNM file")
+    magic = tokens[0]
+    width = int(tokens[1])
+    height = int(tokens[2])
+    maximum = int(tokens[3])
+    values = [int(token) for token in tokens[4:]]
+    expected = width * height * (3 if magic == "P3" else 1)
+    if magic not in {"P2", "P3"} or len(values) != expected or maximum <= 0:
+        raise ValueError(f"{relative_output(path)} has invalid PNM dimensions or pixel data")
+    return magic, width, height, maximum, values
+
+
+def png_chunk(kind: bytes, payload: bytes) -> bytes:
+    checksum = zlib.crc32(kind)
+    checksum = zlib.crc32(payload, checksum)
+    return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", checksum & 0xFFFFFFFF)
+
+
+def png_data_uri_from_pnm(path: Path) -> str:
+    magic, width, height, maximum, values = read_ascii_pnm(path)
+    color_type = 2 if magic == "P3" else 0
+    channels = 3 if magic == "P3" else 1
+    rows: list[bytes] = []
+    scale = 255.0 / maximum
+    stride = width * channels
+    for row in range(height):
+        start = row * stride
+        pixels = bytes(max(0, min(255, round(value * scale))) for value in values[start:start + stride])
+        rows.append(b"\x00" + pixels)
+    png = b"".join(
+        (
+            b"\x89PNG\r\n\x1a\n",
+            png_chunk("IHDR".encode("ascii"), struct.pack(">IIBBBBB", width, height, 8, color_type, 0, 0, 0)),
+            png_chunk("IDAT".encode("ascii"), zlib.compress(b"".join(rows), 9)),
+            png_chunk("IEND".encode("ascii"), b""),
+        )
+    )
+    return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+
+
+def load_json_if_available(path: Path) -> dict[str, object]:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def render_preview_card(title: str, path: Path) -> str:
+    if not path.exists():
+        return (
+            '<section class="card missing">'
+            f"<h2>{html.escape(title)}</h2>"
+            f"<p>{html.escape(relative_output(path))} not generated in this run.</p>"
+            "</section>"
+        )
+    data_uri = png_data_uri_from_pnm(path)
+    return (
+        '<section class="card">'
+        f"<h2>{html.escape(title)}</h2>"
+        f'<img src="{data_uri}" alt="{html.escape(title)} preview">'
+        f"<p>{html.escape(relative_output(path))}</p>"
+        "</section>"
+    )
+
+
+def preview_image_uri(path: Path) -> str:
+    if not path.exists():
+        return ""
+    return png_data_uri_from_pnm(path)
+
+
+def generate_debug_preview() -> Path:
+    terrain_report = load_json_if_available(TERRAIN_REPORT_PATH)
+    quality_report = load_json_if_available(QUALITY_REPORT_PATH)
+    gameplay_goals = load_json_if_available(GAMEPLAY_GOALS_PATH)
+    issues = quality_report.get("issues", []) if isinstance(quality_report.get("issues", []), list) else []
+    goals = gameplay_goals.get("goals", []) if isinstance(gameplay_goals.get("goals", []), list) else []
+    height = terrain_report.get("height", {}) if isinstance(terrain_report.get("height", {}), dict) else {}
+    slope = terrain_report.get("slope", {}) if isinstance(terrain_report.get("slope", {}), dict) else {}
+    walkability = terrain_report.get("walkability", {}) if isinstance(terrain_report.get("walkability", {}), dict) else {}
+    placement = (
+        quality_report.get("scene", {}).get("placement", {})
+        if isinstance(quality_report.get("scene", {}), dict)
+        else {}
+    )
+    cards = [
+        ("Biome Map", BIOME_MAP_PATH),
+        ("Heightmap", HEIGHTMAP_PATH),
+        ("Walkability", WALKABILITY_PATH),
+        ("Slope", SLOPE_MAP_PATH),
+        ("Moisture", MOISTURE_MAP_PATH),
+        *[(f"{name.title()} Mask", path) for name, path in sorted(MATERIAL_MASK_PATHS.items())],
+    ]
+    issue_items = "\n".join(
+        f"<li><strong>{html.escape(str(issue.get('severity', 'info')))}</strong> "
+        f"{html.escape(str(issue.get('code', 'issue')))}: {html.escape(str(issue.get('message', '')))}</li>"
+        for issue in issues
+    ) or "<li>No quality issues reported.</li>"
+    placement_rows = "\n".join(
+        "<tr>"
+        f"<td>{html.escape(name)}</td>"
+        f"<td>{stats.get('requested', 0)}</td>"
+        f"<td>{stats.get('spawned', 0)}</td>"
+        f"<td>{stats.get('skipped', 0)}</td>"
+        "</tr>"
+        for name, stats in sorted(placement.items())
+        if isinstance(stats, dict)
+    ) or '<tr><td colspan="4">Scene placement was not generated in this run.</td></tr>'
+    goal_items = "\n".join(
+        '<li class="goal-item">'
+        f"<strong>{html.escape(str(goal.get('title', 'Без названия')))}</strong>"
+        f"<span>{html.escape(str(goal.get('description', '')))}</span>"
+        "</li>"
+        for goal in goals
+        if isinstance(goal, dict)
+    ) or '<li class="goal-item"><strong>Цели не сгенерированы</strong><span>Запустите генератор с --only scene или --only all.</span></li>'
+    card_markup = "\n".join(render_preview_card(title, path) for title, path in cards)
+    minimap_uri = preview_image_uri(BIOME_MAP_PATH)
+    minimap_markup = (
+        f'<img src="{minimap_uri}" alt="Island minimap">'
+        if minimap_uri
+        else "<div class=\"minimap-empty\">Нет карты</div>"
+    )
+    document = f"""<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Island Debug Preview</title>
+  <style>
+    body {{ margin: 0; font: 14px/1.45 system-ui, sans-serif; color: #d7dddf; background: #151817; }}
+    .layout {{ display: grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); min-height: 100vh; }}
+    .goals {{ position: sticky; top: 0; height: 100vh; overflow: auto; border-right: 1px solid #343b38; background: #111412; padding: 18px; box-sizing: border-box; }}
+    .content {{ min-width: 0; padding-bottom: 180px; }}
+    header, main {{ max-width: 1180px; margin: 0 auto; padding: 24px; }}
+    header {{ border-bottom: 1px solid #343b38; }}
+    h1 {{ margin: 0 0 8px; font-size: 28px; }}
+    h2 {{ margin: 0 0 10px; font-size: 16px; }}
+    p {{ margin: 0; color: #9ba6a2; }}
+    .goal-list {{ list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }}
+    .goal-item {{ border: 1px solid #333b37; background: #1d2220; border-radius: 6px; padding: 12px; }}
+    .goal-item strong {{ display: block; color: #f0f3ef; font-size: 14px; }}
+    .goal-item span {{ display: block; color: #9ba6a2; font-size: 12px; margin-top: 5px; }}
+    .metrics, .grid {{ display: grid; gap: 14px; }}
+    .metrics {{ grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: 18px 0; }}
+    .metric, .card, .panel {{ border: 1px solid #333b37; background: #1d2220; border-radius: 6px; padding: 14px; }}
+    .metric strong {{ display: block; font-size: 22px; color: #f0f3ef; }}
+    .grid {{ grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }}
+    img {{ width: 100%; image-rendering: pixelated; border: 1px solid #303633; background: #0f1211; }}
+    .missing {{ opacity: 0.62; }}
+    table {{ width: 100%; border-collapse: collapse; }}
+    th, td {{ padding: 7px 8px; border-bottom: 1px solid #303633; text-align: left; }}
+    ul {{ margin: 0; padding-left: 18px; }}
+    .minimap {{ position: fixed; right: 18px; bottom: 18px; width: 220px; border: 1px solid #47514b; background: #111412; border-radius: 6px; padding: 10px; box-shadow: 0 14px 38px rgba(0,0,0,.42); z-index: 5; }}
+    .minimap h2 {{ font-size: 13px; margin-bottom: 8px; }}
+    .minimap img {{ display: block; aspect-ratio: 1 / 1; object-fit: cover; }}
+    .minimap-empty {{ display: grid; place-items: center; aspect-ratio: 1 / 1; border: 1px solid #303633; color: #9ba6a2; }}
+    @media (max-width: 860px) {{
+      .layout {{ display: block; }}
+      .goals {{ position: static; height: auto; border-right: 0; border-bottom: 1px solid #343b38; }}
+      .minimap {{ width: 150px; }}
+    }}
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="goals">
+      <h2>Игровые цели</h2>
+      <ol class="goal-list">{goal_items}</ol>
+    </aside>
+    <div class="content">
+      <header>
+        <h1>Island Debug Preview</h1>
+        <p>Seed {SEED}, grid {GRID}, status {html.escape(str(quality_report.get('status', 'unknown')))}</p>
+        <div class="metrics">
+          <div class="metric"><span>Height</span><strong>{height.get("min", "-")} to {height.get("max", "-")}</strong></div>
+          <div class="metric"><span>Avg slope</span><strong>{slope.get("average", "-")}</strong></div>
+          <div class="metric"><span>Good walkability</span><strong>{walkability.get("good_sample_ratio", "-")}</strong></div>
+          <div class="metric"><span>Issues</span><strong>{len(issues)}</strong></div>
+        </div>
+      </header>
+      <main>
+        <div class="grid">
+          {card_markup}
+        </div>
+        <section class="panel">
+          <h2>Placement</h2>
+          <table><thead><tr><th>Rule</th><th>Requested</th><th>Spawned</th><th>Skipped</th></tr></thead><tbody>
+          {placement_rows}
+          </tbody></table>
+        </section>
+        <section class="panel">
+          <h2>Quality Issues</h2>
+          <ul>{issue_items}</ul>
+        </section>
+      </main>
+    </div>
+  </div>
+  <aside class="minimap">
+    <h2>Миникарта</h2>
+    {minimap_markup}
+  </aside>
+</body>
+</html>
+"""
+    DEBUG_PREVIEW_PATH.write_text(document, encoding="utf-8")
+    return DEBUG_PREVIEW_PATH
+
+
 def landmark_entry(
     name: str,
     category: str,
@@ -1458,6 +1789,7 @@ def spawn_collider(
 
 def generate_scene() -> None:
     random.seed(SEED)
+    reset_placement_stats()
     lines = [
         "# Generated by tools/generate_island.py. Do not edit by hand.",
         "# model <id> <asset-path>",
@@ -1495,7 +1827,9 @@ def generate_scene() -> None:
 
     lines.extend(("", "# Dense forest, with clearings around landmarks and the main trail."))
     forest_rule = DECORATION_RULES["forest"]
+    begin_placement_rule("forest", forest_rule.count)
     for _ in range(forest_rule.count):
+        candidate: tuple[float, float, BiomeConfig] | None = None
         for _attempt in range(100):
             x = random.uniform(-116.0, 116.0)
             z = random.uniform(-98.0, 104.0)
@@ -1523,14 +1857,22 @@ def generate_scene() -> None:
                 and biome.tree_density > 0.0
                 and random.random() < forest_chance
             ):
+                candidate = (x, z, biome)
                 break
+        if candidate is None:
+            record_placement("forest", False)
+            continue
+        x, z, biome = candidate
         model = "oak" if random.random() < biome.oak_preference else "tree"
         scale = random.uniform(0.75, 1.35)
-        spawn(lines, model, x, z, scale, (0.78, 2.7, 0.78), random.uniform(0.0, math.tau))
+        spawn(lines, model, x, z, scale, (0.46, 2.35, 0.46), random.uniform(0.0, math.tau))
+        record_placement("forest", True)
 
     lines.extend(("", "# Low understory creates depth between the larger trees."))
     understory_rule = DECORATION_RULES["understory"]
+    begin_placement_rule("understory", understory_rule.count)
     for _ in range(understory_rule.count):
+        candidate: tuple[float, float] | None = None
         for _attempt in range(100):
             x = random.uniform(-116.0, 116.0)
             z = random.uniform(-98.0, 104.0)
@@ -1550,11 +1892,18 @@ def generate_scene() -> None:
                 and biome.bush_density > 0.0
                 and random.random() < biome.bush_density * max(moisture, 0.35)
             ):
+                candidate = (x, z)
                 break
+        if candidate is None:
+            record_placement("understory", False)
+            continue
+        x, z = candidate
         spawn_decor(lines, "bush", x, z, random.uniform(0.55, 1.25), random.uniform(0.0, math.tau))
+        record_placement("understory", True)
 
     lines.extend(("", "# Rocks mark the coast and dangerous approaches."))
     rock_rule = DECORATION_RULES["coastal_rocks"]
+    begin_placement_rule("coastal_rocks", rock_rule.count)
     for _ in range(rock_rule.count):
         angle = random.uniform(0.0, math.tau)
         radius = random.uniform(98.0, 126.0)
@@ -1567,15 +1916,20 @@ def generate_scene() -> None:
             or not (rock_rule.min_height < height < rock_rule.max_height)
             or biome.name not in rock_rule.allowed_biomes
         ):
+            record_placement("coastal_rocks", False)
             continue
         if height > 3.0 and slope < 0.35:
+            record_placement("coastal_rocks", False)
             continue
         scale = random.uniform(0.7, 1.8)
-        spawn(lines, "rock", x, z, scale, (1.3, 0.9, 1.1), random.uniform(0.0, math.tau))
+        spawn(lines, "rock", x, z, scale, (0.82, 0.7, 0.74), random.uniform(0.0, math.tau))
+        record_placement("coastal_rocks", True)
 
     lines.extend(("", "# Palms frame beaches and the sheltered natural harbor."))
     palm_rule = DECORATION_RULES["palms"]
+    begin_placement_rule("palms", palm_rule.count)
     for _ in range(palm_rule.count):
+        candidate: tuple[float, float] | None = None
         for _attempt in range(100):
             angle = random.uniform(0.0, math.tau)
             radius = random.uniform(88.0, 119.0)
@@ -1592,13 +1946,21 @@ def generate_scene() -> None:
                 and biome.name in palm_rule.allowed_biomes
                 and (near_harbor or z > 35.0)
             ):
+                candidate = (x, z)
                 break
+        if candidate is None:
+            record_placement("palms", False)
+            continue
+        x, z = candidate
         scale = random.uniform(0.75, 1.35)
         spawn_decor(lines, "palm", x, z, scale, random.uniform(0.0, math.tau))
+        record_placement("palms", True)
 
     lines.extend(("", "# Mushrooms gather in the eastern marsh."))
     mushroom_rule = DECORATION_RULES["mushrooms"]
+    begin_placement_rule("mushrooms", mushroom_rule.count)
     for _ in range(mushroom_rule.count):
+        candidate: tuple[float, float] | None = None
         for _attempt in range(100):
             x = random.uniform(45.0, 108.0)
             z = random.uniform(-5.0, 70.0)
@@ -1610,38 +1972,508 @@ def generate_scene() -> None:
                 and slope < mushroom_rule.max_slope
                 and moisture > mushroom_rule.min_moisture
             ):
+                candidate = (x, z)
                 break
-        spawn(lines, "mushroom", x, z, random.uniform(0.8, 1.8), (0.35, 0.45, 0.35))
+        if candidate is None:
+            record_placement("mushrooms", False)
+            continue
+        x, z = candidate
+        spawn_decor(lines, "mushroom", x, z, random.uniform(0.8, 1.8), random.uniform(0.0, math.tau))
+        record_placement("mushrooms", True)
 
     SCENE_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def main() -> None:
+def generate_gameplay_goals() -> None:
+    payload = {
+        "generated_by": "tools/generate_island.py",
+        "language": "ru",
+        "seed": SEED,
+        "actions": [
+            {
+                "id": "light_fire",
+                "title": "Разжечь костер",
+                "category": "выживание",
+                "description": "Использовать сухую древесину и кремень, чтобы создать безопасный источник тепла и света.",
+                "requires": ["дерево", "кремень"],
+                "produces": ["огонь", "безопасная зона лагеря"],
+                "landmark_hint": "arrival_camp",
+            },
+            {
+                "id": "keep_fire_alive",
+                "title": "Поддерживать огонь",
+                "category": "выживание",
+                "description": "Добавлять дрова в костер во время ночи, дождя или шторма.",
+                "requires": ["огонь", "дерево"],
+                "produces": ["тепло", "защита от темноты"],
+                "landmark_hint": "arrival_camp",
+            },
+            {
+                "id": "chop_tree",
+                "title": "Рубить деревья",
+                "category": "добыча",
+                "description": "Использовать топор на деревьях, чтобы получить древесину для костра, инструментов и построек.",
+                "requires": ["топор"],
+                "produces": ["дерево"],
+                "landmark_hint": "temperate_forest",
+            },
+            {
+                "id": "mine_stone",
+                "title": "Добывать камень",
+                "category": "добыча",
+                "description": "Разбивать прибрежные и горные камни, чтобы получить материал для инструментов и печи.",
+                "requires": ["кирка или тяжелый камень"],
+                "produces": ["камень", "кремень"],
+                "landmark_hint": "natural_harbor",
+            },
+            {
+                "id": "gather_mushrooms",
+                "title": "Собирать грибы",
+                "category": "собирательство",
+                "description": "Искать грибы во влажных низинах и болотах, затем использовать их для еды или лечения.",
+                "requires": [],
+                "produces": ["грибы"],
+                "landmark_hint": "eastern_wetland",
+            },
+            {
+                "id": "collect_water",
+                "title": "Набрать воду",
+                "category": "выживание",
+                "description": "Набрать воду у озера или реки и подготовить ее к употреблению.",
+                "requires": ["емкость"],
+                "produces": ["сырая вода"],
+                "landmark_hint": "grant_lake",
+            },
+            {
+                "id": "boil_water",
+                "title": "Кипятить воду",
+                "category": "выживание",
+                "description": "Очистить сырую воду на костре, чтобы снизить риск болезни.",
+                "requires": ["сырая вода", "огонь"],
+                "produces": ["чистая вода"],
+                "landmark_hint": "arrival_camp",
+            },
+            {
+                "id": "craft_stone_axe",
+                "title": "Сделать каменный топор",
+                "category": "крафт",
+                "description": "Собрать дерево, камень и волокна, чтобы сделать первый надежный инструмент.",
+                "requires": ["дерево", "камень", "волокна"],
+                "produces": ["топор"],
+                "landmark_hint": "arrival_camp",
+            },
+            {
+                "id": "build_shelter",
+                "title": "Построить укрытие",
+                "category": "строительство",
+                "description": "Поставить простой навес или укрепить найденное убежище перед непогодой.",
+                "requires": ["дерево", "волокна"],
+                "produces": ["укрытие"],
+                "landmark_hint": "granite_house",
+            },
+            {
+                "id": "explore_grotto",
+                "title": "Исследовать грот",
+                "category": "исследование",
+                "description": "Войти в скрытый грот с факелом и отметить найденные проходы.",
+                "requires": ["факел"],
+                "produces": ["открытая область", "редкий ресурс"],
+                "landmark_hint": "hidden_grotto_1",
+            },
+            {
+                "id": "activate_ruin_marker",
+                "title": "Активировать знак руин",
+                "category": "исследование",
+                "description": "Осмотреть древний объект и добавить его в журнал острова.",
+                "requires": [],
+                "produces": ["запись в журнале"],
+                "landmark_hint": "standing_stones",
+            },
+            {
+                "id": "build_boat",
+                "title": "Построить лодку",
+                "category": "строительство",
+                "description": "Собрать материалы у гавани и построить лодку для малых островков или побега.",
+                "requires": ["дерево", "веревка", "смола"],
+                "produces": ["лодка"],
+                "landmark_hint": "natural_harbor",
+            },
+        ],
+        "goals": [
+            {
+                "id": "survive_first_day",
+                "title": "День 1: выжить после высадки",
+                "description": "Найти место для лагеря, собрать древесину и разжечь первый костер.",
+                "priority": "main",
+                "steps": [
+                    {"action": "chop_tree", "text": "Собрать первую древесину."},
+                    {"action": "light_fire", "text": "Разжечь костер у лагеря."},
+                    {"action": "keep_fire_alive", "text": "Поддерживать огонь до утра."},
+                ],
+                "landmarks": ["arrival_camp"],
+            },
+            {
+                "id": "find_clean_water",
+                "title": "Найти воду",
+                "description": "Добраться до озера Гранта или реки Милосердия и подготовить воду к употреблению.",
+                "priority": "main",
+                "steps": [
+                    {"action": "collect_water", "text": "Набрать сырую воду."},
+                    {"action": "boil_water", "text": "Прокипятить воду на костре."},
+                ],
+                "landmarks": ["grant_lake", "mercy_river_source", "mercy_river_mouth"],
+            },
+            {
+                "id": "craft_first_tool",
+                "title": "Сделать первый инструмент",
+                "description": "Добыть камень и собрать древесину, чтобы скрафтить каменный топор.",
+                "priority": "main",
+                "steps": [
+                    {"action": "mine_stone", "text": "Добыть камень или кремень."},
+                    {"action": "craft_stone_axe", "text": "Сделать каменный топор."},
+                ],
+                "landmarks": ["natural_harbor", "arrival_camp"],
+            },
+            {
+                "id": "secure_shelter",
+                "title": "Найти безопасное убежище",
+                "description": "Обнаружить Granite House и подготовить его как долговременную базу.",
+                "priority": "main",
+                "steps": [
+                    {"action": "build_shelter", "text": "Укрепить вход и место для сна."},
+                    {"action": "light_fire", "text": "Поставить постоянный источник света."},
+                ],
+                "landmarks": ["granite_house"],
+            },
+            {
+                "id": "map_island",
+                "title": "Составить карту острова",
+                "description": "Посетить ключевые точки острова и открыть ориентиры в журнале.",
+                "priority": "exploration",
+                "steps": [
+                    {"action": "activate_ruin_marker", "text": "Отметить круг стоячих камней."},
+                    {"action": "explore_grotto", "text": "Исследовать хотя бы один скрытый грот."},
+                    {"action": "activate_ruin_marker", "text": "Осмотреть сторожевую башню и затонувший храм."},
+                ],
+                "landmarks": ["standing_stones", "watchtower", "sunken_temple", "hidden_grotto_1"],
+            },
+            {
+                "id": "prepare_for_storm",
+                "title": "Подготовиться к шторму",
+                "description": "Запасти воду, еду и дрова, затем переждать непогоду в укрытии.",
+                "priority": "survival",
+                "steps": [
+                    {"action": "gather_mushrooms", "text": "Собрать запас еды."},
+                    {"action": "boil_water", "text": "Подготовить чистую воду."},
+                    {"action": "keep_fire_alive", "text": "Поддерживать костер во время шторма."},
+                ],
+                "landmarks": ["granite_house", "hidden_grotto_1", "arrival_camp"],
+            },
+            {
+                "id": "escape_or_claim_island",
+                "title": "Покинуть остров или сделать его домом",
+                "description": "Построить лодку для побега или превратить Granite House в полноценную базу.",
+                "priority": "final",
+                "steps": [
+                    {"action": "build_boat", "text": "Построить лодку у природной гавани."},
+                    {"action": "build_shelter", "text": "Укрепить Granite House как запасной финал."},
+                ],
+                "landmarks": ["natural_harbor", "granite_house", "offshore_islet_1"],
+            },
+        ],
+    }
+    GAMEPLAY_GOALS_PATH.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def add_quality_issue(
+    issues: list[dict[str, object]],
+    severity: str,
+    code: str,
+    message: str,
+    details: dict[str, object] | None = None,
+) -> None:
+    issue: dict[str, object] = {
+        "severity": severity,
+        "code": code,
+        "message": message,
+    }
+    if details:
+        issue["details"] = details
+    issues.append(issue)
+
+
+def path_length(path: tuple[tuple[float, float], ...]) -> float:
+    return sum(math.hypot(end[0] - start[0], end[1] - start[1]) for start, end in zip(path, path[1:]))
+
+
+def obj_file_stats(path: Path) -> dict[str, int]:
+    stats = {"vertices": 0, "faces": 0}
+    if not path.exists():
+        return stats
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith("v "):
+                stats["vertices"] += 1
+            elif line.startswith("f "):
+                stats["faces"] += 1
+    return stats
+
+
+def scene_spawn_stats() -> dict[str, int]:
+    stats = {"spawn_model": 0, "spawn_decor": 0, "spawn_collider": 0}
+    if not SCENE_PATH.exists():
+        return stats
+    with SCENE_PATH.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            command = line.split(maxsplit=1)[0] if line.strip() else ""
+            if command in stats:
+                stats[command] += 1
+    return stats
+
+
+def check_generated_files(outputs: list[Path], issues: list[dict[str, object]]) -> dict[str, object]:
+    file_stats: dict[str, object] = {}
+    for path in outputs:
+        if path == QUALITY_REPORT_PATH:
+            continue
+        relative = relative_output(path)
+        if not path.exists():
+            add_quality_issue(issues, "error", "missing_output", f"Expected output is missing: {relative}")
+            file_stats[relative] = {"exists": False}
+            continue
+        size = path.stat().st_size
+        stats: dict[str, object] = {"exists": True, "bytes": size}
+        if size == 0:
+            add_quality_issue(issues, "error", "empty_output", f"Generated output is empty: {relative}")
+        if path.suffix == ".obj":
+            obj_stats = obj_file_stats(path)
+            stats.update(obj_stats)
+            if obj_stats["vertices"] == 0 or obj_stats["faces"] == 0:
+                add_quality_issue(
+                    issues,
+                    "error",
+                    "empty_obj_geometry",
+                    f"OBJ output has no usable geometry: {relative}",
+                    obj_stats,
+                )
+        if path.suffix == ".json":
+            try:
+                json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError as error:
+                add_quality_issue(
+                    issues,
+                    "error",
+                    "invalid_json_output",
+                    f"Generated JSON output is invalid: {relative}",
+                    {"line": error.lineno, "column": error.colno},
+                )
+        file_stats[relative] = stats
+    return file_stats
+
+
+def check_river_network(issues: list[dict[str, object]]) -> dict[str, object]:
+    river_length = path_length(RIVER_PATH)
+    mouth_distance = math.hypot(RIVER_PATH[-1][0] - HARBOR_CENTER[0], RIVER_PATH[-1][1] - HARBOR_CENTER[1])
+    stats = {
+        "river_points": len(RIVER_PATH),
+        "river_length": round(river_length, 2),
+        "mouth_distance_to_harbor": round(mouth_distance, 2),
+        "tributary_points": [len(path) for path in TRIBUTARY_PATHS],
+        "tributary_lengths": [round(path_length(path), 2) for path in TRIBUTARY_PATHS],
+    }
+    if len(RIVER_PATH) < 8:
+        add_quality_issue(issues, "error", "short_river_path", "Mercy River has too few sampled points.", stats)
+    if river_length < 80.0:
+        add_quality_issue(issues, "error", "short_river_length", "Mercy River is too short to read as a drainage feature.", stats)
+    if mouth_distance > 20.0:
+        add_quality_issue(issues, "warning", "river_misses_harbor", "Mercy River mouth is far from the harbor target.", stats)
+    for index, path in enumerate(TRIBUTARY_PATHS, start=1):
+        if len(path) < 4 or path_length(path) < 18.0:
+            add_quality_issue(
+                issues,
+                "warning",
+                "short_tributary",
+                f"Tributary {index} is very short.",
+                {"points": len(path), "length": round(path_length(path), 2)},
+            )
+    return stats
+
+
+def check_landmarks(issues: list[dict[str, object]]) -> dict[str, object]:
+    if not LANDMARKS_PATH.exists():
+        return {"checked": 0, "available": False}
+    payload = json.loads(LANDMARKS_PATH.read_text(encoding="utf-8"))
+    landmarks = payload.get("landmarks", [])
+    low_walkability_categories = {"water", "waterfall", "volcano", "islet"}
+    checked = 0
+    for landmark in landmarks:
+        position = landmark.get("position", {})
+        name = str(landmark.get("name", "unknown"))
+        category = str(landmark.get("category", "unknown"))
+        x = float(position.get("x", 0.0))
+        y = float(position.get("y", 0.0))
+        z = float(position.get("z", 0.0))
+        terrain_y = terrain_height(x, z)
+        y_offset = y - terrain_y
+        radius = island_radius(x, z)
+        walkability = float(landmark.get("walkability", walkability_score(x, z)))
+        checked += 1
+        if category != "islet" and radius > 1.03:
+            add_quality_issue(
+                issues,
+                "error",
+                "landmark_off_island",
+                f"Landmark {name} is outside the generated island.",
+                {"x": x, "z": z, "island_radius": round(radius, 3)},
+            )
+        if y_offset < 0.2 or y_offset > 12.0:
+            add_quality_issue(
+                issues,
+                "warning",
+                "landmark_height_offset",
+                f"Landmark {name} has an unusual height offset from terrain.",
+                {"y_offset": round(y_offset, 3), "terrain_y": round(terrain_y, 3), "landmark_y": y},
+            )
+        if category not in low_walkability_categories and walkability < 0.08:
+            add_quality_issue(
+                issues,
+                "warning",
+                "low_landmark_walkability",
+                f"Landmark {name} may be hard to reach.",
+                {"walkability": round(walkability, 3), "category": category},
+            )
+    return {"checked": checked, "available": True}
+
+
+def check_debug_report(issues: list[dict[str, object]]) -> dict[str, object]:
+    if not TERRAIN_REPORT_PATH.exists():
+        return {"available": False}
+    report = json.loads(TERRAIN_REPORT_PATH.read_text(encoding="utf-8"))
+    walkability = report.get("walkability", {})
+    slope = report.get("slope", {})
+    good_ratio = float(walkability.get("good_sample_ratio", 0.0))
+    steep_ratio = float(slope.get("steep_sample_ratio", 0.0))
+    if good_ratio < 0.18:
+        add_quality_issue(
+            issues,
+            "warning",
+            "low_walkability_ratio",
+            "Generated terrain has a low ratio of easy traversal samples.",
+            {"good_sample_ratio": good_ratio},
+        )
+    if steep_ratio > 0.65:
+        add_quality_issue(
+            issues,
+            "warning",
+            "high_steep_ratio",
+            "Generated terrain has a high ratio of steep samples.",
+            {"steep_sample_ratio": steep_ratio},
+        )
+    return {"available": True, "good_sample_ratio": good_ratio, "steep_sample_ratio": steep_ratio}
+
+
+def check_placement(issues: list[dict[str, object]]) -> dict[str, dict[str, int]]:
+    for name, stats in sorted(PLACEMENT_STATS.items()):
+        requested = max(1, stats["requested"])
+        skipped_ratio = stats["skipped"] / requested
+        if skipped_ratio > 0.15:
+            add_quality_issue(
+                issues,
+                "warning",
+                "high_placement_skip_ratio",
+                f"Decoration rule {name} skipped many requested placements.",
+                {"rule": name, **stats, "skipped_ratio": round(skipped_ratio, 3)},
+            )
+    return {name: dict(stats) for name, stats in sorted(PLACEMENT_STATS.items())}
+
+
+def generate_quality_report(only: str, outputs: list[Path]) -> Path:
+    issues: list[dict[str, object]] = []
+    payload = {
+        "generated_by": "tools/generate_island.py",
+        "seed": SEED,
+        "grid": GRID,
+        "group": only,
+        "files": check_generated_files(outputs, issues),
+        "river": check_river_network(issues),
+        "landmarks": check_landmarks(issues),
+        "debug": check_debug_report(issues),
+        "scene": {
+            "spawns": scene_spawn_stats(),
+            "placement": check_placement(issues),
+        },
+        "cache": generation_cache_stats(),
+        "issues": issues,
+        "status": "fail" if any(issue["severity"] == "error" for issue in issues) else "pass",
+    }
+    QUALITY_REPORT_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return QUALITY_REPORT_PATH
+
+
+def map_output_paths() -> list[Path]:
+    return [
+        MAP_PATH,
+        *SPLIT_MAP_PATHS.values(),
+        *MAP_LOD_PATHS,
+        INTERNAL_WATER_PATH,
+        LANDMARKS_PATH,
+    ]
+
+
+def debug_output_paths() -> list[Path]:
+    return [
+        WALKABILITY_PATH,
+        HEIGHTMAP_PATH,
+        BIOME_MAP_PATH,
+        SLOPE_MAP_PATH,
+        MOISTURE_MAP_PATH,
+        *MATERIAL_MASK_PATHS.values(),
+        TERRAIN_REPORT_PATH,
+    ]
+
+
+def generate_map_outputs() -> list[Path]:
     generate_map()
     generate_split_maps()
     generate_lod_maps()
     generate_internal_water()
+    generate_landmarks()
+    return map_output_paths()
+
+
+def generate_debug_outputs() -> list[Path]:
     generate_walkability_map()
     generate_debug_maps_and_report()
-    generate_landmarks()
+    return debug_output_paths()
+
+
+def generate_scene_outputs() -> list[Path]:
     generate_scene()
-    lod_outputs = ", ".join(path.relative_to(ROOT).as_posix() for path in MAP_LOD_PATHS)
-    split_outputs = ", ".join(path.relative_to(ROOT).as_posix() for path in SPLIT_MAP_PATHS.values())
-    material_outputs = ", ".join(path.relative_to(ROOT).as_posix() for path in MATERIAL_MASK_PATHS.values())
-    print(
-        f"Generated {MAP_PATH.relative_to(ROOT)}, "
-        f"{split_outputs}, "
-        f"{lod_outputs}, "
-        f"{INTERNAL_WATER_PATH.relative_to(ROOT)}, "
-        f"{WALKABILITY_PATH.relative_to(ROOT)}, "
-        f"{HEIGHTMAP_PATH.relative_to(ROOT)}, "
-        f"{BIOME_MAP_PATH.relative_to(ROOT)}, "
-        f"{SLOPE_MAP_PATH.relative_to(ROOT)}, "
-        f"{MOISTURE_MAP_PATH.relative_to(ROOT)}, "
-        f"{material_outputs}, "
-        f"{TERRAIN_REPORT_PATH.relative_to(ROOT)}, "
-        f"{LANDMARKS_PATH.relative_to(ROOT)} and {SCENE_PATH.relative_to(ROOT)}"
+    generate_gameplay_goals()
+    return [SCENE_PATH, GAMEPLAY_GOALS_PATH]
+
+
+def run_generation(only: str) -> list[Path]:
+    return run_generation_group(
+        only,
+        {
+            "map": generate_map_outputs,
+            "debug": generate_debug_outputs,
+            "scene": generate_scene_outputs,
+        },
     )
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    options = parse_args(argv, DEFAULT_ROOT, DEFAULT_SEED, DEFAULT_GRID)
+    configure_runtime(options)
+    outputs = run_generation(options.only)
+    outputs.append(generate_quality_report(options.only, outputs))
+    outputs.append(generate_debug_preview())
+    print("Generated " + ", ".join(relative_output(path) for path in outputs))
 
 
 if __name__ == "__main__":

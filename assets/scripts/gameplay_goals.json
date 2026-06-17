@@ -1,0 +1,328 @@
+{
+  "actions": [
+    {
+      "category": "выживание",
+      "description": "Использовать сухую древесину и кремень, чтобы создать безопасный источник тепла и света.",
+      "id": "light_fire",
+      "landmark_hint": "arrival_camp",
+      "produces": [
+        "огонь",
+        "безопасная зона лагеря"
+      ],
+      "requires": [
+        "дерево",
+        "кремень"
+      ],
+      "title": "Разжечь костер"
+    },
+    {
+      "category": "выживание",
+      "description": "Добавлять дрова в костер во время ночи, дождя или шторма.",
+      "id": "keep_fire_alive",
+      "landmark_hint": "arrival_camp",
+      "produces": [
+        "тепло",
+        "защита от темноты"
+      ],
+      "requires": [
+        "огонь",
+        "дерево"
+      ],
+      "title": "Поддерживать огонь"
+    },
+    {
+      "category": "добыча",
+      "description": "Использовать топор на деревьях, чтобы получить древесину для костра, инструментов и построек.",
+      "id": "chop_tree",
+      "landmark_hint": "temperate_forest",
+      "produces": [
+        "дерево"
+      ],
+      "requires": [
+        "топор"
+      ],
+      "title": "Рубить деревья"
+    },
+    {
+      "category": "добыча",
+      "description": "Разбивать прибрежные и горные камни, чтобы получить материал для инструментов и печи.",
+      "id": "mine_stone",
+      "landmark_hint": "natural_harbor",
+      "produces": [
+        "камень",
+        "кремень"
+      ],
+      "requires": [
+        "кирка или тяжелый камень"
+      ],
+      "title": "Добывать камень"
+    },
+    {
+      "category": "собирательство",
+      "description": "Искать грибы во влажных низинах и болотах, затем использовать их для еды или лечения.",
+      "id": "gather_mushrooms",
+      "landmark_hint": "eastern_wetland",
+      "produces": [
+        "грибы"
+      ],
+      "requires": [],
+      "title": "Собирать грибы"
+    },
+    {
+      "category": "выживание",
+      "description": "Набрать воду у озера или реки и подготовить ее к употреблению.",
+      "id": "collect_water",
+      "landmark_hint": "grant_lake",
+      "produces": [
+        "сырая вода"
+      ],
+      "requires": [
+        "емкость"
+      ],
+      "title": "Набрать воду"
+    },
+    {
+      "category": "выживание",
+      "description": "Очистить сырую воду на костре, чтобы снизить риск болезни.",
+      "id": "boil_water",
+      "landmark_hint": "arrival_camp",
+      "produces": [
+        "чистая вода"
+      ],
+      "requires": [
+        "сырая вода",
+        "огонь"
+      ],
+      "title": "Кипятить воду"
+    },
+    {
+      "category": "крафт",
+      "description": "Собрать дерево, камень и волокна, чтобы сделать первый надежный инструмент.",
+      "id": "craft_stone_axe",
+      "landmark_hint": "arrival_camp",
+      "produces": [
+        "топор"
+      ],
+      "requires": [
+        "дерево",
+        "камень",
+        "волокна"
+      ],
+      "title": "Сделать каменный топор"
+    },
+    {
+      "category": "строительство",
+      "description": "Поставить простой навес или укрепить найденное убежище перед непогодой.",
+      "id": "build_shelter",
+      "landmark_hint": "granite_house",
+      "produces": [
+        "укрытие"
+      ],
+      "requires": [
+        "дерево",
+        "волокна"
+      ],
+      "title": "Построить укрытие"
+    },
+    {
+      "category": "исследование",
+      "description": "Войти в скрытый грот с факелом и отметить найденные проходы.",
+      "id": "explore_grotto",
+      "landmark_hint": "hidden_grotto_1",
+      "produces": [
+        "открытая область",
+        "редкий ресурс"
+      ],
+      "requires": [
+        "факел"
+      ],
+      "title": "Исследовать грот"
+    },
+    {
+      "category": "исследование",
+      "description": "Осмотреть древний объект и добавить его в журнал острова.",
+      "id": "activate_ruin_marker",
+      "landmark_hint": "standing_stones",
+      "produces": [
+        "запись в журнале"
+      ],
+      "requires": [],
+      "title": "Активировать знак руин"
+    },
+    {
+      "category": "строительство",
+      "description": "Собрать материалы у гавани и построить лодку для малых островков или побега.",
+      "id": "build_boat",
+      "landmark_hint": "natural_harbor",
+      "produces": [
+        "лодка"
+      ],
+      "requires": [
+        "дерево",
+        "веревка",
+        "смола"
+      ],
+      "title": "Построить лодку"
+    }
+  ],
+  "generated_by": "tools/generate_island.py",
+  "goals": [
+    {
+      "description": "Найти место для лагеря, собрать древесину и разжечь первый костер.",
+      "id": "survive_first_day",
+      "landmarks": [
+        "arrival_camp"
+      ],
+      "priority": "main",
+      "steps": [
+        {
+          "action": "chop_tree",
+          "text": "Собрать первую древесину."
+        },
+        {
+          "action": "light_fire",
+          "text": "Разжечь костер у лагеря."
+        },
+        {
+          "action": "keep_fire_alive",
+          "text": "Поддерживать огонь до утра."
+        }
+      ],
+      "title": "День 1: выжить после высадки"
+    },
+    {
+      "description": "Добраться до озера Гранта или реки Милосердия и подготовить воду к употреблению.",
+      "id": "find_clean_water",
+      "landmarks": [
+        "grant_lake",
+        "mercy_river_source",
+        "mercy_river_mouth"
+      ],
+      "priority": "main",
+      "steps": [
+        {
+          "action": "collect_water",
+          "text": "Набрать сырую воду."
+        },
+        {
+          "action": "boil_water",
+          "text": "Прокипятить воду на костре."
+        }
+      ],
+      "title": "Найти воду"
+    },
+    {
+      "description": "Добыть камень и собрать древесину, чтобы скрафтить каменный топор.",
+      "id": "craft_first_tool",
+      "landmarks": [
+        "natural_harbor",
+        "arrival_camp"
+      ],
+      "priority": "main",
+      "steps": [
+        {
+          "action": "mine_stone",
+          "text": "Добыть камень или кремень."
+        },
+        {
+          "action": "craft_stone_axe",
+          "text": "Сделать каменный топор."
+        }
+      ],
+      "title": "Сделать первый инструмент"
+    },
+    {
+      "description": "Обнаружить Granite House и подготовить его как долговременную базу.",
+      "id": "secure_shelter",
+      "landmarks": [
+        "granite_house"
+      ],
+      "priority": "main",
+      "steps": [
+        {
+          "action": "build_shelter",
+          "text": "Укрепить вход и место для сна."
+        },
+        {
+          "action": "light_fire",
+          "text": "Поставить постоянный источник света."
+        }
+      ],
+      "title": "Найти безопасное убежище"
+    },
+    {
+      "description": "Посетить ключевые точки острова и открыть ориентиры в журнале.",
+      "id": "map_island",
+      "landmarks": [
+        "standing_stones",
+        "watchtower",
+        "sunken_temple",
+        "hidden_grotto_1"
+      ],
+      "priority": "exploration",
+      "steps": [
+        {
+          "action": "activate_ruin_marker",
+          "text": "Отметить круг стоячих камней."
+        },
+        {
+          "action": "explore_grotto",
+          "text": "Исследовать хотя бы один скрытый грот."
+        },
+        {
+          "action": "activate_ruin_marker",
+          "text": "Осмотреть сторожевую башню и затонувший храм."
+        }
+      ],
+      "title": "Составить карту острова"
+    },
+    {
+      "description": "Запасти воду, еду и дрова, затем переждать непогоду в укрытии.",
+      "id": "prepare_for_storm",
+      "landmarks": [
+        "granite_house",
+        "hidden_grotto_1",
+        "arrival_camp"
+      ],
+      "priority": "survival",
+      "steps": [
+        {
+          "action": "gather_mushrooms",
+          "text": "Собрать запас еды."
+        },
+        {
+          "action": "boil_water",
+          "text": "Подготовить чистую воду."
+        },
+        {
+          "action": "keep_fire_alive",
+          "text": "Поддерживать костер во время шторма."
+        }
+      ],
+      "title": "Подготовиться к шторму"
+    },
+    {
+      "description": "Построить лодку для побега или превратить Granite House в полноценную базу.",
+      "id": "escape_or_claim_island",
+      "landmarks": [
+        "natural_harbor",
+        "granite_house",
+        "offshore_islet_1"
+      ],
+      "priority": "final",
+      "steps": [
+        {
+          "action": "build_boat",
+          "text": "Построить лодку у природной гавани."
+        },
+        {
+          "action": "build_shelter",
+          "text": "Укрепить Granite House как запасной финал."
+        }
+      ],
+      "title": "Покинуть остров или сделать его домом"
+    }
+  ],
+  "language": "ru",
+  "seed": 1847
+}

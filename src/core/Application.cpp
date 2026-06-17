@@ -29,6 +29,13 @@ constexpr int windowWidth = 1280;
 constexpr int windowHeight = 720;
 constexpr float maximumDeltaTime = 0.1F;
 constexpr float terrainChunkSize = 64.0F;
+const glm::vec3 arrivalCamp{-32.0F, 3.0F, 77.0F};
+const glm::vec3 grantLake{31.0F, 4.0F, -24.0F};
+const glm::vec3 mercyRiverMouth{104.0F, 1.0F, 25.0F};
+const glm::vec3 naturalHarbor{104.0F, 1.0F, 25.0F};
+const glm::vec3 graniteHouse{-104.0F, 7.0F, -10.0F};
+const glm::vec3 standingStones{-82.0F, 2.0F, 38.0F};
+const glm::vec3 watchtower{91.0F, 2.0F, 18.0F};
 
 struct ChunkKey {
     int x = 0;
@@ -251,6 +258,9 @@ void Application::registerEventHandlers() {
         if (event.key == GLFW_KEY_GRAVE_ACCENT && event.action == KeyAction::Press) {
             toggleDebugPanel();
         }
+        if (event.key == GLFW_KEY_E && event.action == KeyAction::Press && !menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
+            useContextAction();
+        }
         if (event.action == KeyAction::Press && event.key >= GLFW_KEY_1 && event.key <= GLFW_KEY_5) {
             inventory_.select(static_cast<std::size_t>(event.key - GLFW_KEY_1));
         }
@@ -336,6 +346,7 @@ void Application::buildPipeline() {
             renderer_->bloomEnabled(),
             weather_,
             inventory_,
+            objectiveHudState(),
             inventoryOpen_,
             debugPanelOpen_);
         ui_.updateTitle(window_, registry_, audio_, context.deltaTime, menuOpen_);
@@ -589,6 +600,58 @@ void Application::useSelectedTool() {
         registry_.destroy(target);
         physics_.rebuildStaticIndex(registry_);
     }
+}
+
+glm::vec3 Application::playerPosition() const {
+    if (!registry_.alive(player_.entity())) {
+        return {};
+    }
+    return registry_.get<Transform>(player_.entity()).position;
+}
+
+void Application::useContextAction() {
+    const glm::vec3 position = playerPosition();
+    const auto near = [&position](glm::vec3 point, float radius) {
+        return glm::length(glm::vec2{position.x - point.x, position.z - point.z}) <= radius;
+    };
+    if (near(arrivalCamp, 14.0F) && !fireLit_ && inventory_.wood() > 0 && inventory_.stone() > 0) {
+        if (inventory_.spendWood(1) && inventory_.spendStone(1)) {
+            fireLit_ = true;
+        }
+        return;
+    }
+    if (near(grantLake, 24.0F) || near(mercyRiverMouth, 24.0F)) {
+        inventory_.addWater(1);
+        return;
+    }
+    if (near(naturalHarbor, 42.0F) || glm::length(glm::vec2{position.x, position.z}) < 56.0F) {
+        inventory_.addStone(1);
+    }
+}
+
+ObjectiveHudState Application::objectiveHudState() const {
+    const glm::vec3 position = playerPosition();
+    const auto near = [&position](glm::vec3 point, float radius) {
+        return glm::length(glm::vec2{position.x - point.x, position.z - point.z}) <= radius;
+    };
+    std::string_view hint = "E: НЕТ ДЕЙСТВИЯ";
+    if (near(arrivalCamp, 14.0F) && !fireLit_) {
+        hint = inventory_.wood() > 0 && inventory_.stone() > 0 ? "E: КОСТЕР" : "НУЖНЫ ДЕРЕВО/КАМЕНЬ";
+    } else if (near(grantLake, 24.0F) || near(mercyRiverMouth, 24.0F)) {
+        hint = "E: НАБРАТЬ ВОДУ";
+    } else if (near(naturalHarbor, 42.0F) || glm::length(glm::vec2{position.x, position.z}) < 56.0F) {
+        hint = "E: ДОБЫТЬ КАМЕНЬ";
+    }
+    return {
+        position,
+        inventory_.wood() > 0,
+        inventory_.stone() > 0,
+        inventory_.water() > 0,
+        fireLit_,
+        near(graniteHouse, 22.0F),
+        near(standingStones, 20.0F) || near(watchtower, 18.0F),
+        hint,
+    };
 }
 
 void Application::toggleFullscreen() {

@@ -38,6 +38,28 @@ the deterministic map and scenery placement with:
 python3 tools/generate_island.py
 ```
 
+For faster iteration, limit the generator to one output group or redirect the
+generated assets into a scratch directory:
+
+```bash
+python3 tools/generate_island.py --only map --seed 1847 --grid 241
+python3 tools/generate_island.py --only debug --grid 61 --output-dir /tmp/pcolonist-island
+python3 tools/generate_island.py --only scene
+```
+
+`--only map` writes the terrain, split meshes, LODs, internal water and
+landmarks. `--only debug` writes traversal/material/biome debug maps and the
+terrain report. `--only scene` writes only `assets/scripts/models.scene`.
+Every run also writes `assets/maps/generation_quality.json` with output-file,
+landmark, river, traversal and decoration-placement checks, plus
+`assets/maps/debug_preview.html` with inline previews of generated debug maps.
+The generator caches repeated terrain, river, biome and moisture samples during
+each run, so scene placement and debug-map iteration avoid recalculating the
+same points.
+The scene generation step also emits `assets/scripts/gameplay_goals.json`, a
+Russian action and objective catalog for survival tasks, resource gathering,
+crafting, exploration and final island goals.
+
 ## Frame pipeline
 
 Every frame executes ordered tasks:
@@ -246,6 +268,9 @@ Every frame executes ordered tasks:
 - `1`-`5`: select a tool slot
 - Left mouse button: use the selected tool; the axe damages nearby targeted
   trees and adds wood after three hits
+- `E`: perform the nearby survival action; collect water at Grant Lake or
+  Mercy River, collect stone near rocky areas, or light the campfire at the
+  arrival camp after collecting wood and stone
 - `Tab`: open/close inventory
 - `Escape`: open/close pause and settings menu
 - Top-right HUD button: toggle fullscreen when the cursor is released

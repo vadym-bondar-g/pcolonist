@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Island Debug Preview</title>
+  <style>
+    body { margin: 0; font: 14px/1.45 system-ui, sans-serif; color: #d7dddf; background: #151817; }
+    .layout { display: grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); min-height: 100vh; }
+    .goals { position: sticky; top: 0; height: 100vh; overflow: auto; border-right: 1px solid #343b38; background: #111412; padding: 18px; box-sizing: border-box; }
+    .content { min-width: 0; padding-bottom: 180px; }
+    header, main { max-width: 1180px; margin: 0 auto; padding: 24px; }
+    header { border-bottom: 1px solid #343b38; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 0 0 10px; font-size: 16px; }
+    p { margin: 0; color: #9ba6a2; }
+    .goal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+    .goal-item { border: 1px solid #333b37; background: #1d2220; border-radius: 6px; padding: 12px; }
+    .goal-item strong { display: block; color: #f0f3ef; font-size: 14px; }
+    .goal-item span { display: block; color: #9ba6a2; font-size: 12px; margin-top: 5px; }
+    .metrics, .grid { display: grid; gap: 14px; }
+    .metrics { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: 18px 0; }
+    .metric, .card, .panel { border: 1px solid #333b37; background: #1d2220; border-radius: 6px; padding: 14px; }
+    .metric strong { display: block; font-size: 22px; color: #f0f3ef; }
+    .grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    img { width: 100%; image-rendering: pixelated; border: 1px solid #303633; background: #0f1211; }
+    .missing { opacity: 0.62; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 7px 8px; border-bottom: 1px solid #303633; text-align: left; }
+    ul { margin: 0; padding-left: 18px; }
+    .minimap { position: fixed; right: 18px; bottom: 18px; width: 220px; border: 1px solid #47514b; background: #111412; border-radius: 6px; padding: 10px; box-shadow: 0 14px 38px rgba(0,0,0,.42); z-index: 5; }
+    .minimap h2 { font-size: 13px; margin-bottom: 8px; }
+    .minimap img { display: block; aspect-ratio: 1 / 1; object-fit: cover; }
+    .minimap-empty { display: grid; place-items: center; aspect-ratio: 1 / 1; border: 1px solid #303633; color: #9ba6a2; }
+    @media (max-width: 860px) {
+      .layout { display: block; }
+      .goals { position: static; height: auto; border-right: 0; border-bottom: 1px solid #343b38; }
+      .minimap { width: 150px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="goals">
+      <h2>Игровые цели</h2>
+      <ol class="goal-list"><li class="goal-item"><strong>День 1: выжить после высадки</strong><span>Найти место для лагеря, собрать древесину и разжечь первый костер.</span></li>
+<li class="goal-item"><strong>Найти воду</strong><span>Добраться до озера Гранта или реки Милосердия и подготовить воду к употреблению.</span></li>
+<li class="goal-item"><strong>Сделать первый инструмент</strong><span>Добыть камень и собрать древесину, чтобы скрафтить каменный топор.</span></li>
+<li class="goal-item"><strong>Найти безопасное убежище</strong><span>Обнаружить Granite House и подготовить его как долговременную базу.</span></li>
+<li class="goal-item"><strong>Составить карту острова</strong><span>Посетить ключевые точки острова и открыть ориентиры в журнале.</span></li>
+<li class="goal-item"><strong>Подготовиться к шторму</strong><span>Запасти воду, еду и дрова, затем переждать непогоду в укрытии.</span></li>
+<li class="goal-item"><strong>Покинуть остров или сделать его домом</strong><span>Построить лодку для побега или превратить Granite House в полноценную базу.</span></li></ol>
+    </aside>
+    <div class="content">
+      <header>
+        <h1>Island Debug Preview</h1>
+        <p>Seed 1847, grid 241, status pass</p>
+        <div class="metrics">
+          <div class="metric"><span>Height</span><strong>-0.246 to 35.358</strong></div>
+          <div class="metric"><span>Avg slope</span><strong>0.428</strong></div>
+          <div class="metric"><span>Good walkability</span><strong>0.7491</strong></div>
+          <div class="metric"><span>Issues</span><strong>6</strong></div>
+        </div>
+      </header>
+      <main>
+        <div class="grid">
+          <section class="card"><h2>Biome Map</h2><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD0AAAA9CAIAAACRAPa+AAABVklEQVR42u3YPQ7CMAwF4CxcgoGRiYURIcEAIwssDByAU3ALDkwkS5blum5p2qSBJ70hKkO/BOevYbFc15gAN9xwww033HDDDTfccNfnfr8ulFrdbfpxezWV2095dyfxcF1xtrdNzCj0kIgmEDV8NLlJnE5PckuTLzbdKfQwuDbujzNFuU1xs2OJBROGoVnDdB8t3SQu4JYUJWv2p228c9eJP6gsPh13nP1zSSm2DpqVrdARqtxMn6mbuU13DK8nueuEX8ZuqTetne4c87LN3SxoM/L/UYsPr+tzdNMm72xGk9f3V3Ti8smE2/K4kmleDnab+3wOd386t9VgF9t3etIjkeeirA2lz30elAuCcsuqMGehqplibp9OevXTLMa7LUovh7mw29Sr5467zH3HvOD4V8wRr8b/ep/vQ6/gO5vaCKtx47sm3HDDDTfccMMNN9xw/6D7A47qjWGirgESAAAAAElFTkSuQmCC" alt="Biome Map preview"><p>assets/maps/biomes.ppm</p></section>
+<section class="card"><h2>Heightmap</h2><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD0AAAA9CAAAAAA7CT41AAAE0klEQVR42u2WSWwbZRTHYyfexo7tscfb2J4Z27N59n1N4q0FaqdS1TqhoiTpgW63VEJqkxCQaCohVAmBVIpUqcsBinpBasoBWm5t4YR6Q3AsN3rnCl8kxAVnqzjmyQdf/t9785bfe2NjB3ZgB/YqFo7GQoF//gdDofF9SCdCUDKTy2bgaCgYHI8m4Ww6Ht3jE4HYJIzkKxiO4+UCks3kCqVyqZCF4clYcHd1LIWgKNagObZJ12sYRuD1Wg0vo8V8Nr6b+4lYOlfBiQbFy5Ii8gxFUwwL3iFr1Woxm9jZewhK58o1kmGaoqRqmiLwgiiKsiSKLFWvlmBoJ3kQyhRQosHwvCiqhqGrIADdnOp2ZwyRoxp4KQv9W4oRcScLlRpJN3lJ0gxguqbqttfpHZkxFJGl60QZScfC26kjcBEnaZrRXNuyDVMHesedch1b52VFZCiSqBYyqejo8CfiCNpgOJZx+x3X0k3Tsqdn2i3PsSRBNRSeA+4rxcxkdJt85zGaN+z2myf7rmVawK1tgZ+lG6blbMk5pl7JpUepxyE4j9YZ2Ts8Ozs85pu65R9+zXNB3IZm2aZjalyzyZDVYiY2InPhVKFMUJzmdVyj83rL0d3uG8Pjg17XV1VNVzVVoBv1Rm103QLRLGgxitdnZjx7Ztp1O4Ojxy9fvrg49G1VAZ3TJAk0g6AYmoFG9DeElOsUK/vDY/1p17P92YXl4b37d66dHrZVVeYFoYEjY2OJajkfH5F0CC43GNGZW1s5c6Tb8vtzyx+d+v2Pl4+vnRt4mqZJioChSLaCY4VE6L/qaKpEsGpv+ebNjbdPDAbz56/eu/DTo+cv7l4YtC3LUBWJZWmKrOP5yRHTEkrmMNYYfvD5F58sn146e37t9pP1L997+OLB2lzX9XRQOsdWmiQoWTIw6sPhCm2dWn3n3U9XLq6sbtx48PyrzR9+fbm5utBvtVy/7XsW36xX8/DIbomkSjVjbn3t6o3V1avX7z549tt33/7156Db8c1DIBGeo/EihRfS0OjxTOVwebB+5+ZnK1duPXr6+NnPm+tPv+92Wq2OIRqmJEg8XSumYtswCUqjlLe0sbF25tKtH395snn/xqmPP+x1O5aja7qiCRzdwLKx7UYM9CrKdRaXFo6dfP+bh19fv3Z5cHZhtt9yHdMyDAkAolbORred7/FwCm06fqc1deLSldWL5+cODfq93qFer+eDfPNUnUCR6E5sSuCcarrO4bfOLs4f7U+3Or3+3OLSfE+3VYEhsVImvCMWUUbVHb/dHwx6rfYUKFR//tyFo5JuyyyFl3LJHdVQiZJUy3Y937cBHizb63mu3Z5taRxJAKqGAzuIo5ky2ZRkWVUBDjRZ03TT6YA42hoLqATvQvR4dmvGOYHjFYBEBVBRU1TdNGQWL2Yno7tsg2g6X8S2gM4JsqKoimqqwhZSKKKYiYd220PBRBJGilWCZFhRVuStJwSAoxoOeBTcywaNQmlAdeC/KQk8z4lAjAGSJgJ7XMGRVKGCEVv+mwyImsZLSBIK7n35p5ESWsYJkmxQAISV/GR4P7dDZDKTQfIohhNEtVoqpML7PD1i8UQC5K+MlgpIOrzv02U8OBGB0nAWTiQir3b8BMKxRGR87NUtOHZgB/b/2N9bl/lQKIWWqQAAAABJRU5ErkJggg==" alt="Heightmap preview"><p>assets/maps/heightmap.pgm</p></section>
+<section class="card"><h2>Walkability</h2><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHkAAAB5CAAAAAA4kdGVAAAFAUlEQVR42u2Zb0xTVxTATykFpOBqKShIIDD+TvZgCyhmgs5tmQtMZQYYkBjFGYgZMGayxWQGsgnL0LoPOLI5lKBuiFtkAxZhBFC2UQwblgyigWILqVJIEail5f/ZayldK2xd4ntlH+7vQymvN+fX8+599557C0AgEAgEAoFAIBAIBAKB8PTgEmtnXgv5CjWaLtrZbHqrH+n+g207rsYi+12ANrG7VjWMOMyS+t9T1Ss0+oV5dtQ4o7Vxo+eQnUHeQsecttnHLGTdlXR2ssvm6GJ4lBliiX1gP96X4n+DwaHV5cSpfeLJtYOaDtR8aAGn6L+jink7Zm2Io8GJKwk5s4iPZyyiD+GfK5ULzJoRZR0NX0iekEypE0f19LNkyUgfw2Kk81VbJ/ZZguRlUXPCYJPK+jYz1s2rdeLtd3oQI18I8XdxC4qvlP+mG2Nj3l5FvNCG3YiUi0jI9eVxg8WVDUo2FgxEyU9yRbeFeLxpuqXWCymBqYUT3Pqmj42UxfBcRNnZ8K8GTbGVai2eAQFFeS+3cYSSajnz4g4A3jpnTvKAaQxr8E7rl88W11BUoLkV71TppX7LKZQRczSAA7gBpD6S64yjuvPG1VOb85qo2HCRAUMrrmtJGuoYnUcQH9KvId/F7QTwRTTkVddYV5oH/JAtKBItqznPbJMUIMPmc/SruLcqH4CvlE4+Hj/2c4u64GMX2BEsEv2thpZrt7SMqlH2Ej12DaEcPDwzf1Cn7e0dxs67kQFefF+zmePA5a17fZzZuRsPeMGuRC7nE2yJjcF6VPRd79xm/CTBw2x25q/3D5BrmVVjCsQ+TKffXEBRaw8myeqUSeIPTrgLCoFvNgs3bfbdenOB2QULU6EY38467LgVJUWommhTZJR5+nm+B47Vs2azX1BoWEhyv5bZlTIdPsWMrMO8KEzT07Ga5OelFVkfFrmW38Pnl8WhEa/hscioWWaX6JR4qE00dCuG0bG+v7HP28Nxf0kgHbY8fOmx8gk2asrP5bpdZbI2CN0AUMhzFGN1qgQ7L3ye5QoRYkRp/M2jgRTlBDyBn1HT0SOT9bQeP70kvcvEE80HEBiCJRomkr1nIOPXqt/xEn5L8b0pyh2chP70h/PGJbpI0QvS4RmcGjJtMJ8en5ZfRooEQz+KQ3cLPDUTFah89MoWf2FUpJc5ZxOaEcXAACwy4+UABB6/nw3ZPUe309NVKWJ9+/U9p6OjvXftCHVd7+6z23pcyUcYXLI4PuD8br600PhPW0FuTu6JmK/fCDmA8bFhG4oO1ViKtUNMrpUcEPq9WIgXzRec3GOoPVQ6ntxXdv6gdQVoXEwZMzsHRsXJe+UDVabVmAPhETsz/PLxo5n529b3er6f2fqgTaW7bAhbzKW/hhA2FW2vTK7KkS8VCsbKdGF2dNQwifVPsVMFqhMDgtxjxXfSLme2ney1SLVdXnPxrUWZdE7JVgFaLyvt6xvInqzXDyBOmMU97XNH8mR5jUkPJG+yVfp2ajLvDY0prqhM+5pJi8SHcVoIUMGO2bBzP3jkQcPQ8gWdSkkvj81xfa+mRIRshGuwkfGi24yxJ0ct6/5FXaObsZV8EERMHxms3CtaU9rUXvU+8LzZOJiyuWGWsXUgZks8tnQ4ZP9DwKk5k9nuB592OXn+J509Drztmuj/xAzWZ432/VnBwrcmv6YQCAQCgUAgEAgEAoFAYJu/ACXj5ZOMDWG6AAAAAElFTkSuQmCC" alt="Walkability preview"><p>assets/maps/walkability.pgm</p></section>
+<section class="card"><h2>Slope</h2><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD0AAAA9CAAAAAA7CT41AAAEMElEQVR42u1Wy25cRRCd24/q7qp+3NfcmTuOrz3xmMQZxpbHjo1JIpGEJBAiofDaIMEC9qzCkg079uyREOKH+AJ+BGoMSEi5mRiLpWs3o3u6u07VOVWDwVVcxVVcImxIdRPprx9FURfZhaEupkTRF3V7bVIURRV8zMs8xiguAg7I4OBTTFU1LKuCvMUQYuBDX//oHMkZAkIk7z0GR+iICPmIVK7HZjYSeoMaMNMG0TlrUBnrPDpjKYW1aL7OejAWnFIqk8BBrhxH6ziQUlwH9xQtOWWEBGGFEEpJMDQGavPVQejzPNpXoyPyq7WyDqzOskxICdpU42rihQVQ1qcUo+sHawrWaakcF9tCJjKhjVFCC6g1gmO8dejQ9z4/M5Hp1ZQXt0bOaJlJ47yUUSjtLVMBGrgA1hnfh0YmNhpX1ifbXOjzZ5O22gitIoEA1EI45sUE+TI4ULIeTYrj0bwphyD5s3YjKYTgjCuktqBAAjcD9mTOSTNl6EnXvjZ8TlXtbS7nHecrpYnOJvLBWmXJ+h5lBGOVxlAAU5ZKMXT2wfL05GDaGqcVk2Yg7/aqDLmdXkKvKLMScfdg56ANgtpmdvrVxx89e/9kNonMoaKha8xgl8v+j/r+FUAUjfHNw9Pjs3Hjqs3p4dbxp2334ux4r9EZJ11Auj4faR18D5q1wM30xoez6f3ja6Mb3e7tN08++fLB4oN3txtrhDFUD0vPrcQi7Gm0wEIcLRenu91ia7K9OHs8/2Uqv6g/P9poYUUbBUIBilzPywesyBi7s3TzxM/G3d5yeXf62w/fPpr89P3+ZlVZLzIoXOAEfZ9QwXnKp/uzJ2/nQ9g6PJmZe7/+fqv9Q8jrs10YKLBD0IgJc+hXGBaT4/t5mGeT2d5U6v3vfvz650wMUqjLUR1sZhHzkPpVxqTno1vPD7u7G4s7O9XmfP+zd24/ORSFWsndn6vex55i/325T83mvbeO9vM73zx/79Hx0bO42Gm52hAAuGVASaLilfqOZTPeurm9k9enT48OFwc3UnstV+PRZKNie7KGc6dqjbuYzRE5kNnWzsbN7a5KqMRke97Nqjmy3LSDuNZY2yai1Kap99q2MgUgjo+WT190S3ZI8Kuar0OPi2TZQ7GMgViaAElN29nj8YQdLXCXeVwDrjyL2VhDjv0NhFTC5htdO+7qKobc52ndTNJcc+LEGYmQaTHIlBZx2IzKmLsYklvr55p9g/sVDQsa2JK1lqz5c2Hw3/S6SVawErzn2w27qVRae2WkdGw5vqDXD0HM2bJ5IoBBTiDjkWIEkxhc7i82gk2eIjfWysA126DUxGzH8sIjPEXv2LjZjbVhD3U8zu3FdweIqwEcgmcH1Sysss/B190eLFGIfjXLbcz/6+oieX0IgTxXORT6UtsP5YQR3aW3J/DqaoW8iv8n/gSlyVhCJ3lThwAAAABJRU5ErkJggg==" alt="Slope preview"><p>assets/maps/slope.pgm</p></section>
+<section class="card"><h2>Moisture</h2><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD0AAAA9CAAAAAA7CT41AAACmUlEQVR42mNgGAWjYBSMgoEDPAK8jOTqFVQytjTTkBbmIkMvi6KFV2RcpIeVqZowGZodk8ube1ozo8Pc9AVI1S1jk9S3YvPO1R1VhQluakIkhpduYO3Gy48fn1k6s6ss1lGVFL+z8gqbx3cffP3//4M9u9fNrI2xkiHBYgVNfeuUvn3P/v9/cun2pT0zi330xInVzCVn6BkUkNq3+dbv/4/e/nt/eVVttKMWP3GaOWSMPJJycwqaV555/vn29/+/r6+pTw+2ViAuqqS0nWNKm9paa3pWHzx1+Om31yc2z29KddVgJ0a3uK5DaHb7zPnzJrY2TZy9+tD505dvHp1TGqxHjG4+DcewnMa567dt2riws6yma/baM0//3lheG2nASlgzm4SBT3rz3I1Hzp46vX3JjNlL1x688/3V2cXV4XpMhHXLW/hF5vetOXT71aev987s237wzINfry9snlzoo0pYs6hFeHFD/aRNJ57///L6+9dn1+6/efX4zKbJtUmWooR1q/oWTV62YuqSfTdf3jp84uKthyeOHdm7alpTmqc6YYdzGkS3bzhzanXfsl1Hdq9YceLNha3L5k1pLk7x0uUmbDW3ccLEfS8eHVwyZ+acqbMOPXx2dnVraVqUr4OOIDHJTC+iZcWx+7cP7li1YP7yc2/uX93SGutpra/MS0xKYVb1zGlbsOXU7asnDhw5ffXJ3fMbm+OspYU4iCzKDHwym6es2rrr5O2H988f2bFqWnWIHifRmVNM3z2quKVn6uLN27esmj+lpybJQY6EgkFIwTgoJqmwvquro6exMC/OWomDpEJJWN3Axi86OTEhKS7Mw0yOldQSkUNc09TGysrWxkSRl5yKgJlPWExSQYqLYRSMglEwsgAA9qMP6FhLuvcAAAAASUVORK5CYII=" alt="Moisture preview"><p>assets/maps/moisture.pgm</p></section>
+<section class="card"><h2>Grass Mask</h2><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD0AAAA9CAAAAAA7CT41AAACWUlEQVR42mNgGAWjYBSMApKAiooGJbod4j00YAaRrNuso7nGXEVFrWzxyu7idFfSnB04ZWZ/Q1qIRfmDP99eXj82UZ14zbH3352/N3VRdcec8j//////8jGXQYV47euAWg6VL1l6+M1/EPh6VYXBss+AKK3efREfgVoOL78AJB9f+//28rGC9k1nPkwhxnaVqce+rALq21J0C0j+/f//0/NJQRcf7vi+J4QI3cGnX/2bDtT3s/bf/52/8ld9/f/fwdYv1c7NkBiHl9z5+//+fwjQEwGCF/+fWmoQGWYqVzofdgA1Pvn//7YIWLfIrf+OhkSml3Q9/2RXkL2/34iIJIJ1i+z77xMYRkyUqZ7UmzpVL/HP/8PfRODg7f8TF2daaRK2Xyt3RsCcbVM//X+P0CzyD+iU8vP/nn0/r4lfd7hr4b7QDdd/f9iBpPv8L0ggft1GyPIJm/UcFrx7f6ksBKr1LDAE910BaX4QQ9DpCXqVU1Z/uNWTkQHVDba1gWHiEhUGIgJer3Kp+d+ZNhlg7cAoO/P//4lv6eE52r7EpfPM3q9WekCQDLRY5BHI6u8rrjdPIDLKq899/R+ol1M65cw1cEIHgn//vxEKbxgwmPbh46cH/w59/A4J6rerftz+VdBuSpxu3dKLP/7/3wW19P//M2fPX1QpcCLS5SrmXVuvfv7//+nuPWcvvfz//9X/Gxda/FWIL9VUzJwu/5znr+Lmnb/s578ve6qzSCxW1RN8zXQindJj1F1ScyxJLpNVNNUddUyWWJNbH2gAk5caJTXKKBgFo2DEAgDcM070jvO0GQAAAABJRU5ErkJggg==" alt="Grass Mask preview"><p>assets/maps/material_grass.pgm</p></section>
+<section class="card"><h2>Rock Mask</h2><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD0AAAA9CAAAAAA7CT41AAABKUlEQVR42mNgGAWjYBSMglFAU5BEieYzghTZnQFnMVFgShjbhgwesnX/33D5/FQZUnSYTFCZCGHpXPkPAud1SbHv2v5HIJpVfKn9wf87dvx/eDCKaM2O/5sa/x9kZvDkMju+5ALQ6h3//4sRrXtT7dXKiCYBBpH6J0CNCySBxFaiA57jkYj/hQRDVqHwdeu/7PgPsbuHjVjt7br/XxSLipgvv7htx8//IH8zMCgamhCp+9D/ic3pQrq9O0AAZDeJcbzE+AtT7Tug3u2r/v8/8n8RadrvbO9m+ACydd/2/wy1KqSmMGFNBoar/7esaO51hiV0RtJMEFBj9BbkgrDFMjh1GPJI0x+CSAJr/v/nWkduXpFk0P9Pfj5l5GRg4BwtcEfBKBgFIwMAAHmEelMM1o3ZAAAAAElFTkSuQmCC" alt="Rock Mask preview"><p>assets/maps/material_rock.pgm</p></section>
+<section class="card"><h2>Sand Mask</h2><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD0AAAA9CAAAAAA7CT41AAABuElEQVR42mNgGAWjYBSMApLA//+/KNF9b9fVXzCDSNb9snvijBf///+dn53SvnjjTdKcfaq2vGnypuMv5qkwc0npOTX8Jl7zHlVhC7XqnJldJfOYgVwewVUM/4nXzgrEbvMyM13FwFxuw/8Mz1o+EqX1YjMDI0h3mhmQVDRgEDV2Xt4dZS1UQ4zt/6udeEF0xBJtiAC/dP1JU+UgTr9jROg+YSPJWAGk2WcwwoTuPTy3+eH1D8Q4fKEGM4MqqpD8s19Ehtl/FagOZME774lMLxuwil44fYSYKPtnz8CGRdjerPzpD8L2f2fgwC4xz4JJlsv2J37dRxiW8mOVAEUAdyghy7kisAj6gEmVvUSE22wbTLEpDA1Z/xmICvhMBkZUAQeujUdWfTtPZCZh5kYT4EzVn9BIZJTPtOTBEh52P4jT/aFKSABdjG1Z92vidH9ZaMqBHFHgBLz8DpEu//+yI8yAD5jU/f2sTCRBItIM/Wf/E1+q/X91x5i98Mz/6xdXpLMz8PrOWktisfp7x/mX3w7e2bDv983Nq5+RXCb///n77tc3WU/IrQ9+AZPXH0pqlFEwCkbBiAUAEd6bva3IE1AAAAAASUVORK5CYII=" alt="Sand Mask preview"><p>assets/maps/material_sand.pgm</p></section>
+<section class="card"><h2>Volcanic Mask</h2><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD0AAAA9CAAAAAA7CT41AAAAYUlEQVR42mNgGAWjYBSMglEwCmgJ/gMB2XrBuv+TazFEN0namRgY4a4mXbcYE5rm/2QGGDm6wQ7n0ybXYhag5yUZyXc2gx4r2O0MZMZX26wUQZDu0RwzCkbBKBgFo4AQAABoS0n2fW77fgAAAABJRU5ErkJggg==" alt="Volcanic Mask preview"><p>assets/maps/material_volcanic.pgm</p></section>
+<section class="card"><h2>Wetness Mask</h2><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD0AAAA9CAAAAAA7CT41AAAAr0lEQVR42mNgGAWjYBSMghEINm2iSDfDwOkGAh5KTNh0nhLdPPsv8Q7J+B7YGIOYUkCyFiYuWELdFEFGGt904hmQ4Ny0aQ45OeTvrk2vGU6vvcNwkRzdm+w2aSUvup5Nqk7zTRDtQOJVBhOp1p7cBguvTedIj7VNF85u2sQCYrzc4U26pzU3XT+/CQTu7bMiI31waW3adOHOtU15cmQmMA4ZNXnu0bJ9FIyCUTBCAACfpEBZIR6EhgAAAABJRU5ErkJggg==" alt="Wetness Mask preview"><p>assets/maps/material_wetness.pgm</p></section>
+        </div>
+        <section class="panel">
+          <h2>Placement</h2>
+          <table><thead><tr><th>Rule</th><th>Requested</th><th>Spawned</th><th>Skipped</th></tr></thead><tbody>
+          <tr><td>coastal_rocks</td><td>120</td><td>81</td><td>39</td></tr>
+<tr><td>forest</td><td>280</td><td>271</td><td>9</td></tr>
+<tr><td>mushrooms</td><td>64</td><td>63</td><td>1</td></tr>
+<tr><td>palms</td><td>95</td><td>95</td><td>0</td></tr>
+<tr><td>understory</td><td>260</td><td>260</td><td>0</td></tr>
+          </tbody></table>
+        </section>
+        <section class="panel">
+          <h2>Quality Issues</h2>
+          <ul><li><strong>warning</strong> river_misses_harbor: Mercy River mouth is far from the harbor target.</li>
+<li><strong>warning</strong> short_tributary: Tributary 3 is very short.</li>
+<li><strong>warning</strong> low_landmark_walkability: Landmark natural_harbor may be hard to reach.</li>
+<li><strong>warning</strong> low_landmark_walkability: Landmark hidden_grotto_2 may be hard to reach.</li>
+<li><strong>warning</strong> low_landmark_walkability: Landmark hidden_grotto_3 may be hard to reach.</li>
+<li><strong>warning</strong> high_placement_skip_ratio: Decoration rule coastal_rocks skipped many requested placements.</li></ul>
+        </section>
+      </main>
+    </div>
+  </div>
+  <aside class="minimap">
+    <h2>Миникарта</h2>
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAD0AAAA9CAIAAACRAPa+AAABVklEQVR42u3YPQ7CMAwF4CxcgoGRiYURIcEAIwssDByAU3ALDkwkS5blum5p2qSBJ70hKkO/BOevYbFc15gAN9xwww033HDDDTfccNfnfr8ulFrdbfpxezWV2095dyfxcF1xtrdNzCj0kIgmEDV8NLlJnE5PckuTLzbdKfQwuDbujzNFuU1xs2OJBROGoVnDdB8t3SQu4JYUJWv2p228c9eJP6gsPh13nP1zSSm2DpqVrdARqtxMn6mbuU13DK8nueuEX8ZuqTetne4c87LN3SxoM/L/UYsPr+tzdNMm72xGk9f3V3Ti8smE2/K4kmleDnab+3wOd386t9VgF9t3etIjkeeirA2lz30elAuCcsuqMGehqplibp9OevXTLMa7LUovh7mw29Sr5467zH3HvOD4V8wRr8b/ep/vQ6/gO5vaCKtx47sm3HDDDTfccMMNN9xw/6D7A47qjWGirgESAAAAAElFTkSuQmCC" alt="Island minimap">
+  </aside>
+</body>
+</html>

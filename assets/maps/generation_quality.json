@@ -1,0 +1,192 @@
+{
+  "cache": {
+    "approximate_moisture": {
+      "hits": 0,
+      "misses": 0,
+      "size": 0
+    },
+    "base_terrain_height": {
+      "hits": 294296,
+      "misses": 73574,
+      "size": 73574
+    },
+    "biome_metrics": {
+      "hits": 0,
+      "misses": 14714,
+      "size": 14714
+    },
+    "island_radius": {
+      "hits": 28313,
+      "misses": 73574,
+      "size": 73574
+    },
+    "raw_terrain_height": {
+      "hits": 0,
+      "misses": 73574,
+      "size": 73574
+    },
+    "river_distance": {
+      "hits": 14714,
+      "misses": 14714,
+      "size": 14714
+    },
+    "river_network_sample": {
+      "hits": 14714,
+      "misses": 73574,
+      "size": 73574
+    },
+    "terrain_height": {
+      "hits": 797,
+      "misses": 73574,
+      "size": 73574
+    },
+    "water_distance": {
+      "hits": 0,
+      "misses": 14714,
+      "size": 14714
+    }
+  },
+  "debug": {
+    "available": true,
+    "good_sample_ratio": 0.7491,
+    "steep_sample_ratio": 0.1942
+  },
+  "files": {
+    "assets/scripts/gameplay_goals.json": {
+      "bytes": 10781,
+      "exists": true
+    },
+    "assets/scripts/models.scene": {
+      "bytes": 48648,
+      "exists": true
+    }
+  },
+  "generated_by": "tools/generate_island.py",
+  "grid": 241,
+  "group": "scene",
+  "issues": [
+    {
+      "code": "river_misses_harbor",
+      "details": {
+        "mouth_distance_to_harbor": 34.63,
+        "river_length": 100.0,
+        "river_points": 26,
+        "tributary_lengths": [
+          95.2,
+          37.48,
+          17.0
+        ],
+        "tributary_points": [
+          29,
+          12,
+          6
+        ]
+      },
+      "message": "Mercy River mouth is far from the harbor target.",
+      "severity": "warning"
+    },
+    {
+      "code": "short_tributary",
+      "details": {
+        "length": 17.0,
+        "points": 6
+      },
+      "message": "Tributary 3 is very short.",
+      "severity": "warning"
+    },
+    {
+      "code": "low_landmark_walkability",
+      "details": {
+        "category": "harbor",
+        "walkability": 0.0
+      },
+      "message": "Landmark natural_harbor may be hard to reach.",
+      "severity": "warning"
+    },
+    {
+      "code": "low_landmark_walkability",
+      "details": {
+        "category": "grotto",
+        "walkability": 0.0
+      },
+      "message": "Landmark hidden_grotto_2 may be hard to reach.",
+      "severity": "warning"
+    },
+    {
+      "code": "low_landmark_walkability",
+      "details": {
+        "category": "grotto",
+        "walkability": 0.0
+      },
+      "message": "Landmark hidden_grotto_3 may be hard to reach.",
+      "severity": "warning"
+    },
+    {
+      "code": "high_placement_skip_ratio",
+      "details": {
+        "requested": 120,
+        "rule": "coastal_rocks",
+        "skipped": 39,
+        "skipped_ratio": 0.325,
+        "spawned": 81
+      },
+      "message": "Decoration rule coastal_rocks skipped many requested placements.",
+      "severity": "warning"
+    }
+  ],
+  "landmarks": {
+    "available": true,
+    "checked": 20
+  },
+  "river": {
+    "mouth_distance_to_harbor": 34.63,
+    "river_length": 100.0,
+    "river_points": 26,
+    "tributary_lengths": [
+      95.2,
+      37.48,
+      17.0
+    ],
+    "tributary_points": [
+      29,
+      12,
+      6
+    ]
+  },
+  "scene": {
+    "placement": {
+      "coastal_rocks": {
+        "requested": 120,
+        "skipped": 39,
+        "spawned": 81
+      },
+      "forest": {
+        "requested": 280,
+        "skipped": 9,
+        "spawned": 271
+      },
+      "mushrooms": {
+        "requested": 64,
+        "skipped": 1,
+        "spawned": 63
+      },
+      "palms": {
+        "requested": 95,
+        "skipped": 0,
+        "spawned": 95
+      },
+      "understory": {
+        "requested": 260,
+        "skipped": 0,
+        "spawned": 260
+      }
+    },
+    "spawns": {
+      "spawn_collider": 9,
+      "spawn_decor": 421,
+      "spawn_model": 357
+    }
+  },
+  "seed": 1847,
+  "status": "pass"
+}

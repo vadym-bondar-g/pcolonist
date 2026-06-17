@@ -11,7 +11,6 @@
 #include <filesystem>
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <stdexcept>
 #include <string>
 #include <sstream>
@@ -30,22 +29,6 @@ constexpr glm::vec4 textMuted{0.46F, 0.51F, 0.54F, 1.0F};
 constexpr glm::vec4 cyan{0.20F, 0.68F, 0.76F, 1.0F};
 constexpr glm::vec4 green{0.32F, 0.68F, 0.53F, 1.0F};
 constexpr glm::vec4 amber{0.78F, 0.61F, 0.30F, 1.0F};
-constexpr glm::vec4 red{0.76F, 0.31F, 0.33F, 1.0F};
-
-struct MenuLayout {
-    float left;
-    float top;
-    float width = 560.0F;
-    float height = 590.0F;
-    float contentLeft;
-    float contentWidth = 492.0F;
-};
-
-MenuLayout menuLayout(int width, int height) {
-    const float left = static_cast<float>(width) * 0.5F - 280.0F;
-    const float top = static_cast<float>(height) * 0.5F - 295.0F;
-    return {left, top, 560.0F, 590.0F, left + 34.0F, 492.0F};
-}
 
 struct DebugLayout {
     float left;
@@ -65,13 +48,34 @@ bool contains(double x, double y, float left, float top, float width, float heig
     return x >= left && x <= left + width && y >= top && y <= top + height;
 }
 
-Glyph glyph(char character) {
-    switch (static_cast<char>(std::toupper(static_cast<unsigned char>(character)))) {
+char32_t uppercase(char32_t character) {
+    if (character >= U'a' && character <= U'z') {
+        return character - 32;
+    }
+    if (character >= U'а' && character <= U'я') {
+        return character - 32;
+    }
+    if (character == U'ё') {
+        return U'Ё';
+    }
+    return character;
+}
+
+Glyph glyph(char32_t character) {
+    switch (uppercase(character)) {
+    case U'А': character = U'A'; break; case U'В': character = U'B'; break; case U'Е': character = U'E'; break;
+    case U'Ё': character = U'E'; break; case U'К': character = U'K'; break; case U'М': character = U'M'; break;
+    case U'Н': character = U'H'; break; case U'О': character = U'O'; break; case U'Р': character = U'P'; break;
+    case U'С': character = U'C'; break; case U'Т': character = U'T'; break; case U'У': character = U'Y'; break;
+    case U'Х': character = U'X'; break; default: break;
+    }
+    switch (character) {
     case 'A': return {14, 17, 17, 31, 17, 17, 17}; case 'B': return {30, 17, 17, 30, 17, 17, 30};
     case 'C': return {14, 17, 16, 16, 16, 17, 14}; case 'D': return {30, 17, 17, 17, 17, 17, 30};
     case 'E': return {31, 16, 16, 30, 16, 16, 31}; case 'F': return {31, 16, 16, 30, 16, 16, 16};
     case 'G': return {14, 17, 16, 23, 17, 17, 14}; case 'H': return {17, 17, 17, 31, 17, 17, 17};
-    case 'I': return {31, 4, 4, 4, 4, 4, 31}; case 'L': return {16, 16, 16, 16, 16, 16, 31};
+    case 'I': return {31, 4, 4, 4, 4, 4, 31}; case 'J': return {7, 2, 2, 2, 18, 18, 12};
+    case 'K': return {17, 18, 20, 24, 20, 18, 17}; case 'L': return {16, 16, 16, 16, 16, 16, 31};
     case 'M': return {17, 27, 21, 21, 17, 17, 17}; case 'N': return {17, 25, 21, 19, 17, 17, 17};
     case 'O': return {14, 17, 17, 17, 17, 17, 14}; case 'P': return {30, 17, 17, 30, 16, 16, 16};
     case 'Q': return {14, 17, 17, 17, 21, 18, 13}; case 'R': return {30, 17, 17, 30, 20, 18, 17};
@@ -85,8 +89,36 @@ Glyph glyph(char character) {
     case '6': return {14, 16, 16, 30, 17, 17, 14}; case '7': return {31, 1, 2, 4, 8, 8, 8};
     case '8': return {14, 17, 17, 14, 17, 17, 14}; case '9': return {14, 17, 17, 15, 1, 1, 14};
     case ':': return {0, 4, 4, 0, 4, 4, 0}; case '/': return {1, 2, 2, 4, 8, 8, 16};
-    case '-': return {0, 0, 0, 31, 0, 0, 0}; default: return {};
+    case '-': return {0, 0, 0, 31, 0, 0, 0};
+    case U'Б': return {31, 16, 16, 30, 17, 17, 30}; case U'Г': return {31, 16, 16, 16, 16, 16, 16};
+    case U'Д': return {6, 10, 10, 10, 10, 31, 17}; case U'Ж': return {21, 21, 14, 4, 14, 21, 21};
+    case U'З': return {30, 1, 1, 14, 1, 1, 30}; case U'И': return {17, 19, 21, 21, 21, 25, 17};
+    case U'Й': return {10, 4, 17, 19, 21, 25, 17}; case U'Л': return {7, 9, 9, 9, 9, 9, 17};
+    case U'П': return {31, 17, 17, 17, 17, 17, 17}; case U'Ф': return {4, 14, 21, 21, 14, 4, 4};
+    case U'Ц': return {17, 17, 17, 17, 17, 31, 1}; case U'Ч': return {17, 17, 17, 15, 1, 1, 1};
+    case U'Ш': return {21, 21, 21, 21, 21, 21, 31}; case U'Щ': return {21, 21, 21, 21, 21, 31, 1};
+    case U'Ъ': return {24, 8, 8, 14, 9, 9, 14}; case U'Ы': return {17, 17, 17, 29, 19, 19, 29};
+    case U'Ь': return {16, 16, 16, 30, 17, 17, 30}; case U'Э': return {14, 17, 1, 7, 1, 17, 14};
+    case U'Ю': return {17, 21, 21, 29, 21, 21, 17}; case U'Я': return {15, 17, 17, 15, 5, 9, 17};
+    default: return {};
     }
+}
+
+char32_t nextCodepoint(std::string_view text, std::size_t& index) {
+    const auto first = static_cast<unsigned char>(text[index++]);
+    if (first < 0x80U) {
+        return first;
+    }
+    if ((first & 0xE0U) == 0xC0U && index < text.size()) {
+        const auto second = static_cast<unsigned char>(text[index++]);
+        return static_cast<char32_t>(((first & 0x1FU) << 6U) | (second & 0x3FU));
+    }
+    if ((first & 0xF0U) == 0xE0U && index + 1 < text.size()) {
+        const auto second = static_cast<unsigned char>(text[index++]);
+        const auto third = static_cast<unsigned char>(text[index++]);
+        return static_cast<char32_t>(((first & 0x0FU) << 12U) | ((second & 0x3FU) << 6U) | (third & 0x3FU));
+    }
+    return U'?';
 }
 
 } // namespace
@@ -135,6 +167,7 @@ void UiSystem::render(
     bool bloom,
     const WeatherSystem& weather,
     const Inventory& inventory,
+    const ObjectiveHudState& objectives,
     bool inventoryOpen,
     bool debugPanelOpen) {
     glDisable(GL_DEPTH_TEST);
@@ -148,19 +181,39 @@ void UiSystem::render(
         rectangle(x + 1.0F, y + 1.0F, width - 2.0F, height - 2.0F, panel, radius - 1.0F);
     };
     const auto statusPill = [this](float x, float y, std::string_view label, const glm::vec4& accent) {
-        rectangle(x, y, 74.0F, 24.0F, panelRaised, 1.0F);
+        rectangle(x, y, 94.0F, 24.0F, panelRaised, 1.0F);
         rectangle(x, y, 2.0F, 24.0F, accent);
         rectangle(x + 10.0F, y + 10.0F, 4.0F, 4.0F, accent);
         text(x + 22.0F, y + 6.0F, label, 1.5F, textPrimary);
+    };
+    const auto questRow = [this](float x, float y, std::string_view number, std::string_view label, bool done, bool active) {
+        const glm::vec4 accent = done ? green : (active ? cyan : textMuted);
+        rectangle(x, y, 286.0F, 40.0F, active ? panelRaised : panel, 1.0F);
+        rectangle(x, y, 4.0F, 40.0F, accent);
+        text(x + 14.0F, y + 10.0F, done ? "OK" : number, 1.7F, accent);
+        text(x + 46.0F, y + 10.0F, label, 1.7F, done ? textMuted : textPrimary);
     };
 
     const float playerY = static_cast<float>(height_ - 82);
     card(18.0F, playerY, 244.0F, 62.0F);
     rectangle(18.0F, playerY, 3.0F, 62.0F, cyan);
-    text(36.0F, playerY + 13.0F, "EXPLORER", 2.0F, textPrimary);
-    text(36.0F, playerY + 37.0F, cursorCaptured ? "FIELD MODE" : "CURSOR FREE", 1.5F, textMuted);
+    text(36.0F, playerY + 13.0F, "ИССЛЕДОВАТЕЛЬ", 1.5F, textPrimary);
+    text(36.0F, playerY + 37.0F, cursorCaptured ? "РЕЖИМ ИГРЫ" : "КУРСОР СВОБОДЕН", 1.3F, textMuted);
     rectangle(153.0F, playerY + 39.0F, 91.0F, 4.0F, {0.08F, 0.09F, 0.1F, 1.0F});
     rectangle(153.0F, playerY + 39.0F, 75.0F, 4.0F, cyan);
+
+    const float questX = 18.0F;
+    const float questY = 86.0F;
+    card(questX, questY, 316.0F, 316.0F);
+    rectangle(questX, questY, 4.0F, 316.0F, amber);
+    text(questX + 20.0F, questY + 18.0F, "ЗАДАЧИ", 2.4F, textPrimary);
+    text(questX + 20.0F, questY + 48.0F, objectives.contextHint, 1.35F, cyan);
+    rectangle(questX + 20.0F, questY + 70.0F, 276.0F, 1.0F, border);
+    questRow(questX + 14.0F, questY + 82.0F, "1", "ДОБЫТЬ ДЕРЕВО", objectives.hasWood, !objectives.hasWood);
+    questRow(questX + 14.0F, questY + 128.0F, "2", "ДОБЫТЬ КАМЕНЬ", objectives.hasStone, objectives.hasWood && !objectives.hasStone);
+    questRow(questX + 14.0F, questY + 174.0F, "3", "РАЗЖЕЧЬ КОСТЕР", objectives.fireLit, objectives.hasWood && objectives.hasStone && !objectives.fireLit);
+    questRow(questX + 14.0F, questY + 220.0F, "4", "НАЙТИ ВОДУ", objectives.hasWater, !objectives.hasWater);
+    questRow(questX + 14.0F, questY + 266.0F, "5", "НАЙТИ УКРЫТИЕ", objectives.nearShelter, !objectives.nearShelter);
 
     const float timePanelX = static_cast<float>(width_) * 0.5F - 178.0F;
     card(timePanelX, 18.0F, 356.0F, 58.0F);
@@ -171,9 +224,9 @@ void UiSystem::render(
     std::ostringstream clock;
     clock << std::setfill('0') << std::setw(2) << hours << ':' << std::setw(2) << minutes;
     text(timePanelX + 34.0F, 31.0F, clock.str(), 3.0F, textPrimary);
-    const std::string dayLabel = "DAY " + std::to_string(weather.dayNumber());
+    const std::string dayLabel = "ДЕНЬ " + std::to_string(weather.dayNumber());
     statusPill(timePanelX + 145.0F, 35.0F, dayLabel, weather.daylight() > 0.2F ? amber : cyan);
-    statusPill(timePanelX + 230.0F, 35.0F, weather.weatherName(), cyan);
+    statusPill(timePanelX + 250.0F, 35.0F, weather.weatherName(), cyan);
 
     const float centerX = static_cast<float>(width_) * 0.5F;
     const float centerY = static_cast<float>(height_) * 0.5F;
@@ -213,10 +266,27 @@ void UiSystem::render(
     rectangle(fullscreenX + 15.0F, 31.0F, 2.0F, 18.0F, textPrimary);
     rectangle(fullscreenX + 37.0F, 31.0F, 2.0F, 18.0F, textPrimary);
 
+    const float minimapSize = 168.0F;
+    const float minimapX = static_cast<float>(width_) - minimapSize - 18.0F;
+    const float minimapY = static_cast<float>(height_) - minimapSize - 112.0F;
+    card(minimapX, minimapY, minimapSize, minimapSize);
+    text(minimapX + 16.0F, minimapY + 13.0F, "МИНИКАРТА", 1.35F, textPrimary);
+    rectangle(minimapX + 16.0F, minimapY + 36.0F, 136.0F, 112.0F, {0.018F, 0.085F, 0.105F, 1.0F}, 1.0F);
+    rectangle(minimapX + 39.0F, minimapY + 54.0F, 84.0F, 70.0F, {0.10F, 0.26F, 0.13F, 1.0F}, 2.0F);
+    rectangle(minimapX + 55.0F, minimapY + 46.0F, 46.0F, 22.0F, {0.16F, 0.31F, 0.17F, 1.0F}, 2.0F);
+    rectangle(minimapX + 77.0F, minimapY + 69.0F, 24.0F, 24.0F, {0.19F, 0.16F, 0.14F, 1.0F}, 2.0F);
+    rectangle(minimapX + 103.0F, minimapY + 86.0F, 24.0F, 20.0F, {0.04F, 0.22F, 0.30F, 1.0F}, 2.0F);
+    rectangle(minimapX + 28.0F, minimapY + 130.0F, 12.0F, 7.0F, {0.18F, 0.30F, 0.12F, 1.0F}, 1.0F);
+    rectangle(minimapX + 130.0F, minimapY + 57.0F, 10.0F, 7.0F, {0.18F, 0.30F, 0.12F, 1.0F}, 1.0F);
+    const float markerX = minimapX + 16.0F + std::clamp((objectives.playerPosition.x + 132.0F) / 264.0F, 0.0F, 1.0F) * 136.0F;
+    const float markerY = minimapY + 36.0F + std::clamp((objectives.playerPosition.z + 112.0F) / 224.0F, 0.0F, 1.0F) * 112.0F;
+    rectangle(markerX - 5.0F, markerY - 5.0F, 10.0F, 10.0F, cyan, 4.0F);
+    rectangle(markerX - 2.0F, markerY - 2.0F, 4.0F, 4.0F, textPrimary, 2.0F);
+
     if (!cursorCaptured) {
         card(18.0F, 18.0F, 216.0F, 40.0F);
         rectangle(31.0F, 32.0F, 3.0F, 12.0F, cyan);
-        text(51.0F, 30.0F, "F1 CAPTURE CURSOR", 1.5F, textPrimary);
+        text(51.0F, 30.0F, "F1 ЗАХВАТ КУРСОРА", 1.3F, textPrimary);
     }
 
     if (inventoryOpen) {
@@ -227,13 +297,17 @@ void UiSystem::render(
         rectangle(left, top, 620.0F, 440.0F, border, 2.0F);
         rectangle(left + 1.0F, top + 1.0F, 618.0F, 438.0F, panel, 1.0F);
         rectangle(left + 1.0F, top + 1.0F, 4.0F, 438.0F, cyan);
-        text(left + 30.0F, top + 28.0F, "INVENTORY", 3.0F, textPrimary);
-        text(left + 420.0F, top + 34.0F, "TAB CLOSE", 1.5F, textMuted);
+        text(left + 30.0F, top + 28.0F, "ИНВЕНТАРЬ", 2.5F, textPrimary);
+        text(left + 420.0F, top + 34.0F, "TAB ЗАКРЫТЬ", 1.25F, textMuted);
         rectangle(left + 30.0F, top + 76.0F, 560.0F, 1.0F, border);
-        text(left + 34.0F, top + 105.0F, "RESOURCES", 1.5F, cyan);
-        text(left + 34.0F, top + 138.0F, "WOOD", 2.0F, textPrimary);
+        text(left + 34.0F, top + 105.0F, "РЕСУРСЫ", 1.5F, cyan);
+        text(left + 34.0F, top + 138.0F, "ДЕРЕВО", 2.0F, textPrimary);
         text(left + 180.0F, top + 138.0F, std::to_string(inventory.wood()), 2.0F, cyan);
-        text(left + 34.0F, top + 205.0F, "TOOLS", 1.5F, cyan);
+        text(left + 34.0F, top + 165.0F, "КАМЕНЬ", 2.0F, textPrimary);
+        text(left + 180.0F, top + 165.0F, std::to_string(inventory.stone()), 2.0F, cyan);
+        text(left + 34.0F, top + 192.0F, "ВОДА", 2.0F, textPrimary);
+        text(left + 180.0F, top + 192.0F, std::to_string(inventory.water()), 2.0F, cyan);
+        text(left + 34.0F, top + 222.0F, "ИНСТРУМЕНТЫ", 1.5F, cyan);
         for (std::size_t slot = 0; slot < Inventory::hotbarSize; ++slot) {
             const float x = left + 34.0F + static_cast<float>(slot) * 106.0F;
             rectangle(x, top + 240.0F, 88.0F, 88.0F, inventory.selectedSlot() == slot ? cyan : border, 1.0F);
@@ -287,48 +361,25 @@ void UiSystem::render(
     }
 
     if (menuOpen) {
-        rectangle(0.0F, 0.0F, static_cast<float>(width_), static_cast<float>(height_), {0.005F, 0.009F, 0.016F, 0.78F});
-        const MenuLayout layout = menuLayout(width_, height_);
-        rectangle(layout.left + 5.0F, layout.top + 6.0F, layout.width, layout.height, {0, 0, 0, 0.42F}, 2.0F);
-        rectangle(layout.left, layout.top, layout.width, layout.height, border, 2.0F);
-        rectangle(layout.left + 1.0F, layout.top + 1.0F, layout.width - 2.0F, layout.height - 2.0F, panel, 1.0F);
-        rectangle(layout.left + 1.0F, layout.top + 1.0F, 4.0F, layout.height - 2.0F, cyan);
-        text(layout.contentLeft, layout.top + 28.0F, "SYSTEM", 1.5F, cyan);
-        text(layout.contentLeft, layout.top + 51.0F, "SETTINGS", 3.0F, textPrimary);
-        text(layout.contentLeft + 330.0F, layout.top + 55.0F, "ESC RESUME", 1.5F, textMuted);
-        rectangle(layout.contentLeft, layout.top + 82.0F, layout.contentWidth, 1.0F, border);
-
-        const auto menuButton = [this, &layout](
-                                    float y,
-                                    std::string_view label,
-                                    std::string_view value,
-                                    const glm::vec4& accent,
-                                    bool active,
-                                    bool destructive = false) {
-            const bool hovered = contains(pointerX_, pointerY_, layout.contentLeft, y, layout.contentWidth, 52.0F);
-            rectangle(layout.contentLeft, y, layout.contentWidth, 52.0F, hovered ? panelHover : panelRaised, 1.0F);
-            rectangle(layout.contentLeft, y, 3.0F, 52.0F, hovered || active ? accent : border);
-            text(layout.contentLeft + 20.0F, y + 19.0F, label, 2.0F, destructive ? red : textPrimary);
-            if (!value.empty()) {
-                const float pillWidth = 112.0F;
-                rectangle(
-                    layout.contentLeft + layout.contentWidth - pillWidth - 14.0F,
-                    y + 12.0F,
-                    pillWidth,
-                    28.0F,
-                    active ? glm::vec4{accent.r * 0.22F, accent.g * 0.22F, accent.b * 0.22F, 1.0F} : panel,
-                    1.0F);
-                text(layout.contentLeft + layout.contentWidth - pillWidth, y + 20.0F, value, 1.5F, active ? accent : textMuted);
-            }
+        const MainMenuState state{
+            width_,
+            height_,
+            pointerX_,
+            pointerY_,
+            fullscreen,
+            vsync,
+            frameLimit,
+            shadows,
+            bloom,
         };
-
-        menuButton(layout.top + 102.0F, "RESUME", "ENTER", cyan, true);
-        menuButton(layout.top + 166.0F, "FULLSCREEN", fullscreen ? "ON" : "OFF", cyan, fullscreen);
-        menuButton(layout.top + 230.0F, "VSYNC", vsync ? "ON" : "OFF", cyan, vsync);
-        menuButton(layout.top + 294.0F, "FRAME LIMIT", frameLimit == 0 ? "UNLIMITED" : std::to_string(frameLimit), cyan, frameLimit != 0);
-        menuButton(layout.top + 358.0F, "SHADOWS", shadows ? "ON" : "OFF", cyan, shadows);
-        menuButton(layout.top + 422.0F, "BLOOM", bloom ? "ON" : "OFF", cyan, bloom);
-        menuButton(layout.top + 506.0F, "QUIT TO DESKTOP", "", red, false, true);
+        mainMenu_.render(
+            state,
+            [this](float x, float y, float width, float height, const glm::vec4& color, float radius) {
+                rectangle(x, y, width, height, color, radius);
+            },
+            [this](float x, float y, std::string_view value, float scale, const glm::vec4& color) {
+                text(x, y, value, scale, color);
+            });
     }
 
     glDisable(GL_BLEND);
@@ -348,10 +399,10 @@ void UiSystem::updateTitle(
     }
     const auto fps = static_cast<unsigned int>(static_cast<float>(frames_) / elapsed_);
     const std::string title = menuOpen
-        ? "pcolonist | SETTINGS: Resume / Fullscreen / VSync / Quit"
+        ? "pcolonist | Меню: Играть / Загрузить игру / Настройки / Выход"
         : "pcolonist | FPS " + std::to_string(fps)
             + " | entities " + std::to_string(registry.size())
-            + " | ESC settings | F11 fullscreen | F1 cursor";
+            + " | ESC меню | F11 экран | F1 курсор";
     glfwSetWindowTitle(window, title.c_str());
     static_cast<void>(audio);
     elapsed_ = 0.0F;
@@ -363,30 +414,25 @@ bool UiSystem::fullscreenButtonContains(double x, double y) const {
 }
 
 UiAction UiSystem::menuActionAt(double x, double y) const {
-    const MenuLayout layout = menuLayout(width_, height_);
-    if (x < layout.contentLeft || x > layout.contentLeft + layout.contentWidth) {
-        return UiAction::None;
-    }
-    if (y >= layout.top + 102.0 && y <= layout.top + 154.0) {
+    switch (mainMenu_.actionAt(x, y, width_, height_)) {
+    case MainMenuAction::Play:
         return UiAction::Resume;
-    }
-    if (y >= layout.top + 166.0 && y <= layout.top + 218.0) {
+    case MainMenuAction::ToggleFullscreen:
         return UiAction::ToggleFullscreen;
-    }
-    if (y >= layout.top + 230.0 && y <= layout.top + 282.0) {
+    case MainMenuAction::ToggleVsync:
         return UiAction::ToggleVsync;
-    }
-    if (y >= layout.top + 294.0 && y <= layout.top + 346.0) {
+    case MainMenuAction::CycleFrameLimit:
         return UiAction::CycleFrameLimit;
-    }
-    if (y >= layout.top + 358.0 && y <= layout.top + 410.0) {
+    case MainMenuAction::ToggleShadows:
         return UiAction::ToggleShadows;
-    }
-    if (y >= layout.top + 422.0 && y <= layout.top + 474.0) {
+    case MainMenuAction::ToggleBloom:
         return UiAction::ToggleBloom;
-    }
-    if (y >= layout.top + 506.0 && y <= layout.top + 558.0) {
+    case MainMenuAction::Quit:
         return UiAction::Quit;
+    case MainMenuAction::LoadGame:
+    case MainMenuAction::Settings:
+    case MainMenuAction::None:
+        return UiAction::None;
     }
     return UiAction::None;
 }
@@ -419,7 +465,8 @@ UiAction UiSystem::debugActionAt(double x, double y) const {
 
 void UiSystem::text(float x, float y, std::string_view value, float scale, const glm::vec4& color) {
     float cursor = x;
-    for (char character : value) {
+    for (std::size_t index = 0; index < value.size();) {
+        const char32_t character = nextCodepoint(value, index);
         const Glyph bitmap = glyph(character);
         for (std::size_t row = 0; row < bitmap.size(); ++row) {
             for (int column = 0; column < 5; ++column) {

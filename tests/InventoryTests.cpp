@@ -4,7 +4,7 @@
 
 void runInventoryTests() {
     pcolonist::Inventory inventory;
-    if (inventory.selectedTool() != pcolonist::Tool::Axe || inventory.toolName(0) != "AXE") {
+    if (inventory.selectedTool() != pcolonist::Tool::Axe || inventory.toolName(0) != "ТОПОР") {
         throw std::runtime_error("The axe must occupy the first hotbar slot");
     }
     inventory.addWood(5);

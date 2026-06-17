@@ -53,6 +53,9 @@ private:
     void toggleFullscreen();
     void teleportPlayer(glm::vec3 position);
     void useSelectedTool();
+    void useContextAction();
+    glm::vec3 playerPosition() const;
+    ObjectiveHudState objectiveHudState() const;
     void updateCursorMode();
 
     static void keyCallback(GLFWwindow* window, int key, int scanCode, int action, int modifiers);
@@ -86,9 +89,10 @@ private:
     bool firstMouseEvent_ = true;
     bool cursorCaptured_ = false;
     bool fullscreen_ = false;
-    bool menuOpen_ = false;
+    bool menuOpen_ = true;
     bool inventoryOpen_ = false;
     bool debugPanelOpen_ = false;
+    bool fireLit_ = false;
     bool vsync_ = true;
     std::size_t nextLandmark_ = 0;
     int windowedX_ = 100;
