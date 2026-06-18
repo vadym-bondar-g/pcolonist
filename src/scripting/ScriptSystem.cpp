@@ -17,13 +17,17 @@
 
 namespace pcolonist {
 
+bool ScriptSystem::frameCounterVisible() const {
+    return frameCounterVisible_;
+}
+
 void ScriptSystem::execute(
     const AssetSystem& assets,
     const std::filesystem::path& script,
     Registry& registry,
     PhysicsSystem& physics,
     ResourceManager& resources,
-    JobSystem& jobs) const {
+    JobSystem& jobs) {
     struct ModelEntry {
         std::string path;
         std::future<Mesh> pending;
@@ -57,6 +61,15 @@ void ScriptSystem::execute(
                 throw std::runtime_error("Script gravity expects x y z");
             }
             physics.setGravity(gravity);
+            continue;
+        }
+
+        if (command == "frame_counter") {
+            std::string value;
+            if (!(row >> value) || (value != "on" && value != "off")) {
+                throw std::runtime_error("Script frame_counter expects on or off");
+            }
+            frameCounterVisible_ = value == "on";
             continue;
         }
 

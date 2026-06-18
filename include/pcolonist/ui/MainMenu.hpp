@@ -21,6 +21,7 @@ enum class MainMenuAction {
 struct MainMenuState {
     int width = 1280;
     int height = 720;
+    float time = 0.0F;
     double pointerX = 0.0;
     double pointerY = 0.0;
     bool fullscreen = false;

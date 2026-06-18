@@ -18,6 +18,7 @@ public:
     [[nodiscard]] bool closeRequested() const;
     [[nodiscard]] bool cursorCaptured() const;
     void setCursorCaptured(bool captured);
+    void clearMovementKeys();
 
 private:
     void onKey(const KeyEvent& event);

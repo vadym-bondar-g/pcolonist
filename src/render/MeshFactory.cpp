@@ -1,5 +1,6 @@
 #include "pcolonist/render/MeshFactory.hpp"
 
+#include <glm/common.hpp>
 #include <glm/geometric.hpp>
 
 #include <algorithm>
@@ -97,6 +98,26 @@ Mesh MeshFactory::disc(float radius, std::size_t segments, glm::vec3 color) {
             0,
             static_cast<std::uint32_t>(index + 1),
             static_cast<std::uint32_t>((index + 1) % segments + 1),
+        });
+    }
+    return mesh;
+}
+
+Mesh MeshFactory::flame(glm::vec3 baseColor, glm::vec3 tipColor) {
+    Mesh mesh;
+    constexpr std::array<float, 3> rotations = {0.0F, 2.09439510239F, 4.18879020479F};
+    for (float rotation : rotations) {
+        const glm::vec3 right{std::cos(rotation), 0.0F, std::sin(rotation)};
+        const std::uint32_t base = static_cast<std::uint32_t>(mesh.vertices.size());
+        mesh.vertices.push_back({right * -0.34F, baseColor, {0.0F, 0.0F, 1.0F}, {0.0F, 0.0F}});
+        mesh.vertices.push_back({right * 0.34F, baseColor, {0.0F, 0.0F, 1.0F}, {1.0F, 0.0F}});
+        mesh.vertices.push_back({right * 0.18F + glm::vec3{0.0F, 0.72F, 0.0F}, glm::mix(baseColor, tipColor, 0.45F), {0.0F, 0.0F, 1.0F}, {0.74F, 0.58F}});
+        mesh.vertices.push_back({right * -0.18F + glm::vec3{0.0F, 0.72F, 0.0F}, glm::mix(baseColor, tipColor, 0.45F), {0.0F, 0.0F, 1.0F}, {0.26F, 0.58F}});
+        mesh.vertices.push_back({glm::vec3{std::sin(rotation) * 0.08F, 1.18F, std::cos(rotation) * 0.08F}, tipColor, {0.0F, 0.0F, 1.0F}, {0.5F, 1.0F}});
+        mesh.indices.insert(mesh.indices.end(), {
+            base, static_cast<std::uint32_t>(base + 1), static_cast<std::uint32_t>(base + 2),
+            base, static_cast<std::uint32_t>(base + 2), static_cast<std::uint32_t>(base + 3),
+            static_cast<std::uint32_t>(base + 3), static_cast<std::uint32_t>(base + 2), static_cast<std::uint32_t>(base + 4),
         });
     }
     return mesh;

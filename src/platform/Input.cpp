@@ -53,6 +53,15 @@ void Input::setCursorCaptured(bool captured) {
     cursorCaptured_ = captured;
 }
 
+void Input::clearMovementKeys() {
+    keys_[GLFW_KEY_W] = false;
+    keys_[GLFW_KEY_A] = false;
+    keys_[GLFW_KEY_S] = false;
+    keys_[GLFW_KEY_D] = false;
+    keys_[GLFW_KEY_SPACE] = false;
+    keys_[GLFW_KEY_LEFT_SHIFT] = false;
+}
+
 void Input::onKey(const KeyEvent& event) {
     if (event.key >= 0 && event.key < maxKeys) {
         keys_[static_cast<std::size_t>(event.key)] = event.action != KeyAction::Release;

@@ -300,12 +300,12 @@ void Application::buildPipeline() {
         }
     });
     pipeline_.add(FrameStage::Update, "update enemies", [this](FrameContext& context) {
-        if (!menuOpen_ && !inventoryOpen_) {
+        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
             enemies_.update(registry_, player_.entity(), context.deltaTime);
         }
     });
     pipeline_.add(FrameStage::Update, "update physics", [this](FrameContext& context) {
-        if (!menuOpen_ && !inventoryOpen_) {
+        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
             physicsTimestep_.advance(context.deltaTime, [this](float step) {
                 physicsTime_ += step;
                 physics_.setTime(physicsTime_);
@@ -315,7 +315,7 @@ void Application::buildPipeline() {
         }
     });
     pipeline_.add(FrameStage::Update, "update animations", [this](FrameContext& context) {
-        if (!menuOpen_ && !inventoryOpen_) {
+        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
             animations_.update(registry_, context.deltaTime);
         }
     });
@@ -324,7 +324,7 @@ void Application::buildPipeline() {
             audio_.update(deltaTime);
         });
         auto weatherUpdate = jobs_.submit([this, deltaTime = context.deltaTime] {
-            if (!menuOpen_ && !inventoryOpen_) {
+            if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
                 weather_.update(deltaTime);
             }
         });
@@ -347,6 +347,7 @@ void Application::buildPipeline() {
             frameLimiter_.limit(),
             renderer_->shadowsEnabled(),
             renderer_->bloomEnabled(),
+            renderer_->skyQualityName(),
             weather_,
             inventory_,
             objectiveHudState(),
@@ -400,7 +401,7 @@ void Application::createWorld() {
         return MeshFactory::gridPlane(640.0F, 224, {0.02F, 0.24F, 0.42F});
     });
     const auto lavaMesh = resources_.load<Mesh>("builtin/lava", [] {
-        return MeshFactory::disc(5.0F, 64, {1.0F, 0.12F, 0.005F});
+        return MeshFactory::disc(1.0F, 96, {1.0F, 0.12F, 0.005F});
     });
     const auto internalWaterMesh = resources_.load<Mesh>("maps/internal_water.obj", [this] {
         return MeshLoader::load(assets_, "maps/internal_water.obj");
@@ -433,10 +434,38 @@ void Application::createWorld() {
     registry_.emplace<MeshRenderer>(internalWater, internalWaterMesh);
     registry_.emplace<WaterSurface>(internalWater, WaterSurface{{0.0F, 0.0F}, false});
 
-    const Entity lava = registry_.create();
-    registry_.emplace<Transform>(lava, Transform{{0.0F, 13.4F, 0.0F}});
-    registry_.emplace<MeshRenderer>(lava, lavaMesh);
-    registry_.emplace<LavaSurface>(lava);
+    const std::array<Transform, 22> lavaPools = {
+        Transform{{0.0F, 13.43F, 0.0F}, {}, {17.8F, 1.0F, 14.6F}},
+        Transform{{0.1F, 13.46F, 0.3F}, {0.0F, 0.18F, 0.0F}, {9.2F, 1.0F, 7.0F}},
+        Transform{{-6.6F, 13.40F, 2.9F}, {0.0F, 0.32F, 0.0F}, {7.8F, 1.0F, 4.2F}},
+        Transform{{6.4F, 13.39F, -3.3F}, {0.0F, -0.54F, 0.0F}, {7.4F, 1.0F, 3.8F}},
+        Transform{{2.0F, 13.38F, 7.3F}, {0.0F, 1.02F, 0.0F}, {6.7F, 1.0F, 3.0F}},
+        Transform{{-2.3F, 13.37F, -7.1F}, {0.0F, -1.15F, 0.0F}, {6.2F, 1.0F, 2.8F}},
+        Transform{{-10.2F, 13.34F, -1.7F}, {0.0F, 1.36F, 0.0F}, {5.1F, 1.0F, 1.8F}},
+        Transform{{10.0F, 13.33F, 1.9F}, {0.0F, -1.28F, 0.0F}, {4.9F, 1.0F, 1.7F}},
+        Transform{{-7.8F, 13.32F, 7.0F}, {0.0F, 0.78F, 0.0F}, {4.8F, 1.0F, 1.8F}},
+        Transform{{8.2F, 13.31F, -7.0F}, {0.0F, -0.92F, 0.0F}, {4.6F, 1.0F, 1.7F}},
+        Transform{{-0.5F, 13.30F, 10.2F}, {0.0F, 0.05F, 0.0F}, {5.0F, 1.0F, 1.5F}},
+        Transform{{0.8F, 13.29F, -10.0F}, {0.0F, 0.12F, 0.0F}, {4.8F, 1.0F, 1.45F}},
+        Transform{{-12.0F, 13.28F, 3.8F}, {0.0F, 0.35F, 0.0F}, {3.0F, 1.0F, 1.15F}},
+        Transform{{0.0F, 31.28F, 15.2F}, {0.0F, 0.08F, 0.0F}, {8.8F, 1.0F, 3.2F}},
+        Transform{{-3.8F, 31.18F, 16.8F}, {0.0F, -0.42F, 0.0F}, {4.2F, 1.0F, 1.4F}},
+        Transform{{3.9F, 31.16F, 16.7F}, {0.0F, 0.46F, 0.0F}, {4.1F, 1.0F, 1.35F}},
+        Transform{{0.3F, 31.10F, 18.6F}, {0.0F, 0.02F, 0.0F}, {5.6F, 1.0F, 1.2F}},
+        Transform{{-5.8F, 31.02F, 13.4F}, {0.0F, 0.82F, 0.0F}, {2.9F, 1.0F, 0.95F}},
+        Transform{{5.6F, 31.00F, 13.2F}, {0.0F, -0.78F, 0.0F}, {2.8F, 1.0F, 0.92F}},
+        Transform{{-1.4F, 30.92F, 12.0F}, {0.0F, 1.08F, 0.0F}, {3.8F, 1.0F, 1.05F}},
+        Transform{{1.7F, 30.90F, 11.7F}, {0.0F, -1.02F, 0.0F}, {3.6F, 1.0F, 1.0F}},
+        Transform{{0.1F, 31.34F, 15.6F}, {0.0F, 0.21F, 0.0F}, {4.2F, 1.0F, 1.7F}},
+    };
+    for (const Transform& transform : lavaPools) {
+        const Entity lava = registry_.create();
+        registry_.emplace<Transform>(lava, transform);
+        registry_.emplace<MeshRenderer>(lava, lavaMesh);
+        registry_.emplace<LavaSurface>(lava);
+    }
+
+    createCampfireFire({-26.48F, 0.86F, 75.48F}, 0.52F);
 
     player_.create(registry_, {-25.0F, 2.0F, 75.0F});
     Enemy::create(registry_, {-14.0F, 1.0F, -22.0F}, enemyMesh);
@@ -445,9 +474,72 @@ void Application::createWorld() {
     Enemy::create(registry_, {-35.0F, 1.0F, 12.0F}, enemyMesh);
 }
 
+Entity Application::createCampfireFire(glm::vec3 position, float size) {
+    const auto emberMesh = resources_.load<Mesh>("builtin/campfire_embers", [] {
+        return MeshFactory::disc(0.52F, 28, {1.0F, 0.16F, 0.018F});
+    });
+    const auto fireMesh = resources_.load<Mesh>("builtin/campfire_flame", [] {
+        return MeshFactory::flame({1.0F, 0.20F, 0.02F}, {1.0F, 0.86F, 0.24F});
+    });
+    const auto smokeMesh = resources_.load<Mesh>("builtin/campfire_smoke", [] {
+        return MeshFactory::flame({0.52F, 0.50F, 0.46F}, {0.72F, 0.70F, 0.66F});
+    });
+
+    const Entity fire = registry_.create();
+    registry_.emplace<Transform>(fire, Transform{position + glm::vec3{0.0F, 0.22F * size, 0.0F}});
+    registry_.emplace<CampfireFire>(fire, CampfireFire{size});
+    registry_.emplace<FireLight>(fire, FireLight{{1.0F, 0.31F, 0.05F}, 0.82F * size, 0.82F});
+
+    const Entity embers = registry_.create();
+    registry_.emplace<Transform>(
+        embers,
+        Transform{position + glm::vec3{0.0F, -0.018F * size, 0.0F}, {}, {0.62F * size, 1.0F, 0.62F * size}});
+    registry_.emplace<MeshRenderer>(embers, emberMesh);
+    registry_.emplace<LavaSurface>(embers);
+
+    createFireLayer(fireMesh, position + glm::vec3{0.0F, -0.015F * size, 0.0F}, {0.70F * size, 0.88F * size, 0.70F * size}, 0.0F, 0.34F, 0.018F * size);
+    createFireLayer(fireMesh, position + glm::vec3{0.035F * size, 0.045F * size, -0.025F * size}, {0.44F * size, 0.68F * size, 0.44F * size}, 0.9F, -0.53F, 0.014F * size);
+    createFireLayer(fireMesh, position + glm::vec3{-0.035F * size, 0.095F * size, 0.03F * size}, {0.26F * size, 0.48F * size, 0.26F * size}, 1.7F, 0.78F, 0.010F * size);
+    createSmokeLayer(smokeMesh, position + glm::vec3{0.02F * size, 0.35F * size, -0.01F * size}, {0.42F * size, 0.72F * size, 0.42F * size}, 0.35F, 0.10F, 0.022F * size);
+    createSmokeLayer(smokeMesh, position + glm::vec3{-0.03F * size, 0.55F * size, 0.02F * size}, {0.58F * size, 0.95F * size, 0.58F * size}, 1.25F, -0.08F, 0.028F * size);
+
+    return fire;
+}
+
+Entity Application::createFireLayer(
+    const std::shared_ptr<Mesh>& mesh,
+    glm::vec3 position,
+    glm::vec3 scale,
+    float yaw,
+    float spin,
+    float bob) {
+    const Entity flame = registry_.create();
+    registry_.emplace<Transform>(flame, Transform{position, {0.0F, yaw, 0.0F}, scale});
+    registry_.emplace<MeshRenderer>(flame, mesh);
+    registry_.emplace<FireSurface>(flame);
+    registry_.emplace<Animation>(flame, Animation{{0.0F, spin, 0.0F}, bob, 8.0F + std::abs(spin) * 1.7F, position.y});
+    return flame;
+}
+
+Entity Application::createSmokeLayer(
+    const std::shared_ptr<Mesh>& mesh,
+    glm::vec3 position,
+    glm::vec3 scale,
+    float yaw,
+    float spin,
+    float bob) {
+    const Entity smoke = registry_.create();
+    registry_.emplace<Transform>(smoke, Transform{position, {0.0F, yaw, 0.0F}, scale});
+    registry_.emplace<MeshRenderer>(smoke, mesh);
+    registry_.emplace<SmokeSurface>(smoke);
+    registry_.emplace<Animation>(smoke, Animation{{0.0F, spin, 0.0F}, bob, 2.1F + std::abs(spin) * 1.4F, position.y});
+    return smoke;
+}
+
 void Application::initializeSystems() {
     scripts_.execute(assets_, "scripts/startup.script", registry_, physics_, resources_, jobs_);
     scripts_.execute(assets_, "scripts/models.scene", registry_, physics_, resources_, jobs_);
+    ui_.setFrameCounterVisible(scripts_.frameCounterVisible());
     physics_.rebuildStaticIndex(registry_);
     physicsTime_ = weather_.time();
 
@@ -485,6 +577,9 @@ void Application::handleUiAction(UiAction action) {
         break;
     case UiAction::ToggleBloom:
         renderer_->setBloomEnabled(!renderer_->bloomEnabled());
+        break;
+    case UiAction::CycleSkyQuality:
+        renderer_->cycleSkyQuality();
         break;
     case UiAction::RespawnPlayer:
         teleportPlayer({-25.0F, 2.0F, 75.0F});
@@ -534,6 +629,7 @@ void Application::toggleMenu() {
     if (menuOpen_) {
         inventoryOpen_ = false;
         debugPanelOpen_ = false;
+        stopPlayerMotion();
     }
     input_.setCursorCaptured(!menuOpen_ && !inventoryOpen_);
     updateCursorMode();
@@ -543,6 +639,7 @@ void Application::toggleInventory() {
     inventoryOpen_ = !inventoryOpen_;
     if (inventoryOpen_) {
         debugPanelOpen_ = false;
+        stopPlayerMotion();
     }
     input_.setCursorCaptured(!inventoryOpen_);
     updateCursorMode();
@@ -553,6 +650,7 @@ void Application::toggleDebugPanel() {
     if (debugPanelOpen_) {
         menuOpen_ = false;
         inventoryOpen_ = false;
+        stopPlayerMotion();
     }
     input_.setCursorCaptured(!debugPanelOpen_);
     updateCursorMode();
@@ -565,6 +663,19 @@ void Application::teleportPlayer(glm::vec3 position) {
     registry_.get<Transform>(player_.entity()).position = position;
     registry_.get<RigidBody>(player_.entity()) = RigidBody{};
     player_.syncCamera(registry_, camera_);
+}
+
+void Application::stopPlayerMotion() {
+    input_.clearMovementKeys();
+    if (!registry_.alive(player_.entity())) {
+        return;
+    }
+    RigidBody& body = registry_.get<RigidBody>(player_.entity());
+    body.velocity.x = 0.0F;
+    body.velocity.z = 0.0F;
+    if (body.inWater) {
+        body.velocity.y = 0.0F;
+    }
 }
 
 void Application::useSelectedTool() {

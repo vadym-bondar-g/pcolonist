@@ -29,6 +29,7 @@ struct GLFWwindow;
 namespace pcolonist {
 
 class Renderer;
+struct Mesh;
 
 class Application {
 public:
@@ -45,6 +46,21 @@ private:
     void buildPipeline();
     void loadMap();
     void createWorld();
+    Entity createCampfireFire(glm::vec3 position, float size);
+    Entity createFireLayer(
+        const std::shared_ptr<Mesh>& mesh,
+        glm::vec3 position,
+        glm::vec3 scale,
+        float yaw,
+        float spin,
+        float bob);
+    Entity createSmokeLayer(
+        const std::shared_ptr<Mesh>& mesh,
+        glm::vec3 position,
+        glm::vec3 scale,
+        float yaw,
+        float spin,
+        float bob);
     void initializeSystems();
     void handleUiAction(UiAction action);
     void toggleMenu();
@@ -52,6 +68,7 @@ private:
     void toggleDebugPanel();
     void toggleFullscreen();
     void teleportPlayer(glm::vec3 position);
+    void stopPlayerMotion();
     void useSelectedTool();
     void useContextAction();
     glm::vec3 playerPosition() const;

@@ -176,6 +176,10 @@ void UiSystem::setPointerPosition(double x, double y) {
     pointerY_ = y;
 }
 
+void UiSystem::setFrameCounterVisible(bool visible) {
+    frameCounterVisible_ = visible;
+}
+
 void UiSystem::render(
     bool fullscreen,
     bool cursorCaptured,
@@ -184,6 +188,7 @@ void UiSystem::render(
     int frameLimit,
     bool shadows,
     bool bloom,
+    std::string_view skyQuality,
     const WeatherSystem& weather,
     const Inventory& inventory,
     const ObjectiveHudState& objectives,
@@ -285,6 +290,14 @@ void UiSystem::render(
     rectangle(fullscreenX + 15.0F, 31.0F, 2.0F, 18.0F, textPrimary);
     rectangle(fullscreenX + 37.0F, 31.0F, 2.0F, 18.0F, textPrimary);
 
+    if (frameCounterVisible_) {
+        const std::string fpsLabel = "FPS " + std::to_string(currentFps_);
+        const float frameCounterX = static_cast<float>(width_ - 126);
+        card(frameCounterX, 72.0F, 108.0F, 38.0F);
+        rectangle(frameCounterX + 12.0F, 86.0F, 3.0F, 10.0F, green);
+        text(frameCounterX + 26.0F, 84.0F, fpsLabel, 1.45F, textPrimary);
+    }
+
     const float minimapSize = 168.0F;
     const float minimapX = static_cast<float>(width_) - minimapSize - 18.0F;
     const float minimapY = static_cast<float>(height_) - minimapSize - 112.0F;
@@ -377,12 +390,14 @@ void UiSystem::render(
         debugButton(1, 2, "SET NIGHT", "MOON LIGHT", cyan);
         debugButton(0, 3, "SHADOWS", shadows ? "ON" : "OFF", cyan);
         debugButton(1, 3, "BLOOM", bloom ? "ON" : "OFF", cyan);
+        debugButton(0, 4, "SKY QUALITY", skyQuality, cyan);
     }
 
     if (menuOpen) {
         const MainMenuState state{
             width_,
             height_,
+            animationTime_,
             pointerX_,
             pointerY_,
             fullscreen,
@@ -412,14 +427,15 @@ void UiSystem::updateTitle(
     float deltaTime,
     bool menuOpen) {
     elapsed_ += deltaTime;
+    animationTime_ += deltaTime;
     ++frames_;
     if (elapsed_ < 0.25F) {
         return;
     }
-    const auto fps = static_cast<unsigned int>(static_cast<float>(frames_) / elapsed_);
+    currentFps_ = static_cast<unsigned int>(static_cast<float>(frames_) / elapsed_);
     const std::string title = menuOpen
         ? "pcolonist | Меню: Играть / Загрузить игру / Настройки / Выход"
-        : "pcolonist | FPS " + std::to_string(fps)
+        : "pcolonist | FPS " + std::to_string(currentFps_)
             + " | entities " + std::to_string(registry.size())
             + " | ESC меню | F11 экран | F1 курсор";
     glfwSetWindowTitle(window, title.c_str());
@@ -467,8 +483,10 @@ UiAction UiSystem::debugActionAt(double x, double y) const {
         UiAction::SetNight,
         UiAction::ToggleShadows,
         UiAction::ToggleBloom,
+        UiAction::CycleSkyQuality,
+        UiAction::None,
     };
-    for (int row = 0; row < 4; ++row) {
+    for (int row = 0; row < 5; ++row) {
         for (int column = 0; column < 2; ++column) {
             const float left = layout.left + 32.0F + static_cast<float>(column) * 292.0F;
             const float top = layout.top + 116.0F + static_cast<float>(row) * 78.0F;

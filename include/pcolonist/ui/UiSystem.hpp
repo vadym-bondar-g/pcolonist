@@ -22,6 +22,7 @@ enum class UiAction {
     CycleFrameLimit,
     ToggleShadows,
     ToggleBloom,
+    CycleSkyQuality,
     RespawnPlayer,
     TeleportVolcano,
     TeleportNextLandmark,
@@ -56,6 +57,7 @@ public:
     void shutdown();
     void resize(int width, int height);
     void setPointerPosition(double x, double y);
+    void setFrameCounterVisible(bool visible);
     void render(
         bool fullscreen,
         bool cursorCaptured,
@@ -64,6 +66,7 @@ public:
         int frameLimit,
         bool shadows,
         bool bloom,
+        std::string_view skyQuality,
         const WeatherSystem& weather,
         const Inventory& inventory,
         const ObjectiveHudState& objectives,
@@ -102,7 +105,10 @@ private:
     int width_ = 1280;
     int height_ = 720;
     float elapsed_ = 0.0F;
+    float animationTime_ = 0.0F;
     std::uint32_t frames_ = 0;
+    unsigned int currentFps_ = 0;
+    bool frameCounterVisible_ = false;
     double pointerX_ = 0.0;
     double pointerY_ = 0.0;
     MainMenu mainMenu_;

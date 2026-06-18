@@ -13,13 +13,18 @@ class ResourceManager;
 
 class ScriptSystem {
 public:
+    [[nodiscard]] bool frameCounterVisible() const;
+
     void execute(
         const AssetSystem& assets,
         const std::filesystem::path& script,
         Registry& registry,
         PhysicsSystem& physics,
         ResourceManager& resources,
-        JobSystem& jobs) const;
+        JobSystem& jobs);
+
+private:
+    bool frameCounterVisible_ = false;
 };
 
 } // namespace pcolonist

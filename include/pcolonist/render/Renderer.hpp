@@ -29,8 +29,11 @@ public:
     void render(const Camera& camera, Registry& registry, const WeatherSystem& weather);
     void setShadowsEnabled(bool enabled);
     void setBloomEnabled(bool enabled);
+    void cycleSkyQuality();
     [[nodiscard]] bool shadowsEnabled() const;
     [[nodiscard]] bool bloomEnabled() const;
+    [[nodiscard]] SkyQuality skyQuality() const;
+    [[nodiscard]] const char* skyQualityName() const;
 
 private:
     struct GpuMesh {
@@ -64,6 +67,7 @@ private:
     int height_ = 720;
     bool shadowsEnabled_ = true;
     bool bloomEnabled_ = true;
+    SkyQuality skyQuality_ = SkyQuality::Medium;
 };
 
 } // namespace pcolonist

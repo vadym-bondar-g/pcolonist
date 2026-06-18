@@ -23,6 +23,16 @@ struct WaterSurface {
     glm::vec2 halfExtents{320.0F};
     bool affectsPhysics = true;
 };
+struct CampfireFire {
+    float size = 1.0F;
+};
+struct FireLight {
+    glm::vec3 color{1.0F, 0.32F, 0.05F};
+    float intensity = 1.0F;
+    float falloff = 0.72F;
+};
+struct FireSurface {};
+struct SmokeSurface {};
 struct TerrainSurface {};
 struct TerrainChunk {
     glm::vec2 center{0.0F};

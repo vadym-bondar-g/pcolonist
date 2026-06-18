@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/vec3.hpp>
+#include <glm/vec2.hpp>
 
 #include <cstdint>
 #include <string_view>
@@ -29,6 +30,11 @@ public:
     [[nodiscard]] glm::vec3 ambientColor() const;
     [[nodiscard]] float fogDensity() const;
     [[nodiscard]] float cloudiness() const;
+    [[nodiscard]] float stormStrength() const;
+    [[nodiscard]] float hazeAmount() const;
+    [[nodiscard]] float starVisibility() const;
+    [[nodiscard]] float moonPhase() const;
+    [[nodiscard]] glm::vec2 cloudWind() const;
     [[nodiscard]] float daylight() const;
     [[nodiscard]] float nightFactor() const;
     [[nodiscard]] float dayProgress() const;

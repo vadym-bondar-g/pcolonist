@@ -12,10 +12,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <filesystem>
 #include <stdexcept>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -26,6 +28,7 @@ constexpr std::array<float, 2> shadowRanges = {48.0F, 190.0F};
 constexpr float cameraFarPlane = 760.0F;
 constexpr float terrainStreamingDistance = 340.0F;
 constexpr float objectDrawDistance = 310.0F;
+constexpr int maxFireLights = 4;
 
 glm::mat4 modelMatrix(const pcolonist::Transform& transform) {
     glm::mat4 model = glm::translate(glm::mat4(1.0F), transform.position);
@@ -41,6 +44,15 @@ struct RenderBatch {
     bool water = false;
     bool terrain = false;
     bool lava = false;
+    bool fire = false;
+    bool smoke = false;
+};
+
+struct FireLightUniform {
+    glm::vec3 position{0.0F};
+    glm::vec3 color{1.0F, 0.32F, 0.05F};
+    float intensity = 0.0F;
+    float falloff = 0.72F;
 };
 
 std::vector<RenderBatch> collectBatches(
@@ -55,12 +67,16 @@ std::vector<RenderBatch> collectBatches(
             const pcolonist::MeshRenderer& renderer) {
             if (!renderer.mesh
                 || (shadows && (registry.has<pcolonist::WaterSurface>(entity)
-                    || registry.has<pcolonist::LavaSurface>(entity)))) {
+                    || registry.has<pcolonist::LavaSurface>(entity)
+                    || registry.has<pcolonist::FireSurface>(entity)
+                    || registry.has<pcolonist::SmokeSurface>(entity)))) {
                 return;
             }
             const bool water = registry.has<pcolonist::WaterSurface>(entity);
             const bool terrain = registry.has<pcolonist::TerrainSurface>(entity);
             const bool lava = registry.has<pcolonist::LavaSurface>(entity);
+            const bool fire = registry.has<pcolonist::FireSurface>(entity);
+            const bool smoke = registry.has<pcolonist::SmokeSurface>(entity);
             if (registry.has<pcolonist::TerrainChunk>(entity)) {
                 const pcolonist::TerrainChunk& chunk = registry.get<pcolonist::TerrainChunk>(entity);
                 const float chunkDistance = glm::distance(glm::vec2{cameraPosition.x, cameraPosition.z}, chunk.center);
@@ -87,15 +103,36 @@ std::vector<RenderBatch> collectBatches(
                 return candidate.mesh == renderer.mesh.get()
                     && candidate.water == water
                     && candidate.terrain == terrain
-                    && candidate.lava == lava;
+                    && candidate.lava == lava
+                    && candidate.fire == fire
+                    && candidate.smoke == smoke;
             });
             if (batch == batches.end()) {
-                batches.push_back({renderer.mesh.get(), {}, water, terrain, lava});
+                batches.push_back({renderer.mesh.get(), {}, water, terrain, lava, fire, smoke});
                 batch = std::prev(batches.end());
             }
             batch->models.push_back(modelMatrix(transform));
         });
     return batches;
+}
+
+std::array<FireLightUniform, maxFireLights> collectFireLights(pcolonist::Registry& registry, int& count) {
+    std::array<FireLightUniform, maxFireLights> lights{};
+    count = 0;
+    registry.each<pcolonist::Transform, pcolonist::FireLight>(
+        [&lights, &count](pcolonist::Entity, const pcolonist::Transform& transform, const pcolonist::FireLight& light) {
+            if (count >= maxFireLights) {
+                return;
+            }
+            lights[static_cast<std::size_t>(count)] = FireLightUniform{
+                transform.position,
+                light.color,
+                light.intensity,
+                light.falloff,
+            };
+            ++count;
+        });
+    return lights;
 }
 
 } // namespace
@@ -145,7 +182,7 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
     glBindFramebuffer(GL_FRAMEBUFFER, hdrFramebuffer_);
     glViewport(0, 0, width_, height_);
     const float aspectRatio = height_ > 0 ? static_cast<float>(width_) / static_cast<float>(height_) : 1.0F;
-    skybox_.render(shaders_.get("sky"), camera, weather, aspectRatio);
+    skybox_.render(shaders_.get("sky"), camera, weather, aspectRatio, skyQuality_);
 
     Shader& shader = shaders_.get("scene");
     shader.use();
@@ -172,16 +209,46 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
     shader.setInt("terrainSandTexture", 1);
     shader.setInt("terrainBasaltTexture", 2);
     shader.setInt("shadowsEnabled", shadowsEnabled_ ? 1 : 0);
+    int fireLightCount = 0;
+    const auto fireLights = collectFireLights(registry, fireLightCount);
+    shader.setInt("fireLightCount", fireLightCount);
+    for (int index = 0; index < maxFireLights; ++index) {
+        const std::string suffix = "[" + std::to_string(index) + "]";
+        shader.setVec3("fireLightPositions" + suffix, fireLights[static_cast<std::size_t>(index)].position);
+        shader.setVec3("fireLightColors" + suffix, fireLights[static_cast<std::size_t>(index)].color);
+        shader.setFloat("fireLightIntensities" + suffix, fireLights[static_cast<std::size_t>(index)].intensity);
+        shader.setFloat("fireLightFalloffs" + suffix, fireLights[static_cast<std::size_t>(index)].falloff);
+    }
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, shadowDepths_[0]);
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, shadowDepths_[1]);
 
-    for (const RenderBatch& batch : collectBatches(registry, camera.position(), false)) {
+    std::vector<RenderBatch> batches = collectBatches(registry, camera.position(), false);
+    std::stable_sort(batches.begin(), batches.end(), [](const RenderBatch& left, const RenderBatch& right) {
+        const int leftOrder = left.fire ? 2 : left.smoke ? 1 : 0;
+        const int rightOrder = right.fire ? 2 : right.smoke ? 1 : 0;
+        return leftOrder < rightOrder;
+    });
+    for (const RenderBatch& batch : batches) {
             const GpuMesh& gpuMesh = upload(*batch.mesh);
             shader.setFloat("water", batch.water ? 1.0F : 0.0F);
             shader.setFloat("terrain", batch.terrain ? 1.0F : 0.0F);
             shader.setFloat("lava", batch.lava ? 1.0F : 0.0F);
+            shader.setFloat("fire", batch.fire ? 1.0F : 0.0F);
+            shader.setFloat("smoke", batch.smoke ? 1.0F : 0.0F);
+            if (batch.fire) {
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+                glDepthMask(GL_FALSE);
+            } else if (batch.smoke) {
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                glDepthMask(GL_FALSE);
+            } else {
+                glDisable(GL_BLEND);
+                glDepthMask(GL_TRUE);
+            }
             if (batch.terrain) {
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, loadTexture("textures/terrain/earth.png"));
@@ -225,6 +292,8 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
                     static_cast<int>(batch.models.size()));
             }
     }
+    glDisable(GL_BLEND);
+    glDepthMask(GL_TRUE);
 
     bool underwater = false;
     registry.each<Transform, WaterSurface>(
@@ -250,12 +319,47 @@ void Renderer::setBloomEnabled(bool enabled) {
     bloomEnabled_ = enabled;
 }
 
+void Renderer::cycleSkyQuality() {
+    switch (skyQuality_) {
+    case SkyQuality::Off:
+        skyQuality_ = SkyQuality::Low;
+        break;
+    case SkyQuality::Low:
+        skyQuality_ = SkyQuality::Medium;
+        break;
+    case SkyQuality::Medium:
+        skyQuality_ = SkyQuality::High;
+        break;
+    case SkyQuality::High:
+        skyQuality_ = SkyQuality::Off;
+        break;
+    }
+}
+
 bool Renderer::shadowsEnabled() const {
     return shadowsEnabled_;
 }
 
 bool Renderer::bloomEnabled() const {
     return bloomEnabled_;
+}
+
+SkyQuality Renderer::skyQuality() const {
+    return skyQuality_;
+}
+
+const char* Renderer::skyQualityName() const {
+    switch (skyQuality_) {
+    case SkyQuality::Off:
+        return "OFF";
+    case SkyQuality::Low:
+        return "LOW";
+    case SkyQuality::Medium:
+        return "MED";
+    case SkyQuality::High:
+        return "HIGH";
+    }
+    return "UNKNOWN";
 }
 
 void Renderer::createRenderTargets() {

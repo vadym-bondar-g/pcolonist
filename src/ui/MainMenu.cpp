@@ -1,19 +1,23 @@
 #include "pcolonist/ui/MainMenu.hpp"
 
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <string>
 
 namespace {
 
-constexpr glm::vec4 backdrop{0.006F, 0.010F, 0.015F, 1.0F};
-constexpr glm::vec4 panel{0.018F, 0.022F, 0.028F, 0.96F};
-constexpr glm::vec4 panelRaised{0.032F, 0.039F, 0.048F, 0.98F};
-constexpr glm::vec4 panelHover{0.055F, 0.072F, 0.084F, 1.0F};
-constexpr glm::vec4 border{0.20F, 0.24F, 0.27F, 0.92F};
-constexpr glm::vec4 textPrimary{0.88F, 0.90F, 0.91F, 1.0F};
-constexpr glm::vec4 textMuted{0.46F, 0.51F, 0.54F, 1.0F};
-constexpr glm::vec4 cyan{0.20F, 0.68F, 0.76F, 1.0F};
-constexpr glm::vec4 amber{0.78F, 0.61F, 0.30F, 1.0F};
-constexpr glm::vec4 red{0.76F, 0.31F, 0.33F, 1.0F};
+constexpr glm::vec4 ink{0.16F, 0.105F, 0.055F, 1.0F};
+constexpr glm::vec4 inkMuted{0.34F, 0.24F, 0.14F, 0.88F};
+constexpr glm::vec4 paper{0.70F, 0.58F, 0.38F, 0.98F};
+constexpr glm::vec4 paperDark{0.45F, 0.33F, 0.19F, 0.98F};
+constexpr glm::vec4 brass{0.74F, 0.52F, 0.22F, 1.0F};
+constexpr glm::vec4 brassDark{0.34F, 0.22F, 0.10F, 1.0F};
+constexpr glm::vec4 waxRed{0.55F, 0.12F, 0.08F, 1.0F};
+constexpr glm::vec4 oceanInk{0.13F, 0.31F, 0.34F, 0.68F};
+constexpr glm::vec4 jungleInk{0.16F, 0.35F, 0.16F, 0.74F};
+constexpr glm::vec4 mountainInk{0.30F, 0.20F, 0.12F, 0.78F};
+constexpr glm::vec4 lamp{1.0F, 0.70F, 0.28F, 1.0F};
 
 struct ButtonSpec {
     float y;
@@ -25,13 +29,17 @@ struct ButtonSpec {
     bool destructive;
 };
 
+float wrap(float value, float period) {
+    return value - std::floor(value / period) * period;
+}
+
 } // namespace
 
 namespace pcolonist {
 
 MainMenu::Layout MainMenu::layout(int width, int height) {
-    constexpr float menuWidth = 960.0F;
-    constexpr float menuHeight = 590.0F;
+    const float menuWidth = std::clamp(static_cast<float>(width) - 96.0F, 920.0F, 1120.0F);
+    const float menuHeight = std::clamp(static_cast<float>(height) - 76.0F, 560.0F, 650.0F);
     const float left = static_cast<float>(width) * 0.5F - menuWidth * 0.5F;
     const float top = static_cast<float>(height) * 0.5F - menuHeight * 0.5F;
     return {
@@ -39,9 +47,9 @@ MainMenu::Layout MainMenu::layout(int width, int height) {
         top,
         menuWidth,
         menuHeight,
-        left + 36.0F,
-        left + 590.0F,
-        330.0F,
+        left + 48.0F,
+        left + menuWidth - 392.0F,
+        344.0F,
     };
 }
 
@@ -51,84 +59,129 @@ bool MainMenu::contains(double x, double y, float left, float top, float width, 
 
 void MainMenu::render(const MainMenuState& state, const Rectangle& rectangle, const Text& text) const {
     const Layout frame = layout(state.width, state.height);
-    rectangle(0.0F, 0.0F, static_cast<float>(state.width), static_cast<float>(state.height), backdrop, 0.0F);
-    rectangle(0.0F, 0.0F, static_cast<float>(state.width), 96.0F, {0.020F, 0.036F, 0.044F, 1.0F}, 0.0F);
-    rectangle(0.0F, static_cast<float>(state.height) - 120.0F, static_cast<float>(state.width), 120.0F, {0.014F, 0.022F, 0.026F, 1.0F}, 0.0F);
-    rectangle(0.0F, 96.0F, static_cast<float>(state.width), 2.0F, {0.11F, 0.31F, 0.35F, 1.0F}, 0.0F);
-    rectangle(frame.left + 7.0F, frame.top + 8.0F, frame.width, frame.height, {0.0F, 0.0F, 0.0F, 0.44F}, 2.0F);
-    rectangle(frame.left, frame.top, frame.width, frame.height, border, 2.0F);
-    rectangle(frame.left + 1.0F, frame.top + 1.0F, frame.width - 2.0F, frame.height - 2.0F, panel, 1.0F);
-    rectangle(frame.left + 1.0F, frame.top + 1.0F, 5.0F, frame.height - 2.0F, cyan, 1.0F);
+    const float width = static_cast<float>(state.width);
+    const float height = static_cast<float>(state.height);
+    const float t = state.time;
+    const float intro = std::clamp(t * 0.95F, 0.0F, 1.0F);
+    const float drift = std::sin(t * 0.18F) * 16.0F;
+    const float pulse = 0.72F + std::sin(t * 1.25F) * 0.12F;
 
-    rectangle(frame.storyLeft, frame.top + 32.0F, 500.0F, 290.0F, panelRaised, 1.0F);
-    rectangle(frame.storyLeft, frame.top + 32.0F, 5.0F, 290.0F, amber, 1.0F);
-    text(frame.storyLeft + 28.0F, frame.top + 55.0F, "ТАИНСТВЕННЫЙ", 2.6F, cyan);
-    text(frame.storyLeft + 28.0F, frame.top + 95.0F, "ОСТРОВ", 4.1F, textPrimary);
-    rectangle(frame.storyLeft + 28.0F, frame.top + 146.0F, 430.0F, 1.0F, border, 0.0F);
-    text(frame.storyLeft + 28.0F, frame.top + 172.0F, "ВЫЖИВАЙ, ДОБЫВАЙ РЕСУРСЫ", 1.7F, textPrimary);
-    text(frame.storyLeft + 28.0F, frame.top + 202.0F, "И ИССЛЕДУЙ ОСТРОВ", 1.7F, textPrimary);
-    text(frame.storyLeft + 28.0F, frame.top + 248.0F, "WASD ДВИЖЕНИЕ   E ДЕЙСТВИЕ", 1.35F, textMuted);
-    text(frame.storyLeft + 28.0F, frame.top + 272.0F, "TAB ИНВЕНТАРЬ   ESC МЕНЮ", 1.35F, textMuted);
+    rectangle(0.0F, 0.0F, width, height, {0.012F, 0.026F, 0.038F, 1.0F}, 0.0F);
+    rectangle(0.0F, 0.0F, width, height * 0.58F, {0.050F, 0.115F, 0.155F, 0.96F}, 0.0F);
+    rectangle(0.0F, height * 0.30F, width, height * 0.34F, {0.86F, 0.40F, 0.18F, 0.22F}, 0.0F);
+    rectangle(0.0F, height * 0.54F, width, height * 0.46F, {0.030F, 0.095F, 0.120F, 1.0F}, 0.0F);
+    rectangle(0.0F, height * 0.68F, width, height * 0.32F, {0.008F, 0.030F, 0.043F, 0.88F}, 0.0F);
 
-    rectangle(frame.storyLeft, frame.top + 344.0F, 500.0F, 198.0F, panelRaised, 1.0F);
-    rectangle(frame.storyLeft, frame.top + 344.0F, 5.0F, 198.0F, cyan, 1.0F);
-    text(frame.storyLeft + 28.0F, frame.top + 368.0F, "ПЕРВЫЕ ЦЕЛИ", 2.1F, textPrimary);
-    text(frame.storyLeft + 28.0F, frame.top + 410.0F, "1 ДОБЫТЬ ДЕРЕВО И КАМЕНЬ", 1.45F, textMuted);
-    text(frame.storyLeft + 28.0F, frame.top + 438.0F, "2 РАЗЖЕЧЬ КОСТЕР У ЛАГЕРЯ", 1.45F, textMuted);
-    text(frame.storyLeft + 28.0F, frame.top + 466.0F, "3 НАЙТИ ВОДУ И УКРЫТИЕ", 1.45F, textMuted);
-    text(frame.storyLeft + 28.0F, frame.top + 506.0F, "ESC ТАКЖЕ ВОЗВРАЩАЕТ В ИГРУ", 1.25F, cyan);
+    const auto haze = [&](float y, float alpha, float speed) {
+        const float x = wrap(t * speed, width + 320.0F) - 260.0F;
+        rectangle(x, y, 260.0F, 30.0F, {0.70F, 0.80F, 0.84F, alpha}, 15.0F);
+        rectangle(x + 126.0F, y - 18.0F, 210.0F, 42.0F, {0.70F, 0.80F, 0.84F, alpha * 0.82F}, 21.0F);
+        rectangle(x + 294.0F, y + 3.0F, 250.0F, 28.0F, {0.70F, 0.80F, 0.84F, alpha * 0.62F}, 14.0F);
+    };
+    haze(height * 0.20F, 0.12F, 8.0F);
+    haze(height * 0.36F, 0.08F, 4.4F);
+
+    rectangle(width * 0.16F + drift * 0.25F, height * 0.35F, width * 0.55F, height * 0.19F, {0.035F, 0.115F, 0.070F, 0.94F}, 88.0F);
+    rectangle(width * 0.28F + drift * 0.16F, height * 0.28F, width * 0.30F, height * 0.12F, {0.038F, 0.135F, 0.078F, 0.96F}, 48.0F);
+    rectangle(width * 0.47F + drift * 0.10F, height * 0.22F, width * 0.12F, height * 0.17F, {0.055F, 0.058F, 0.052F, 0.92F}, 14.0F);
+    rectangle(width * 0.50F + drift * 0.10F, height * 0.205F, width * 0.055F, height * 0.060F, {0.25F, 0.085F, 0.035F, 0.86F}, 10.0F);
+    rectangle(width * 0.60F + drift * 0.06F, height * 0.42F, width * 0.22F, height * 0.07F, {0.040F, 0.115F, 0.072F, 0.86F}, 28.0F);
+
+    for (int index = 0; index < 9; ++index) {
+        const float y = height * 0.58F + static_cast<float>(index) * 18.0F;
+        const float offset = std::sin(t * 0.9F + static_cast<float>(index) * 0.7F) * 30.0F;
+        rectangle(offset - 40.0F, y, width + 80.0F, 2.0F, {0.35F, 0.70F, 0.78F, 0.060F}, 1.0F);
+    }
+
+    rectangle(width * 0.12F, height * 0.66F, width * 0.15F, 22.0F, {0.11F, 0.068F, 0.038F, 0.88F}, 3.0F);
+    rectangle(width * 0.18F, height * 0.61F, 7.0F, height * 0.10F, {0.10F, 0.064F, 0.035F, 0.92F}, 1.0F);
+    rectangle(width * 0.18F, height * 0.61F, width * 0.09F, 3.0F, {0.11F, 0.068F, 0.038F, 0.90F}, 1.0F);
+    rectangle(width * 0.26F, height * 0.615F, 4.0F, height * 0.055F, {0.11F, 0.068F, 0.038F, 0.88F}, 1.0F);
+    rectangle(width * 0.175F, height * 0.69F, 22.0F, 16.0F, {0.95F, 0.55F, 0.19F, 0.18F + 0.13F * pulse}, 8.0F);
+
+    rectangle(0.0F, 0.0F, width, height, {0.0F, 0.0F, 0.0F, 0.20F}, 0.0F);
+    rectangle(0.0F, 0.0F, width * 0.34F, height, {0.0F, 0.0F, 0.0F, 0.34F}, 0.0F);
+    rectangle(width * 0.68F, 0.0F, width * 0.32F, height, {0.0F, 0.0F, 0.0F, 0.28F}, 0.0F);
+
+    const auto glassPanel = [&](float x, float y, float panelWidth, float panelHeight, float alpha) {
+        rectangle(x + 10.0F, y + 12.0F, panelWidth, panelHeight, {0.0F, 0.0F, 0.0F, 0.34F * alpha}, 8.0F);
+        rectangle(x, y, panelWidth, panelHeight, {0.52F, 0.70F, 0.72F, 0.18F * alpha}, 8.0F);
+        rectangle(x + 1.0F, y + 1.0F, panelWidth - 2.0F, panelHeight - 2.0F, {0.035F, 0.060F, 0.070F, 0.58F * alpha}, 7.0F);
+        rectangle(x + 20.0F, y + 16.0F, panelWidth - 40.0F, 1.0F, {0.85F, 0.98F, 1.0F, 0.22F * alpha}, 0.0F);
+    };
+
+    glassPanel(frame.storyLeft - 12.0F, frame.top + 70.0F, 492.0F, 418.0F, intro);
+    glassPanel(frame.actionLeft - 18.0F, frame.top + 86.0F, frame.buttonWidth + 36.0F, 486.0F, intro);
+
+    rectangle(frame.storyLeft + 8.0F, frame.top + 94.0F, 58.0F, 3.0F, {0.90F, 0.62F, 0.30F, intro}, 0.0F);
+    text(frame.storyLeft + 8.0F, frame.top + 118.0F, "COLONIST", 5.1F, {0.94F, 0.97F, 0.92F, intro});
+    text(frame.storyLeft + 12.0F, frame.top + 178.0F, "ПОСЛЕ КОРАБЛЕКРУШЕНИЯ", 1.55F, {0.90F, 0.67F, 0.36F, 0.92F * intro});
+    text(frame.storyLeft + 12.0F, frame.top + 224.0F, "ЗАГАДОЧНЫЙ ОСТРОВ", 2.1F, {0.94F, 0.97F, 0.92F, 0.94F * intro});
+    text(frame.storyLeft + 12.0F, frame.top + 260.0F, "ВЫЖИВАНИЕ, ИССЛЕДОВАНИЕ", 1.55F, {0.72F, 0.83F, 0.82F, 0.82F * intro});
+    text(frame.storyLeft + 12.0F, frame.top + 288.0F, "И ОТКРЫТИЕ НОВЫХ ЗЕМЕЛЬ", 1.55F, {0.72F, 0.83F, 0.82F, 0.82F * intro});
+    rectangle(frame.storyLeft + 12.0F, frame.top + 338.0F, 384.0F, 1.0F, {0.85F, 0.98F, 1.0F, 0.16F * intro}, 0.0F);
+    text(frame.storyLeft + 12.0F, frame.top + 368.0F, "EXPEDITION STATUS", 1.25F, {0.90F, 0.67F, 0.36F, 0.90F * intro});
+    text(frame.storyLeft + 12.0F, frame.top + 402.0F, "UNKNOWN LANDMASS", 1.45F, {0.94F, 0.97F, 0.92F, 0.90F * intro});
+    text(frame.storyLeft + 12.0F, frame.top + 430.0F, "SIGNAL FIRE REQUIRED", 1.45F, {0.94F, 0.97F, 0.92F, 0.76F * intro});
+    text(frame.storyLeft + 12.0F, frame.top + 458.0F, "OCEAN ROUTES UNCHARTED", 1.45F, {0.94F, 0.97F, 0.92F, 0.62F * intro});
 
     const auto menuButton = [&](const ButtonSpec& button) {
         const bool hovered = !button.disabled && contains(state.pointerX, state.pointerY, frame.actionLeft, button.y, frame.buttonWidth, 58.0F);
-        const glm::vec4 labelColor = button.disabled ? textMuted : (button.destructive ? red : textPrimary);
-        rectangle(frame.actionLeft, button.y, frame.buttonWidth, 58.0F, hovered ? panelHover : panelRaised, 1.0F);
-        rectangle(frame.actionLeft, button.y, 4.0F, 58.0F, hovered || button.active ? button.accent : border, 1.0F);
-        text(frame.actionLeft + 22.0F, button.y + 21.0F, button.label, 2.1F, labelColor);
+        const glm::vec4 labelColor = button.disabled
+            ? glm::vec4{0.45F, 0.54F, 0.55F, 0.75F}
+            : button.destructive ? glm::vec4{0.95F, 0.42F, 0.34F, 1.0F} : glm::vec4{0.94F, 0.98F, 0.96F, 1.0F};
+        const glm::vec4 accent = button.destructive ? glm::vec4{0.95F, 0.24F, 0.18F, 1.0F} : glm::vec4{0.34F, 0.88F, 0.92F, 1.0F};
+        rectangle(frame.actionLeft + 8.0F, button.y + 8.0F, frame.buttonWidth, 58.0F, {0.0F, 0.0F, 0.0F, 0.28F}, 6.0F);
+        rectangle(frame.actionLeft, button.y, frame.buttonWidth, 58.0F, hovered ? glm::vec4{0.52F, 0.82F, 0.86F, 0.42F} : glm::vec4{0.38F, 0.54F, 0.56F, 0.20F}, 6.0F);
+        rectangle(frame.actionLeft + 1.0F, button.y + 1.0F, frame.buttonWidth - 2.0F, 56.0F, hovered ? glm::vec4{0.090F, 0.145F, 0.155F, 0.88F} : glm::vec4{0.030F, 0.055F, 0.064F, 0.76F}, 5.0F);
+        rectangle(frame.actionLeft + 1.0F, button.y + 1.0F, hovered ? frame.buttonWidth - 2.0F : 5.0F, 2.0F, accent, 1.0F);
+        rectangle(frame.actionLeft + 18.0F, button.y + 17.0F, 3.0F, 24.0F, accent, 1.0F);
+        text(frame.actionLeft + 38.0F, button.y + 19.0F, button.label, 2.05F, labelColor);
         if (!button.value.empty()) {
             rectangle(
                 frame.actionLeft + frame.buttonWidth - 110.0F,
                 button.y + 15.0F,
                 88.0F,
                 28.0F,
-                button.active ? glm::vec4{0.045F, 0.17F, 0.19F, 1.0F} : panel,
+                button.active ? glm::vec4{0.10F, 0.25F, 0.27F, 0.74F} : glm::vec4{0.02F, 0.04F, 0.05F, 0.52F},
                 1.0F);
-            text(frame.actionLeft + frame.buttonWidth - 96.0F, button.y + 23.0F, button.value, 1.45F, button.disabled ? textMuted : button.accent);
+            text(frame.actionLeft + frame.buttonWidth - 96.0F, button.y + 23.0F, button.value, 1.45F, labelColor);
         }
     };
 
     if (screen_ == Screen::Home) {
-        text(frame.actionLeft, frame.top + 39.0F, "МЕНЮ", 2.6F, textPrimary);
-        text(frame.actionLeft + 190.0F, frame.top + 46.0F, "НАЖМИ ESC ДЛЯ ИГРЫ", 1.2F, textMuted);
-        menuButton({frame.top + 96.0F, "ИГРАТЬ", "ESC", cyan, true, false, false});
-        menuButton({frame.top + 174.0F, "ЗАГРУЗИТЬ ИГРУ", "", amber, false, false, false});
-        menuButton({frame.top + 252.0F, "НАСТРОЙКИ", "", cyan, false, false, false});
-        menuButton({frame.top + 500.0F, "ВЫХОД", "", red, false, false, true});
+        text(frame.actionLeft + 4.0F, frame.top + 116.0F, "MAIN MENU", 1.45F, {0.52F, 0.88F, 0.90F, 0.88F});
+        text(frame.actionLeft + 4.0F, frame.top + 146.0F, "SURVIVAL STARTS HERE", 1.75F, {0.94F, 0.98F, 0.96F, 0.92F});
+        rectangle(frame.actionLeft + 4.0F, frame.top + 192.0F, frame.buttonWidth - 8.0F, 1.0F, {0.85F, 0.98F, 1.0F, 0.18F}, 0.0F);
+        menuButton({frame.top + 226.0F, "НОВАЯ ИГРА", "", brass, true, false, false});
+        menuButton({frame.top + 298.0F, "ПРОДОЛЖИТЬ", "", brass, false, false, false});
+        menuButton({frame.top + 370.0F, "НАСТРОЙКИ", "", brass, false, false, false});
+        menuButton({frame.top + 500.0F, "ВЫХОД", "", waxRed, false, false, true});
         return;
     }
 
     if (screen_ == Screen::LoadGame) {
-        text(frame.actionLeft, frame.top + 39.0F, "ЗАГРУЗКА", 2.6F, textPrimary);
-        rectangle(frame.actionLeft, frame.top + 104.0F, frame.buttonWidth, 210.0F, panelRaised, 1.0F);
-        rectangle(frame.actionLeft, frame.top + 104.0F, 4.0F, 210.0F, amber, 1.0F);
-        text(frame.actionLeft + 24.0F, frame.top + 136.0F, "СОХРАНЕНИЙ НЕТ", 2.0F, textPrimary);
-        text(frame.actionLeft + 24.0F, frame.top + 182.0F, "СИСТЕМА СОХРАНЕНИЙ", 1.35F, textMuted);
-        text(frame.actionLeft + 24.0F, frame.top + 208.0F, "ЕЩЕ НЕ ПОДКЛЮЧЕНА", 1.35F, textMuted);
-        text(frame.actionLeft + 24.0F, frame.top + 262.0F, "ИГРА НАЧИНАЕТСЯ С НОВОГО ОСТРОВА", 1.05F, cyan);
-        menuButton({frame.top + 344.0F, "НАЗАД", "", cyan, false, false, false});
-        menuButton({frame.top + 500.0F, "ВЫХОД", "", red, false, false, true});
+        text(frame.actionLeft + 4.0F, frame.top + 116.0F, "CONTINUE", 2.5F, {0.94F, 0.98F, 0.96F, 0.92F});
+        rectangle(frame.actionLeft, frame.top + 174.0F, frame.buttonWidth, 150.0F, {0.030F, 0.055F, 0.064F, 0.72F}, 6.0F);
+        rectangle(frame.actionLeft + 18.0F, frame.top + 198.0F, 3.0F, 88.0F, {0.34F, 0.88F, 0.92F, 0.82F}, 1.0F);
+        text(frame.actionLeft + 40.0F, frame.top + 205.0F, "СОХРАНЕНИЙ НЕТ", 2.0F, {0.94F, 0.98F, 0.96F, 0.92F});
+        text(frame.actionLeft + 40.0F, frame.top + 246.0F, "ЭКСПЕДИЦИЯ ЕЩЕ НЕ НАЧАТА", 1.15F, {0.65F, 0.75F, 0.75F, 0.78F});
+        text(frame.actionLeft + 40.0F, frame.top + 274.0F, "СОЗДАЙТЕ НОВУЮ ИГРУ", 1.05F, {0.65F, 0.75F, 0.75F, 0.70F});
+        menuButton({frame.top + 370.0F, "НАЗАД", "", brass, false, false, false});
+        menuButton({frame.top + 500.0F, "ВЫХОД", "", waxRed, false, false, true});
         return;
     }
 
-    text(frame.actionLeft, frame.top + 39.0F, "НАСТРОЙКИ", 2.4F, textPrimary);
-    text(frame.actionLeft, frame.top + 80.0F, "ГРАФИКА", 1.35F, cyan);
+    text(frame.actionLeft + 4.0F, frame.top + 116.0F, "НАСТРОЙКИ", 2.6F, {0.94F, 0.98F, 0.96F, 0.92F});
+    text(frame.actionLeft + 4.0F, frame.top + 158.0F, "DISPLAY AND RENDERING", 1.15F, {0.52F, 0.88F, 0.90F, 0.78F});
 
     const auto optionButton = [&](int index, std::string_view label, std::string_view value, bool active) {
-        const float y = frame.top + 122.0F + static_cast<float>(index) * 58.0F;
+        const float y = frame.top + 198.0F + static_cast<float>(index) * 54.0F;
         const bool hovered = contains(state.pointerX, state.pointerY, frame.actionLeft, y, frame.buttonWidth, 46.0F);
-        rectangle(frame.actionLeft, y, frame.buttonWidth, 46.0F, hovered ? panelHover : panelRaised, 1.0F);
-        rectangle(frame.actionLeft, y, 4.0F, 46.0F, active ? cyan : border, 1.0F);
-        text(frame.actionLeft + 24.0F, y + 16.0F, label, 1.55F, textPrimary);
-        text(frame.actionLeft + 228.0F, y + 16.0F, value, 1.55F, active ? cyan : textMuted);
+        rectangle(frame.actionLeft, y, frame.buttonWidth, 46.0F, hovered ? glm::vec4{0.10F, 0.20F, 0.22F, 0.78F} : glm::vec4{0.030F, 0.055F, 0.064F, 0.68F}, 4.0F);
+        rectangle(frame.actionLeft, y, 4.0F, 46.0F, active ? glm::vec4{0.34F, 0.88F, 0.92F, 1.0F} : glm::vec4{0.38F, 0.54F, 0.56F, 0.55F}, 1.0F);
+        text(frame.actionLeft + 24.0F, y + 16.0F, label, 1.45F, {0.94F, 0.98F, 0.96F, 0.90F});
+        text(frame.actionLeft + 228.0F, y + 16.0F, value, 1.45F, active ? glm::vec4{0.52F, 0.95F, 0.98F, 0.92F} : glm::vec4{0.65F, 0.75F, 0.75F, 0.72F});
     };
 
     optionButton(0, "ПОЛНЫЙ ЭКРАН", state.fullscreen ? "ВКЛ" : "ВЫКЛ", state.fullscreen);
@@ -136,21 +189,21 @@ void MainMenu::render(const MainMenuState& state, const Rectangle& rectangle, co
     optionButton(2, "ЛИМИТ FPS", state.frameLimit == 0 ? "НЕТ" : std::to_string(state.frameLimit), state.frameLimit != 0);
     optionButton(3, "ТЕНИ", state.shadows ? "ВКЛ" : "ВЫКЛ", state.shadows);
     optionButton(4, "СВЕЧЕНИЕ", state.bloom ? "ВКЛ" : "ВЫКЛ", state.bloom);
-    menuButton({frame.top + 500.0F, "НАЗАД", "", cyan, false, false, false});
+    menuButton({frame.top + 500.0F, "НАЗАД", "", brass, false, false, false});
 }
 
 MainMenuAction MainMenu::actionAt(double x, double y, int width, int height) {
     const Layout frame = layout(width, height);
 
     if (screen_ == Screen::Home) {
-        if (contains(x, y, frame.actionLeft, frame.top + 96.0F, frame.buttonWidth, 58.0F)) {
+        if (contains(x, y, frame.actionLeft, frame.top + 226.0F, frame.buttonWidth, 58.0F)) {
             return MainMenuAction::Play;
         }
-        if (contains(x, y, frame.actionLeft, frame.top + 174.0F, frame.buttonWidth, 58.0F)) {
+        if (contains(x, y, frame.actionLeft, frame.top + 298.0F, frame.buttonWidth, 58.0F)) {
             screen_ = Screen::LoadGame;
             return MainMenuAction::None;
         }
-        if (contains(x, y, frame.actionLeft, frame.top + 252.0F, frame.buttonWidth, 58.0F)) {
+        if (contains(x, y, frame.actionLeft, frame.top + 370.0F, frame.buttonWidth, 58.0F)) {
             screen_ = Screen::Settings;
             return MainMenuAction::None;
         }
@@ -161,7 +214,7 @@ MainMenuAction MainMenu::actionAt(double x, double y, int width, int height) {
     }
 
     if (screen_ == Screen::LoadGame) {
-        if (contains(x, y, frame.actionLeft, frame.top + 344.0F, frame.buttonWidth, 58.0F)) {
+        if (contains(x, y, frame.actionLeft, frame.top + 370.0F, frame.buttonWidth, 58.0F)) {
             screen_ = Screen::Home;
         } else if (contains(x, y, frame.actionLeft, frame.top + 500.0F, frame.buttonWidth, 58.0F)) {
             return MainMenuAction::Quit;
@@ -170,7 +223,7 @@ MainMenuAction MainMenu::actionAt(double x, double y, int width, int height) {
     }
 
     for (int index = 0; index < 5; ++index) {
-        const float top = frame.top + 122.0F + static_cast<float>(index) * 58.0F;
+        const float top = frame.top + 198.0F + static_cast<float>(index) * 54.0F;
         if (!contains(x, y, frame.actionLeft, top, frame.buttonWidth, 46.0F)) {
             continue;
         }

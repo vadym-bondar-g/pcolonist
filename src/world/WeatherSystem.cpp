@@ -57,7 +57,9 @@ glm::vec3 WeatherSystem::fogColor() const {
 
 glm::vec3 WeatherSystem::horizonColor() const {
     const float twilight = 1.0F - std::abs(daylight() * 2.0F - 1.0F);
-    return glm::mix(skyColor() * 0.72F, glm::vec3{1.0F, 0.28F, 0.08F}, twilight * 0.72F);
+    const glm::vec3 mist = glm::mix(skyColor() * 0.68F, fogColor(), 0.58F + cloudiness() * 0.24F);
+    const glm::vec3 warmBand = glm::mix(glm::vec3{1.0F, 0.34F, 0.08F}, glm::vec3{0.92F, 0.22F, 0.20F}, cloudiness());
+    return glm::mix(mist, warmBand, twilight * (0.62F - cloudiness() * 0.18F));
 }
 
 glm::vec3 WeatherSystem::sunDirection() const {
@@ -95,6 +97,35 @@ float WeatherSystem::fogDensity() const {
 
 float WeatherSystem::cloudiness() const {
     return weather_ == WeatherType::Storm ? 0.9F : weather_ == WeatherType::Cloudy ? 0.55F : 0.15F;
+}
+
+float WeatherSystem::stormStrength() const {
+    return weather_ == WeatherType::Storm ? 1.0F : weather_ == WeatherType::Cloudy ? 0.22F : 0.0F;
+}
+
+float WeatherSystem::hazeAmount() const {
+    const float twilightMist = (1.0F - std::abs(daylight() * 2.0F - 1.0F)) * 0.25F;
+    const float weatherHaze = weather_ == WeatherType::Storm ? 0.82F : weather_ == WeatherType::Cloudy ? 0.48F : 0.18F;
+    return glm::clamp(weatherHaze + twilightMist, 0.0F, 1.0F);
+}
+
+float WeatherSystem::starVisibility() const {
+    return nightFactor() * (1.0F - cloudiness() * 0.72F) * (1.0F - hazeAmount() * 0.42F);
+}
+
+float WeatherSystem::moonPhase() const {
+    const float moonCycle = static_cast<float>(std::fmod(time_ / dayDuration + 0.35, 8.0) / 8.0);
+    return std::sin(moonCycle * 2.0F * pi);
+}
+
+glm::vec2 WeatherSystem::cloudWind() const {
+    if (weather_ == WeatherType::Storm) {
+        return {0.028F, -0.013F};
+    }
+    if (weather_ == WeatherType::Cloudy) {
+        return {0.015F, 0.004F};
+    }
+    return {0.006F, 0.002F};
 }
 
 float WeatherSystem::daylight() const {

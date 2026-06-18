@@ -102,11 +102,14 @@ Every frame executes ordered tasks:
   `glslangValidator` is installed.
 - Shader uniform locations are cached after their first lookup.
 - The sky pass renders atmospheric horizon scattering, broad sun glow,
-  raymarched volumetric clouds with parallax and internal lighting, storm
-  lightning and spherical twinkling stars. The sun and moon discs use
+  raymarched volumetric clouds with parallax and internal lighting, high
+  cirrus streaks, low storm shelf clouds, richer twilight bands, moon phases,
+  faint constellation lines, storm lightning and spherical twinkling stars. The sun and moon discs use
   analytic ray-sphere intersections in the sky fragment pass. Approximate
   Rayleigh/Mie scattering, a procedural Milky Way and lunar surface variation
   add depth without additional render passes.
+- The scene shader adds material-specific noise for bark, leaves, cloth, lichen,
+  water, lava and the campfire flame.
 - A full 180-second day/night cycle moves the sun and moon across the sky,
   transitions through sunrise and sunset, and switches scene lighting between
   warm sunlight and cool moonlight.
@@ -137,10 +140,16 @@ Every frame executes ordered tasks:
   are culled to reduce draw calls and vertex work.
 - The scene renders into an HDR framebuffer and passes through exposure tone
   mapping, bloom, color grading and vignette post-processing.
-- `WeatherSystem` cycles through clear, cloudy and storm conditions.
+- `WeatherSystem` cycles through clear, cloudy and storm conditions, exposing
+  per-weather sky parameters for cloud wind, haze, storm strength, star
+  visibility and the procedural moon phase.
+- The developer panel can cycle sky quality through `OFF`, `LOW`, `MED` and
+  `HIGH`; lower modes reduce cloud raymarch steps and self-shadowing to isolate
+  sky-related FPS drops.
 - A dense animated water mesh surrounds the playable map, with crest foam,
-  breaking shoreline foam, fine normal ripples, distance tinting and Fresnel
-  reflections. Underwater rendering adds caustics and suspended particles.
+  breaking shoreline foam, crossed wave normals, shallow-water tinting,
+  turbidity, caustic shimmer and restrained Fresnel reflections. Underwater
+  rendering adds caustics and suspended particles.
 - Water uses a shared multi-wave model for rendering and physics. Moving
   crests change buoyancy, surface normals and apply vertical and horizontal
   impulses to floating bodies.
@@ -152,6 +161,8 @@ Every frame executes ordered tasks:
   with a box collider. Use `spawn_decor <id> px py pz sx sy sz` for visual
   vegetation and props that should not block movement. Both spawn commands
   accept an optional final yaw angle in radians.
+- Use `frame_counter on` in a script to show the in-scene FPS counter, or
+  `frame_counter off` to hide it again.
 - `spawn_collider px py pz halfX halfY halfZ` creates an invisible static
   collision volume. The generated island uses these volumes for three
   walkable stone grottos with open entrances, walls and ceilings.
@@ -163,7 +174,8 @@ Every frame executes ordered tasks:
 - `SceneSerializer` serializes transforms and rigid bodies and validates a
   round-trip during startup.
 - `FrameArena` provides temporary per-frame memory.
-- `UiSystem` displays FPS, entity and audio counts in the window title.
+- `UiSystem` displays FPS and entity counts in the window title, with an
+  optional scene-controlled FPS counter in the HUD.
 - The screen HUD renders a crosshair, status panel, cursor hint and a
   clickable fullscreen button.
 - `F11` or the top-right HUD button switches between windowed and fullscreen
