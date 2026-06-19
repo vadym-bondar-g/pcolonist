@@ -217,6 +217,14 @@ void UiSystem::render(
         text(x + 14.0F, y + 10.0F, done ? "OK" : number, 1.7F, accent);
         text(x + 46.0F, y + 10.0F, label, 1.7F, done ? textMuted : textPrimary);
     };
+    const auto survivalBar = [this](float x, float y, std::string_view label, float value, const glm::vec4& accent) {
+        const float clamped = std::clamp(value, 0.0F, 100.0F);
+        rectangle(x, y, 184.0F, 16.0F, {0.07F, 0.08F, 0.09F, 1.0F}, 1.0F);
+        rectangle(x, y, 184.0F * (clamped / 100.0F), 16.0F, accent, 1.0F);
+        text(x + 7.0F, y + 3.0F, label, 1.15F, textPrimary);
+        const std::string valueText = std::to_string(static_cast<int>(std::round(clamped)));
+        text(x + 150.0F, y + 3.0F, valueText, 1.15F, textPrimary);
+    };
 
     const float playerY = static_cast<float>(height_ - 82);
     card(18.0F, playerY, 244.0F, 62.0F);
@@ -228,16 +236,17 @@ void UiSystem::render(
 
     const float questX = 18.0F;
     const float questY = 86.0F;
-    card(questX, questY, 316.0F, 316.0F);
-    rectangle(questX, questY, 4.0F, 316.0F, amber);
+    card(questX, questY, 316.0F, 340.0F);
+    rectangle(questX, questY, 4.0F, 340.0F, amber);
     text(questX + 20.0F, questY + 18.0F, "ЗАДАЧИ", 2.4F, textPrimary);
     text(questX + 20.0F, questY + 48.0F, objectives.contextHint, 1.35F, cyan);
-    rectangle(questX + 20.0F, questY + 70.0F, 276.0F, 1.0F, border);
-    questRow(questX + 14.0F, questY + 82.0F, "1", "ДОБЫТЬ ДЕРЕВО", objectives.hasWood, !objectives.hasWood);
-    questRow(questX + 14.0F, questY + 128.0F, "2", "ДОБЫТЬ КАМЕНЬ", objectives.hasStone, objectives.hasWood && !objectives.hasStone);
-    questRow(questX + 14.0F, questY + 174.0F, "3", "РАЗЖЕЧЬ КОСТЕР", objectives.fireLit, objectives.hasWood && objectives.hasStone && !objectives.fireLit);
-    questRow(questX + 14.0F, questY + 220.0F, "4", "НАЙТИ ВОДУ", objectives.hasWater, !objectives.hasWater);
-    questRow(questX + 14.0F, questY + 266.0F, "5", "НАЙТИ УКРЫТИЕ", objectives.nearShelter, !objectives.nearShelter);
+    text(questX + 20.0F, questY + 66.0F, objectives.craftingHint, 1.15F, textMuted);
+    rectangle(questX + 20.0F, questY + 84.0F, 276.0F, 1.0F, border);
+    questRow(questX + 14.0F, questY + 96.0F, "1", "ДОБЫТЬ ДЕРЕВО", objectives.hasWood, !objectives.hasWood);
+    questRow(questX + 14.0F, questY + 142.0F, "2", "ДОБЫТЬ КАМЕНЬ", objectives.hasStone, objectives.hasWood && !objectives.hasStone);
+    questRow(questX + 14.0F, questY + 188.0F, "3", "РАЗЖЕЧЬ КОСТЕР", objectives.fireLit, objectives.hasWood && objectives.hasStone && !objectives.fireLit);
+    questRow(questX + 14.0F, questY + 234.0F, "4", "НАЙТИ ВОДУ", objectives.hasWater, !objectives.hasWater);
+    questRow(questX + 14.0F, questY + 280.0F, "5", "НАЙТИ УКРЫТИЕ", objectives.nearShelter, !objectives.nearShelter);
 
     const float timePanelX = static_cast<float>(width_) * 0.5F - 178.0F;
     card(timePanelX, 18.0F, 356.0F, 58.0F);
@@ -251,6 +260,36 @@ void UiSystem::render(
     const std::string dayLabel = "ДЕНЬ " + std::to_string(weather.dayNumber());
     statusPill(timePanelX + 145.0F, 35.0F, dayLabel, weather.daylight() > 0.2F ? amber : cyan);
     statusPill(timePanelX + 250.0F, 35.0F, weather.weatherName(), cyan);
+
+    const float survivalX = static_cast<float>(width_) - 246.0F;
+    const float survivalY = 126.0F;
+    card(survivalX, survivalY, 228.0F, 202.0F);
+    rectangle(survivalX, survivalY, 4.0F, 202.0F, objectives.sick ? amber : green);
+    text(survivalX + 18.0F, survivalY + 15.0F, "ВЫЖИВАНИЕ", 1.8F, textPrimary);
+    text(survivalX + 18.0F, survivalY + 38.0F, objectives.survivalBiome, 1.2F, cyan);
+    text(survivalX + 18.0F, survivalY + 58.0F, objectives.survivalLocation, 1.05F, textMuted);
+    survivalBar(survivalX + 18.0F, survivalY + 82.0F, "HP", objectives.health, green);
+    survivalBar(survivalX + 18.0F, survivalY + 104.0F, "H2O", objectives.thirst, cyan);
+    survivalBar(survivalX + 18.0F, survivalY + 126.0F, "FOOD", objectives.hunger, amber);
+    survivalBar(survivalX + 18.0F, survivalY + 148.0F, "FAT", 100.0F - objectives.fatigue, {0.58F, 0.62F, 0.70F, 1.0F});
+    const std::string temperature = "TEMP " + std::to_string(static_cast<int>(std::round(objectives.bodyTemperature))) + "C";
+    text(survivalX + 18.0F, survivalY + 174.0F, temperature, 1.15F, textMuted);
+    text(survivalX + 96.0F, survivalY + 174.0F, objectives.survivalWarning, 1.05F, objectives.sick ? amber : textPrimary);
+
+    const float discoveryY = survivalY + 208.0F;
+    card(survivalX, discoveryY, 228.0F, 94.0F);
+    rectangle(survivalX, discoveryY, 4.0F, 94.0F, objectives.discoveryBlocked ? amber : cyan);
+    text(survivalX + 18.0F, discoveryY + 14.0F, "ОТКРЫТИЯ", 1.65F, textPrimary);
+    const std::string poiProgress = "POI " + std::to_string(objectives.discoveredLocations)
+        + "/" + std::to_string(objectives.totalLocations);
+    const std::string clueProgress = "УЛИКИ " + std::to_string(objectives.storyClues)
+        + "/" + std::to_string(objectives.totalStoryClues);
+    const std::string secretProgress = "ТАЙНЫ " + std::to_string(objectives.secretsFound)
+        + "/" + std::to_string(objectives.totalSecrets);
+    text(survivalX + 18.0F, discoveryY + 38.0F, poiProgress, 1.15F, cyan);
+    text(survivalX + 98.0F, discoveryY + 38.0F, clueProgress, 1.15F, textMuted);
+    text(survivalX + 18.0F, discoveryY + 58.0F, secretProgress, 1.15F, objectives.discoveryBlocked ? amber : green);
+    text(survivalX + 18.0F, discoveryY + 76.0F, objectives.discoveryMessage, 0.9F, textPrimary);
 
     const float centerX = static_cast<float>(width_) * 0.5F;
     const float centerY = static_cast<float>(height_) * 0.5F;
@@ -339,14 +378,20 @@ void UiSystem::render(
         text(left + 180.0F, top + 165.0F, std::to_string(inventory.stone()), 2.0F, cyan);
         text(left + 34.0F, top + 192.0F, "ВОДА", 2.0F, textPrimary);
         text(left + 180.0F, top + 192.0F, std::to_string(inventory.water()), 2.0F, cyan);
-        text(left + 34.0F, top + 222.0F, "ИНСТРУМЕНТЫ", 1.5F, cyan);
+        text(left + 300.0F, top + 138.0F, "ВОЛОКНО", 2.0F, textPrimary);
+        text(left + 470.0F, top + 138.0F, std::to_string(inventory.fiber()), 2.0F, cyan);
+        text(left + 300.0F, top + 165.0F, "МЕТАЛЛ", 2.0F, textPrimary);
+        text(left + 470.0F, top + 165.0F, std::to_string(inventory.metal()), 2.0F, cyan);
+        text(left + 300.0F, top + 192.0F, objectives.craftingHint, 1.2F, textMuted);
+        text(left + 300.0F, top + 214.0F, objectives.discoveryClue, 0.95F, textMuted);
+        text(left + 34.0F, top + 232.0F, "ИНСТРУМЕНТЫ", 1.5F, cyan);
         for (std::size_t slot = 0; slot < Inventory::hotbarSize; ++slot) {
             const float x = left + 34.0F + static_cast<float>(slot) * 106.0F;
-            rectangle(x, top + 240.0F, 88.0F, 88.0F, inventory.selectedSlot() == slot ? cyan : border, 1.0F);
-            rectangle(x + 2.0F, top + 242.0F, 84.0F, 84.0F, panelRaised);
-            text(x + 10.0F, top + 251.0F, std::to_string(slot + 1), 1.5F, textMuted);
+            rectangle(x, top + 252.0F, 88.0F, 88.0F, inventory.selectedSlot() == slot ? cyan : border, 1.0F);
+            rectangle(x + 2.0F, top + 254.0F, 84.0F, 84.0F, panelRaised);
+            text(x + 10.0F, top + 263.0F, std::to_string(slot + 1), 1.5F, textMuted);
             if (!inventory.toolName(slot).empty()) {
-                text(x + 22.0F, top + 288.0F, inventory.toolName(slot), 1.5F, textPrimary);
+                text(x + 22.0F, top + 300.0F, inventory.toolName(slot), 1.5F, textPrimary);
             }
         }
     }

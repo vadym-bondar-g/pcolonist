@@ -27,6 +27,7 @@ public:
 
     void resize(int width, int height);
     void render(const Camera& camera, Registry& registry, const WeatherSystem& weather);
+    void releaseUnusedMeshes(Registry& registry);
     void setShadowsEnabled(bool enabled);
     void setBloomEnabled(bool enabled);
     void cycleSkyQuality();

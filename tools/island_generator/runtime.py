@@ -11,6 +11,7 @@ class OutputLayout:
     root: Path
     map_path: Path
     map_lod_paths: tuple[Path, Path]
+    terrain_chunk_dir: Path
     split_map_paths: dict[str, Path]
     internal_water_path: Path
     landmarks_path: Path
@@ -40,6 +41,7 @@ class OutputLayout:
                 maps_dir / "demo_map_lod1.obj",
                 maps_dir / "demo_map_lod2.obj",
             ),
+            terrain_chunk_dir=maps_dir / "chunks",
             split_map_paths={
                 "terrain": maps_dir / "demo_map_terrain.obj",
                 "structures": maps_dir / "demo_map_structures.obj",
@@ -71,6 +73,7 @@ class OutputLayout:
             self.map_path,
             *self.split_map_paths.values(),
             *self.map_lod_paths,
+            *sorted(self.terrain_chunk_dir.glob("*.obj")),
             self.internal_water_path,
             self.landmarks_path,
         ]

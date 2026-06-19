@@ -25,6 +25,13 @@ class Obj:
         self.lines.append(f"v {x:.4f} {y:.4f} {z:.4f}")
         return self.vertex_count
 
+    def colored_vertex(self, x: float, y: float, z: float, color: tuple[float, float, float]) -> int:
+        self.vertex_count += 1
+        self.lines.append(
+            f"v {x:.4f} {y:.4f} {z:.4f} {color[0]:.3f} {color[1]:.3f} {color[2]:.3f}"
+        )
+        return self.vertex_count
+
     def face(self, *indices: int) -> None:
         self.lines.append("f " + " ".join(map(str, indices)))
 
@@ -179,6 +186,61 @@ def generate_rock() -> None:
     )
 
 
+def generate_basalt_scree() -> None:
+    random.seed(2406)
+    variants = (
+        ("basalt_scree_tiny", 0.42, 0.16, 8, 0.55),
+        ("basalt_scree_small", 0.72, 0.28, 9, 0.78),
+        ("basalt_scree_medium", 1.08, 0.46, 10, 1.05),
+        ("basalt_scree_large", 1.58, 0.72, 11, 1.26),
+        ("basalt_scree_shard", 1.10, 0.38, 7, 1.85),
+    )
+    palette = (
+        (0.105, 0.116, 0.120),
+        (0.145, 0.154, 0.162),
+        (0.185, 0.178, 0.165),
+        (0.075, 0.080, 0.084),
+    )
+
+    for name, radius, height, sides, stretch in variants:
+        obj = Obj(name, "")
+        obj.lines = [f"o {name}"]
+        bottom: list[int] = []
+        waist: list[int] = []
+        top: list[int] = []
+        phase = random.uniform(0.0, math.tau)
+        for index in range(sides):
+            angle = phase + index / sides * math.tau
+            jag = random.uniform(0.68, 1.22)
+            x = math.cos(angle) * radius * jag * stretch
+            z = math.sin(angle) * radius * random.uniform(0.72, 1.18)
+            bottom.append(obj.colored_vertex(x, 0.0, z, palette[(index + 3) % len(palette)]))
+
+            waist_radius = radius * random.uniform(0.58, 0.95)
+            waist.append(obj.colored_vertex(
+                math.cos(angle + random.uniform(-0.08, 0.08)) * waist_radius * stretch,
+                height * random.uniform(0.34, 0.72),
+                math.sin(angle + random.uniform(-0.08, 0.08)) * waist_radius,
+                palette[index % len(palette)],
+            ))
+
+            top_radius = radius * random.uniform(0.12, 0.36)
+            top.append(obj.colored_vertex(
+                math.cos(angle + random.uniform(-0.16, 0.16)) * top_radius * stretch,
+                height * random.uniform(0.84, 1.18),
+                math.sin(angle + random.uniform(-0.16, 0.16)) * top_radius,
+                palette[(index + 1) % len(palette)],
+            ))
+
+        for index in range(sides):
+            next_index = (index + 1) % sides
+            obj.face(bottom[index], bottom[next_index], waist[next_index], waist[index])
+            obj.face(waist[index], waist[next_index], top[next_index], top[index])
+        obj.face(*reversed(bottom))
+        obj.face(*top)
+        obj.write(MODEL_DIR / f"{name}.obj")
+
+
 def generate_grotto() -> None:
     random.seed(431)
     obj = Obj("stone_grotto", "grotto.mtl")
@@ -279,9 +341,10 @@ def main() -> None:
     generate_tree()
     generate_bush()
     generate_rock()
+    generate_basalt_scree()
     generate_grotto()
     generate_palm()
-    print("Generated tree.obj, bush.obj, rock.obj, grotto.obj and palm.obj")
+    print("Generated tree.obj, bush.obj, rock.obj, basalt scree variants, grotto.obj and palm.obj")
 
 
 if __name__ == "__main__":

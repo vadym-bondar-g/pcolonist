@@ -1,69 +1,1311 @@
 {
   "cache": {
     "approximate_moisture": {
-      "hits": 0,
-      "misses": 0,
-      "size": 0
+      "hits": 18362,
+      "misses": 58081,
+      "size": 58081
     },
     "base_terrain_height": {
-      "hits": 294296,
-      "misses": 73574,
-      "size": 73574
+      "hits": 259610,
+      "misses": 129805,
+      "size": 129805
     },
     "biome_metrics": {
-      "hits": 0,
-      "misses": 14714,
-      "size": 14714
+      "hits": 3740,
+      "misses": 28887,
+      "size": 28887
     },
     "island_radius": {
-      "hits": 28313,
-      "misses": 73574,
-      "size": 73574
+      "hits": 130435,
+      "misses": 129805,
+      "size": 129805
     },
     "raw_terrain_height": {
       "hits": 0,
-      "misses": 73574,
-      "size": 73574
+      "misses": 129805,
+      "size": 129805
     },
     "river_distance": {
-      "hits": 14714,
-      "misses": 14714,
-      "size": 14714
+      "hits": 28887,
+      "misses": 72323,
+      "size": 72323
     },
     "river_network_sample": {
-      "hits": 14714,
-      "misses": 73574,
-      "size": 73574
+      "hits": 72323,
+      "misses": 129805,
+      "size": 129805
     },
     "terrain_height": {
-      "hits": 797,
-      "misses": 73574,
-      "size": 73574
+      "hits": 92101,
+      "misses": 129805,
+      "size": 129805
     },
     "water_distance": {
-      "hits": 0,
-      "misses": 14714,
-      "size": 14714
+      "hits": 175580,
+      "misses": 72323,
+      "size": 72323
     }
   },
   "debug": {
     "available": true,
-    "good_sample_ratio": 0.7491,
-    "steep_sample_ratio": 0.1942
+    "good_sample_ratio": 0.7534,
+    "steep_sample_ratio": 0.1922
   },
   "files": {
+    "assets/maps/biomes.ppm": {
+      "bytes": 30912,
+      "exists": true
+    },
+    "assets/maps/chunks/terrain_lod0_-1_-1.obj": {
+      "bytes": 177291,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-1_-2.obj": {
+      "bytes": 178216,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-1_-3.obj": {
+      "bytes": 178623,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-1_-4.obj": {
+      "bytes": 132657,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_-1_0.obj": {
+      "bytes": 175282,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-1_1.obj": {
+      "bytes": 175997,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-1_2.obj": {
+      "bytes": 176591,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-1_3.obj": {
+      "bytes": 131831,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_-2_-1.obj": {
+      "bytes": 178168,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-2_-2.obj": {
+      "bytes": 179400,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-2_-3.obj": {
+      "bytes": 178506,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-2_-4.obj": {
+      "bytes": 133182,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_-2_0.obj": {
+      "bytes": 176145,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-2_1.obj": {
+      "bytes": 177464,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-2_2.obj": {
+      "bytes": 177343,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-2_3.obj": {
+      "bytes": 132356,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_-3_-1.obj": {
+      "bytes": 178611,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-3_-2.obj": {
+      "bytes": 178441,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-3_-3.obj": {
+      "bytes": 178924,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-3_-4.obj": {
+      "bytes": 133632,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_-3_0.obj": {
+      "bytes": 177578,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-3_1.obj": {
+      "bytes": 177477,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-3_2.obj": {
+      "bytes": 177834,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_-3_3.obj": {
+      "bytes": 132806,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_-4_-1.obj": {
+      "bytes": 132591,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_-4_-2.obj": {
+      "bytes": 133116,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_-4_-3.obj": {
+      "bytes": 133566,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_-4_-4.obj": {
+      "bytes": 100374,
+      "exists": true,
+      "faces": 1152,
+      "vertices": 625
+    },
+    "assets/maps/chunks/terrain_lod0_-4_0.obj": {
+      "bytes": 131790,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_-4_1.obj": {
+      "bytes": 132290,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_-4_2.obj": {
+      "bytes": 132740,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_-4_3.obj": {
+      "bytes": 99748,
+      "exists": true,
+      "faces": 1152,
+      "vertices": 625
+    },
+    "assets/maps/chunks/terrain_lod0_0_-1.obj": {
+      "bytes": 175289,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_0_-2.obj": {
+      "bytes": 176873,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_0_-3.obj": {
+      "bytes": 177217,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_0_-4.obj": {
+      "bytes": 131856,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_0_0.obj": {
+      "bytes": 174087,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_0_1.obj": {
+      "bytes": 175151,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_0_2.obj": {
+      "bytes": 175568,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_0_3.obj": {
+      "bytes": 131030,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_1_-1.obj": {
+      "bytes": 176244,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_1_-2.obj": {
+      "bytes": 177318,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_1_-3.obj": {
+      "bytes": 177255,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_1_-4.obj": {
+      "bytes": 132356,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_1_0.obj": {
+      "bytes": 175221,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_1_1.obj": {
+      "bytes": 175512,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_1_2.obj": {
+      "bytes": 176158,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_1_3.obj": {
+      "bytes": 131530,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_2_-1.obj": {
+      "bytes": 177039,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_2_-2.obj": {
+      "bytes": 177330,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_2_-3.obj": {
+      "bytes": 177834,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_2_-4.obj": {
+      "bytes": 132806,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_2_0.obj": {
+      "bytes": 175884,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_2_1.obj": {
+      "bytes": 176150,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_2_2.obj": {
+      "bytes": 176744,
+      "exists": true,
+      "faces": 2048,
+      "vertices": 1089
+    },
+    "assets/maps/chunks/terrain_lod0_2_3.obj": {
+      "bytes": 131980,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_3_-1.obj": {
+      "bytes": 131765,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_3_-2.obj": {
+      "bytes": 132290,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_3_-3.obj": {
+      "bytes": 132740,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_3_-4.obj": {
+      "bytes": 99748,
+      "exists": true,
+      "faces": 1152,
+      "vertices": 625
+    },
+    "assets/maps/chunks/terrain_lod0_3_0.obj": {
+      "bytes": 130964,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_3_1.obj": {
+      "bytes": 131464,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_3_2.obj": {
+      "bytes": 131914,
+      "exists": true,
+      "faces": 1536,
+      "vertices": 825
+    },
+    "assets/maps/chunks/terrain_lod0_3_3.obj": {
+      "bytes": 99122,
+      "exists": true,
+      "faces": 1152,
+      "vertices": 625
+    },
+    "assets/maps/chunks/terrain_lod1_-1_-1.obj": {
+      "bytes": 44307,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-1_-2.obj": {
+      "bytes": 44580,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-1_-3.obj": {
+      "bytes": 44697,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-1_-4.obj": {
+      "bytes": 33309,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_-1_0.obj": {
+      "bytes": 43781,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-1_1.obj": {
+      "bytes": 43976,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-1_2.obj": {
+      "bytes": 44135,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-1_3.obj": {
+      "bytes": 33087,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_-2_-1.obj": {
+      "bytes": 44558,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-2_-2.obj": {
+      "bytes": 44912,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-2_-3.obj": {
+      "bytes": 44673,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-2_-4.obj": {
+      "bytes": 33465,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_-2_0.obj": {
+      "bytes": 44021,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-2_1.obj": {
+      "bytes": 44401,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-2_2.obj": {
+      "bytes": 44363,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-2_3.obj": {
+      "bytes": 33243,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_-3_-1.obj": {
+      "bytes": 44694,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-3_-2.obj": {
+      "bytes": 44655,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-3_-3.obj": {
+      "bytes": 44770,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-3_-4.obj": {
+      "bytes": 33582,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_-3_0.obj": {
+      "bytes": 44411,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-3_1.obj": {
+      "bytes": 44398,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-3_2.obj": {
+      "bytes": 44480,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_-3_3.obj": {
+      "bytes": 33360,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_-4_-1.obj": {
+      "bytes": 33309,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_-4_-2.obj": {
+      "bytes": 33465,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_-4_-3.obj": {
+      "bytes": 33582,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_-4_-4.obj": {
+      "bytes": 25098,
+      "exists": true,
+      "faces": 288,
+      "vertices": 169
+    },
+    "assets/maps/chunks/terrain_lod1_-4_0.obj": {
+      "bytes": 33100,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_-4_1.obj": {
+      "bytes": 33243,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_-4_2.obj": {
+      "bytes": 33360,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_-4_3.obj": {
+      "bytes": 24928,
+      "exists": true,
+      "faces": 288,
+      "vertices": 169
+    },
+    "assets/maps/chunks/terrain_lod1_0_-1.obj": {
+      "bytes": 43777,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_0_-2.obj": {
+      "bytes": 44232,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_0_-3.obj": {
+      "bytes": 44316,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_0_-4.obj": {
+      "bytes": 33100,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_0_0.obj": {
+      "bytes": 43456,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_0_1.obj": {
+      "bytes": 43766,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_0_2.obj": {
+      "bytes": 43875,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_0_3.obj": {
+      "bytes": 32878,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_1_-1.obj": {
+      "bytes": 44046,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_1_-2.obj": {
+      "bytes": 44359,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_1_-3.obj": {
+      "bytes": 44333,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_1_-4.obj": {
+      "bytes": 33243,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_1_0.obj": {
+      "bytes": 43760,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_1_1.obj": {
+      "bytes": 43866,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_1_2.obj": {
+      "bytes": 44037,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_1_3.obj": {
+      "bytes": 33021,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_2_-1.obj": {
+      "bytes": 44263,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_2_-2.obj": {
+      "bytes": 44356,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_2_-3.obj": {
+      "bytes": 44480,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_2_-4.obj": {
+      "bytes": 33360,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_2_0.obj": {
+      "bytes": 43954,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_2_1.obj": {
+      "bytes": 44037,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_2_2.obj": {
+      "bytes": 44190,
+      "exists": true,
+      "faces": 512,
+      "vertices": 289
+    },
+    "assets/maps/chunks/terrain_lod1_2_3.obj": {
+      "bytes": 33138,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_3_-1.obj": {
+      "bytes": 33087,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_3_-2.obj": {
+      "bytes": 33243,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_3_-3.obj": {
+      "bytes": 33360,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_3_-4.obj": {
+      "bytes": 24928,
+      "exists": true,
+      "faces": 288,
+      "vertices": 169
+    },
+    "assets/maps/chunks/terrain_lod1_3_0.obj": {
+      "bytes": 32878,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_3_1.obj": {
+      "bytes": 33021,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_3_2.obj": {
+      "bytes": 33138,
+      "exists": true,
+      "faces": 384,
+      "vertices": 221
+    },
+    "assets/maps/chunks/terrain_lod1_3_3.obj": {
+      "bytes": 24758,
+      "exists": true,
+      "faces": 288,
+      "vertices": 169
+    },
+    "assets/maps/chunks/terrain_lod2_-1_-1.obj": {
+      "bytes": 11076,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-1_-2.obj": {
+      "bytes": 11163,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-1_-3.obj": {
+      "bytes": 11205,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-1_-4.obj": {
+      "bytes": 8538,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_-1_0.obj": {
+      "bytes": 10937,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-1_1.obj": {
+      "bytes": 10984,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-1_2.obj": {
+      "bytes": 11039,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-1_3.obj": {
+      "bytes": 8474,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_-2_-1.obj": {
+      "bytes": 11159,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-2_-2.obj": {
+      "bytes": 11263,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-2_-3.obj": {
+      "bytes": 11203,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-2_-4.obj": {
+      "bytes": 8587,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_-2_0.obj": {
+      "bytes": 11009,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-2_1.obj": {
+      "bytes": 11118,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-2_2.obj": {
+      "bytes": 11111,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-2_3.obj": {
+      "bytes": 8523,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_-3_-1.obj": {
+      "bytes": 11204,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-3_-2.obj": {
+      "bytes": 11195,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-3_-3.obj": {
+      "bytes": 11224,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-3_-4.obj": {
+      "bytes": 8622,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_-3_0.obj": {
+      "bytes": 11121,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-3_1.obj": {
+      "bytes": 11120,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-3_2.obj": {
+      "bytes": 11142,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_-3_3.obj": {
+      "bytes": 8558,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_-4_-1.obj": {
+      "bytes": 8538,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_-4_-2.obj": {
+      "bytes": 8587,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_-4_-3.obj": {
+      "bytes": 8622,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_-4_-4.obj": {
+      "bytes": 6624,
+      "exists": true,
+      "faces": 72,
+      "vertices": 49
+    },
+    "assets/maps/chunks/terrain_lod2_-4_0.obj": {
+      "bytes": 8481,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_-4_1.obj": {
+      "bytes": 8523,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_-4_2.obj": {
+      "bytes": 8558,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_-4_3.obj": {
+      "bytes": 6574,
+      "exists": true,
+      "faces": 72,
+      "vertices": 49
+    },
+    "assets/maps/chunks/terrain_lod2_0_-1.obj": {
+      "bytes": 10934,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_0_-2.obj": {
+      "bytes": 11073,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_0_-3.obj": {
+      "bytes": 11100,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_0_-4.obj": {
+      "bytes": 8481,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_0_0.obj": {
+      "bytes": 10848,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_0_1.obj": {
+      "bytes": 10940,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_0_2.obj": {
+      "bytes": 10972,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_0_3.obj": {
+      "bytes": 8417,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_1_-1.obj": {
+      "bytes": 11014,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_1_-2.obj": {
+      "bytes": 11102,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_1_-3.obj": {
+      "bytes": 11100,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_1_-4.obj": {
+      "bytes": 8523,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_1_0.obj": {
+      "bytes": 10919,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_1_1.obj": {
+      "bytes": 10964,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_1_2.obj": {
+      "bytes": 11015,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_1_3.obj": {
+      "bytes": 8459,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_2_-1.obj": {
+      "bytes": 11081,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_2_-2.obj": {
+      "bytes": 11109,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_2_-3.obj": {
+      "bytes": 11142,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_2_-4.obj": {
+      "bytes": 8558,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_2_0.obj": {
+      "bytes": 10992,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_2_1.obj": {
+      "bytes": 11015,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_2_2.obj": {
+      "bytes": 11060,
+      "exists": true,
+      "faces": 128,
+      "vertices": 81
+    },
+    "assets/maps/chunks/terrain_lod2_2_3.obj": {
+      "bytes": 8494,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_3_-1.obj": {
+      "bytes": 8474,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_3_-2.obj": {
+      "bytes": 8523,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_3_-3.obj": {
+      "bytes": 8558,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_3_-4.obj": {
+      "bytes": 6574,
+      "exists": true,
+      "faces": 72,
+      "vertices": 49
+    },
+    "assets/maps/chunks/terrain_lod2_3_0.obj": {
+      "bytes": 8417,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_3_1.obj": {
+      "bytes": 8459,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_3_2.obj": {
+      "bytes": 8494,
+      "exists": true,
+      "faces": 96,
+      "vertices": 63
+    },
+    "assets/maps/chunks/terrain_lod2_3_3.obj": {
+      "bytes": 6524,
+      "exists": true,
+      "faces": 72,
+      "vertices": 49
+    },
+    "assets/maps/demo_map.obj": {
+      "bytes": 11896614,
+      "exists": true,
+      "faces": 116917,
+      "vertices": 60259
+    },
+    "assets/maps/demo_map_lod1.obj": {
+      "bytes": 3090103,
+      "exists": true,
+      "faces": 30517,
+      "vertices": 16819
+    },
+    "assets/maps/demo_map_lod2.obj": {
+      "bytes": 973162,
+      "exists": true,
+      "faces": 8917,
+      "vertices": 5899
+    },
+    "assets/maps/demo_map_rocks.obj": {
+      "bytes": 259502,
+      "exists": true,
+      "faces": 1512,
+      "vertices": 1850
+    },
+    "assets/maps/demo_map_structures.obj": {
+      "bytes": 39176,
+      "exists": true,
+      "faces": 205,
+      "vertices": 328
+    },
+    "assets/maps/demo_map_terrain.obj": {
+      "bytes": 11561308,
+      "exists": true,
+      "faces": 115200,
+      "vertices": 58081
+    },
+    "assets/maps/heightmap.pgm": {
+      "bytes": 8797,
+      "exists": true
+    },
+    "assets/maps/internal_water.obj": {
+      "bytes": 23818,
+      "exists": true,
+      "faces": 133,
+      "vertices": 211
+    },
+    "assets/maps/landmarks.json": {
+      "bytes": 4300,
+      "exists": true
+    },
+    "assets/maps/material_grass.pgm": {
+      "bytes": 8496,
+      "exists": true
+    },
+    "assets/maps/material_rock.pgm": {
+      "bytes": 7871,
+      "exists": true
+    },
+    "assets/maps/material_sand.pgm": {
+      "bytes": 7988,
+      "exists": true
+    },
+    "assets/maps/material_volcanic.pgm": {
+      "bytes": 7694,
+      "exists": true
+    },
+    "assets/maps/material_wetness.pgm": {
+      "bytes": 7733,
+      "exists": true
+    },
+    "assets/maps/moisture.pgm": {
+      "bytes": 8391,
+      "exists": true
+    },
+    "assets/maps/slope.pgm": {
+      "bytes": 8310,
+      "exists": true
+    },
+    "assets/maps/terrain_report.json": {
+      "bytes": 3240,
+      "exists": true
+    },
+    "assets/maps/walkability.pgm": {
+      "bytes": 33385,
+      "exists": true
+    },
     "assets/scripts/gameplay_goals.json": {
       "bytes": 10781,
       "exists": true
     },
     "assets/scripts/models.scene": {
-      "bytes": 48689,
+      "bytes": 51442,
       "exists": true
     }
   },
   "generated_by": "tools/generate_island.py",
   "grid": 241,
-  "group": "scene",
+  "group": "all",
   "issues": [
     {
       "code": "river_misses_harbor",
@@ -93,45 +1335,6 @@
       },
       "message": "Tributary 3 is very short.",
       "severity": "warning"
-    },
-    {
-      "code": "low_landmark_walkability",
-      "details": {
-        "category": "harbor",
-        "walkability": 0.0
-      },
-      "message": "Landmark natural_harbor may be hard to reach.",
-      "severity": "warning"
-    },
-    {
-      "code": "low_landmark_walkability",
-      "details": {
-        "category": "grotto",
-        "walkability": 0.0
-      },
-      "message": "Landmark hidden_grotto_2 may be hard to reach.",
-      "severity": "warning"
-    },
-    {
-      "code": "low_landmark_walkability",
-      "details": {
-        "category": "grotto",
-        "walkability": 0.0
-      },
-      "message": "Landmark hidden_grotto_3 may be hard to reach.",
-      "severity": "warning"
-    },
-    {
-      "code": "high_placement_skip_ratio",
-      "details": {
-        "requested": 120,
-        "rule": "coastal_rocks",
-        "skipped": 39,
-        "skipped_ratio": 0.325,
-        "spawned": 81
-      },
-      "message": "Decoration rule coastal_rocks skipped many requested placements.",
-      "severity": "warning"
     }
   ],
   "landmarks": {
@@ -157,8 +1360,8 @@
     "placement": {
       "coastal_rocks": {
         "requested": 120,
-        "skipped": 39,
-        "spawned": 81
+        "skipped": 0,
+        "spawned": 120
       },
       "forest": {
         "requested": 280,
@@ -167,8 +1370,8 @@
       },
       "mushrooms": {
         "requested": 64,
-        "skipped": 1,
-        "spawned": 63
+        "skipped": 0,
+        "spawned": 64
       },
       "palms": {
         "requested": 95,
@@ -183,8 +1386,8 @@
     },
     "spawns": {
       "spawn_collider": 9,
-      "spawn_decor": 421,
-      "spawn_model": 357
+      "spawn_decor": 422,
+      "spawn_model": 396
     }
   },
   "seed": 1847,

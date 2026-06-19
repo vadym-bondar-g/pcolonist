@@ -10,16 +10,21 @@
 #include "pcolonist/core/FramePipeline.hpp"
 #include "pcolonist/core/JobSystem.hpp"
 #include "pcolonist/ecs/Registry.hpp"
+#include "pcolonist/gameplay/CraftingSystem.hpp"
+#include "pcolonist/gameplay/DiscoverySystem.hpp"
 #include "pcolonist/gameplay/Enemy.hpp"
 #include "pcolonist/gameplay/Inventory.hpp"
 #include "pcolonist/gameplay/Player.hpp"
+#include "pcolonist/gameplay/SurvivalSystem.hpp"
 #include "pcolonist/memory/FrameArena.hpp"
 #include "pcolonist/physics/PhysicsSystem.hpp"
 #include "pcolonist/platform/Input.hpp"
 #include "pcolonist/render/Camera.hpp"
 #include "pcolonist/scripting/ScriptSystem.hpp"
 #include "pcolonist/ui/UiSystem.hpp"
+#include "pcolonist/world/AssetManager.hpp"
 #include "pcolonist/world/WeatherSystem.hpp"
+#include "pcolonist/world/WorldStreamer.hpp"
 
 #include <memory>
 #include <string>
@@ -71,6 +76,8 @@ private:
     void stopPlayerMotion();
     void useSelectedTool();
     void useContextAction();
+    void craftNextItem();
+    bool nearCraftStation() const;
     glm::vec3 playerPosition() const;
     ObjectiveHudState objectiveHudState() const;
     void updateCursorMode();
@@ -88,12 +95,16 @@ private:
     Input input_;
     Camera camera_;
     AssetSystem assets_;
+    AssetManager assetManager_;
     JobSystem jobs_;
     ResourceManager resources_;
     Registry registry_;
     Player player_;
     EnemySystem enemies_;
     Inventory inventory_;
+    CraftingSystem crafting_;
+    DiscoverySystem discovery_;
+    SurvivalSystem survival_;
     WeatherSystem weather_;
     PhysicsSystem physics_;
     AnimationSystem animations_;
@@ -103,6 +114,7 @@ private:
     FrameArena frameArena_;
     std::string sceneSnapshot_;
     std::unique_ptr<Renderer> renderer_;
+    std::unique_ptr<WorldStreamer> worldStreamer_;
     bool firstMouseEvent_ = true;
     bool cursorCaptured_ = false;
     bool fullscreen_ = false;
@@ -111,6 +123,7 @@ private:
     bool debugPanelOpen_ = false;
     bool fireLit_ = false;
     bool vsync_ = true;
+    std::string craftMessage_ = "C: КАМЕННЫЙ НОЖ Д:1 К:2 ВЛ:1";
     std::size_t nextLandmark_ = 0;
     int windowedX_ = 100;
     int windowedY_ = 100;

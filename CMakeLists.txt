@@ -86,8 +86,11 @@ add_executable(pcolonist
     src/core/FramePipeline.cpp
     src/core/JobSystem.cpp
     src/gameplay/Enemy.cpp
+    src/gameplay/CraftingSystem.cpp
+    src/gameplay/DiscoverySystem.cpp
     src/gameplay/Inventory.cpp
     src/gameplay/Player.cpp
+    src/gameplay/SurvivalSystem.cpp
     src/memory/FrameArena.cpp
     src/physics/PhysicsSystem.cpp
     src/physics/StaticColliderGrid.cpp
@@ -106,6 +109,10 @@ add_executable(pcolonist
     src/ui/UiSystem.cpp
     src/world/WeatherSystem.cpp
     src/world/WaterWaves.cpp
+    src/world/AssetManager.cpp
+    src/world/Chunk.cpp
+    src/world/ChunkManager.cpp
+    src/world/WorldStreamer.cpp
 )
 
 target_include_directories(pcolonist PRIVATE include)
@@ -129,6 +136,13 @@ add_custom_target(pcolonist_runtime_assets ALL
     VERBATIM
 )
 add_dependencies(pcolonist_runtime_assets pcolonist)
+add_custom_command(TARGET pcolonist POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        "$<TARGET_FILE_DIR:pcolonist>/assets"
+    COMMENT "Synchronizing runtime assets next to pcolonist"
+    VERBATIM
+)
 
 set(PCOLONIST_SHADER_PROGRAMS
     basic

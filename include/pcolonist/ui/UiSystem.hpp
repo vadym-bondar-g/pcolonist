@@ -46,6 +46,25 @@ struct ObjectiveHudState {
     bool nearShelter = false;
     bool nearRuin = false;
     std::string_view contextHint;
+    float health = 100.0F;
+    float thirst = 100.0F;
+    float hunger = 100.0F;
+    float fatigue = 0.0F;
+    float bodyTemperature = 37.0F;
+    bool sick = false;
+    std::string_view survivalBiome;
+    std::string_view survivalLocation;
+    std::string_view survivalWarning;
+    std::string_view craftingHint;
+    int discoveredLocations = 0;
+    int totalLocations = 0;
+    int storyClues = 0;
+    int totalStoryClues = 0;
+    int secretsFound = 0;
+    int totalSecrets = 0;
+    bool discoveryBlocked = false;
+    std::string_view discoveryMessage;
+    std::string_view discoveryClue;
 };
 
 class UiSystem {

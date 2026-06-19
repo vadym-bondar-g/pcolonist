@@ -1,8 +1,29 @@
 #include "pcolonist/gameplay/Inventory.hpp"
 
 #include <algorithm>
+#include <array>
 
 namespace pcolonist {
+
+namespace {
+
+std::size_t slotForTool(Tool tool) {
+    switch (tool) {
+    case Tool::Axe:
+        return 0;
+    case Tool::Knife:
+        return 1;
+    case Tool::Pickaxe:
+        return 2;
+    case Tool::Torch:
+        return 3;
+    case Tool::Empty:
+        return Inventory::hotbarSize;
+    }
+    return Inventory::hotbarSize;
+}
+
+} // namespace
 
 Inventory::Inventory() {
     tools_.fill(Tool::Empty);
@@ -27,6 +48,14 @@ void Inventory::addWater(int amount) {
     water_ = std::max(water_ + amount, 0);
 }
 
+void Inventory::addFiber(int amount) {
+    fiber_ = std::max(fiber_ + amount, 0);
+}
+
+void Inventory::addMetal(int amount) {
+    metal_ = std::max(metal_ + amount, 0);
+}
+
 bool Inventory::spendWood(int amount) {
     if (wood_ < amount) {
         return false;
@@ -43,6 +72,50 @@ bool Inventory::spendStone(int amount) {
     return true;
 }
 
+bool Inventory::spendWater(int amount) {
+    if (water_ < amount) {
+        return false;
+    }
+    water_ -= amount;
+    return true;
+}
+
+bool Inventory::spendFiber(int amount) {
+    if (fiber_ < amount) {
+        return false;
+    }
+    fiber_ -= amount;
+    return true;
+}
+
+bool Inventory::spendMetal(int amount) {
+    if (metal_ < amount) {
+        return false;
+    }
+    metal_ -= amount;
+    return true;
+}
+
+bool Inventory::spendResources(int wood, int stone, int fiber, int metal) {
+    if (!canAfford(wood, stone, fiber, metal)) {
+        return false;
+    }
+    wood_ -= wood;
+    stone_ -= stone;
+    fiber_ -= fiber;
+    metal_ -= metal;
+    return true;
+}
+
+bool Inventory::unlockTool(Tool tool) {
+    const std::size_t slot = slotForTool(tool);
+    if (slot >= tools_.size() || tools_[slot] == tool) {
+        return false;
+    }
+    tools_[slot] = tool;
+    return true;
+}
+
 std::size_t Inventory::selectedSlot() const {
     return selectedSlot_;
 }
@@ -55,7 +128,27 @@ std::string_view Inventory::toolName(std::size_t slot) const {
     if (slot >= tools_.size()) {
         return {};
     }
-    return tools_[slot] == Tool::Axe ? "ТОПОР" : "";
+    switch (tools_[slot]) {
+    case Tool::Axe:
+        return "ТОПОР";
+    case Tool::Knife:
+        return "НОЖ";
+    case Tool::Pickaxe:
+        return "КИРКА";
+    case Tool::Torch:
+        return "ФАКЕЛ";
+    case Tool::Empty:
+        return "";
+    }
+    return "";
+}
+
+bool Inventory::hasTool(Tool tool) const {
+    return std::find(tools_.begin(), tools_.end(), tool) != tools_.end();
+}
+
+bool Inventory::canAfford(int wood, int stone, int fiber, int metal) const {
+    return wood_ >= wood && stone_ >= stone && fiber_ >= fiber && metal_ >= metal;
 }
 
 int Inventory::wood() const {
@@ -68,6 +161,14 @@ int Inventory::stone() const {
 
 int Inventory::water() const {
     return water_;
+}
+
+int Inventory::fiber() const {
+    return fiber_;
+}
+
+int Inventory::metal() const {
+    return metal_;
 }
 
 } // namespace pcolonist

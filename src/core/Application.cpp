@@ -8,6 +8,7 @@
 #include "pcolonist/render/MeshFactory.hpp"
 #include "pcolonist/render/Renderer.hpp"
 #include "pcolonist/serialization/SceneSerializer.hpp"
+#include "pcolonist/world/WorldStreamer.hpp"
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
@@ -16,6 +17,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -28,71 +30,13 @@ namespace {
 constexpr int windowWidth = 1280;
 constexpr int windowHeight = 720;
 constexpr float maximumDeltaTime = 0.1F;
-constexpr float terrainChunkSize = 64.0F;
 const glm::vec3 arrivalCamp{-32.0F, 3.0F, 77.0F};
 const glm::vec3 grantLake{31.0F, 4.0F, -24.0F};
 const glm::vec3 mercyRiverMouth{104.0F, 1.0F, 25.0F};
-const glm::vec3 naturalHarbor{104.0F, 1.0F, 25.0F};
+const glm::vec3 naturalHarbor{91.0F, 1.0F, 14.5F};
 const glm::vec3 graniteHouse{-104.0F, 7.0F, -10.0F};
 const glm::vec3 standingStones{-82.0F, 2.0F, 38.0F};
 const glm::vec3 watchtower{91.0F, 2.0F, 18.0F};
-
-struct ChunkKey {
-    int x = 0;
-    int z = 0;
-
-    bool operator==(const ChunkKey&) const = default;
-};
-
-struct ChunkKeyHash {
-    std::size_t operator()(const ChunkKey& key) const noexcept {
-        return static_cast<std::size_t>(static_cast<unsigned int>(key.x)) * 0x9e3779b1U
-            ^ static_cast<std::size_t>(static_cast<unsigned int>(key.z));
-    }
-};
-
-std::vector<std::pair<pcolonist::TerrainChunk, std::shared_ptr<pcolonist::Mesh>>> splitTerrain(
-    const pcolonist::Mesh& source) {
-    struct ChunkBuilder {
-        pcolonist::Mesh mesh;
-        std::unordered_map<std::uint32_t, std::uint32_t> remap;
-    };
-    std::unordered_map<ChunkKey, ChunkBuilder, ChunkKeyHash> builders;
-    for (std::size_t index = 0; index + 2 < source.indices.size(); index += 3) {
-        const glm::vec3 center = (
-            source.vertices[source.indices[index]].position
-            + source.vertices[source.indices[index + 1]].position
-            + source.vertices[source.indices[index + 2]].position) / 3.0F;
-        const ChunkKey key{
-            static_cast<int>(std::floor(center.x / terrainChunkSize)),
-            static_cast<int>(std::floor(center.z / terrainChunkSize)),
-        };
-        ChunkBuilder& builder = builders[key];
-        for (std::size_t corner = 0; corner < 3; ++corner) {
-            const std::uint32_t sourceIndex = source.indices[index + corner];
-            const auto [iterator, inserted] = builder.remap.try_emplace(
-                sourceIndex,
-                static_cast<std::uint32_t>(builder.mesh.vertices.size()));
-            if (inserted) {
-                builder.mesh.vertices.push_back(source.vertices[sourceIndex]);
-            }
-            builder.mesh.indices.push_back(iterator->second);
-        }
-    }
-
-    std::vector<std::pair<pcolonist::TerrainChunk, std::shared_ptr<pcolonist::Mesh>>> chunks;
-    chunks.reserve(builders.size());
-    for (auto& [key, builder] : builders) {
-        const glm::vec2 center{
-            (static_cast<float>(key.x) + 0.5F) * terrainChunkSize,
-            (static_cast<float>(key.z) + 0.5F) * terrainChunkSize,
-        };
-        chunks.emplace_back(
-            pcolonist::TerrainChunk{center, terrainChunkSize * 0.78F},
-            std::make_shared<pcolonist::Mesh>(std::move(builder.mesh)));
-    }
-    return chunks;
-}
 
 pcolonist::KeyAction toKeyAction(int action) {
     if (action == GLFW_PRESS) {
@@ -142,7 +86,8 @@ namespace pcolonist {
 
 Application::Application()
     : input_(events_),
-      assets_(PCOLONIST_ASSET_DIR) {
+      assets_(PCOLONIST_ASSET_DIR),
+      assetManager_(assets_) {
     if (glfwInit() != GLFW_TRUE) {
         throw std::runtime_error("GLFW initialization failed");
     }
@@ -178,6 +123,8 @@ Application::Application()
     glEnable(GL_MULTISAMPLE);
     renderer_ = std::make_unique<Renderer>();
     ui_.initialize();
+    survival_.loadLocations(assets_);
+    discovery_.loadLocations(assets_);
     loadMap();
     createWorld();
     initializeSystems();
@@ -261,6 +208,9 @@ void Application::registerEventHandlers() {
         if (event.key == GLFW_KEY_E && event.action == KeyAction::Press && !menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
             useContextAction();
         }
+        if (event.key == GLFW_KEY_C && event.action == KeyAction::Press && !menuOpen_ && !debugPanelOpen_) {
+            craftNextItem();
+        }
         if (event.action == KeyAction::Press && event.key >= GLFW_KEY_1 && event.key <= GLFW_KEY_5) {
             inventory_.select(static_cast<std::size_t>(event.key - GLFW_KEY_1));
         }
@@ -299,6 +249,13 @@ void Application::buildPipeline() {
             player_.update(registry_, input_, camera_, context.deltaTime);
         }
     });
+    pipeline_.add(FrameStage::Update, "stream terrain chunks", [this](FrameContext&) {
+        if (worldStreamer_ == nullptr || menuOpen_) {
+            return;
+        }
+        worldStreamer_->update(playerPosition(), registry_, jobs_);
+        renderer_->releaseUnusedMeshes(registry_);
+    });
     pipeline_.add(FrameStage::Update, "update enemies", [this](FrameContext& context) {
         if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
             enemies_.update(registry_, player_.entity(), context.deltaTime);
@@ -331,6 +288,16 @@ void Application::buildPipeline() {
         audioUpdate.get();
         weatherUpdate.get();
     });
+    pipeline_.add(FrameStage::Update, "update survival", [this](FrameContext& context) {
+        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
+            survival_.update(playerPosition(), weather_, context.deltaTime);
+        }
+    });
+    pipeline_.add(FrameStage::Update, "update discoveries", [this](FrameContext&) {
+        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
+            discovery_.update(playerPosition(), inventory_);
+        }
+    });
     pipeline_.add(FrameStage::Render, "render scene", [this](FrameContext& context) {
         static_cast<void>(context);
         if (menuOpen_) {
@@ -361,33 +328,37 @@ void Application::buildPipeline() {
 }
 
 void Application::loadMap() {
-    const auto map = resources_.load<Mesh>("maps/demo_map.obj", [this] {
-        return MeshLoader::load(assets_, "maps/demo_map.obj");
+    const bool chunkAssetsAvailable = std::filesystem::exists(assets_.resolve("maps/chunks/terrain_lod0_-1_1.obj"));
+
+    const auto structures = resources_.load<Mesh>("maps/demo_map_structures.obj", [this] {
+        return MeshLoader::load(assets_, "maps/demo_map_structures.obj");
     });
-    const auto mapLod1 = resources_.load<Mesh>("maps/demo_map_lod1.obj", [this] {
-        return MeshLoader::load(assets_, "maps/demo_map_lod1.obj");
-    });
-    const auto mapLod2 = resources_.load<Mesh>("maps/demo_map_lod2.obj", [this] {
-        return MeshLoader::load(assets_, "maps/demo_map_lod2.obj");
+    const auto rocks = resources_.load<Mesh>("maps/demo_map_rocks.obj", [this] {
+        return MeshLoader::load(assets_, "maps/demo_map_rocks.obj");
     });
 
-    const Entity mapEntity = registry_.create();
-    const Transform& transform = registry_.emplace<Transform>(mapEntity);
-    registry_.emplace<TerrainCollider>(mapEntity, *map, transform);
+    const Entity structuresEntity = registry_.create();
+    registry_.emplace<Transform>(structuresEntity);
+    registry_.emplace<MeshRenderer>(structuresEntity, structures);
 
-    const auto addTerrainLod = [this](const Mesh& source, TerrainLod lod) {
-        for (auto& [chunk, mesh] : splitTerrain(source)) {
-            const Entity chunkEntity = registry_.create();
-            registry_.emplace<Transform>(chunkEntity);
-            registry_.emplace<MeshRenderer>(chunkEntity, std::move(mesh));
-            registry_.emplace<TerrainSurface>(chunkEntity);
-            registry_.emplace<TerrainChunk>(chunkEntity, chunk);
-            registry_.emplace<TerrainLod>(chunkEntity, lod);
-        }
-    };
-    addTerrainLod(*map, TerrainLod{0.0F, 145.0F});
-    addTerrainLod(*mapLod1, TerrainLod{145.0F, 280.0F});
-    addTerrainLod(*mapLod2, TerrainLod{280.0F, 100000.0F});
+    const Entity rocksEntity = registry_.create();
+    registry_.emplace<Transform>(rocksEntity);
+    registry_.emplace<MeshRenderer>(rocksEntity, rocks);
+
+    if (chunkAssetsAvailable) {
+        worldStreamer_ = std::make_unique<WorldStreamer>(assetManager_);
+        worldStreamer_->loadInitial(arrivalCamp, registry_);
+        return;
+    }
+
+    const auto terrain = resources_.load<Mesh>("maps/demo_map_terrain.obj", [this] {
+        return MeshLoader::load(assets_, "maps/demo_map_terrain.obj");
+    });
+    const Entity terrainEntity = registry_.create();
+    const Transform& transform = registry_.emplace<Transform>(terrainEntity);
+    registry_.emplace<MeshRenderer>(terrainEntity, terrain);
+    registry_.emplace<TerrainSurface>(terrainEntity);
+    registry_.emplace<TerrainCollider>(terrainEntity, *terrain, transform);
 }
 
 void Application::createWorld() {
@@ -590,7 +561,7 @@ void Application::handleUiAction(UiAction action) {
     case UiAction::TeleportNextLandmark: {
         constexpr std::array landmarks = {
             glm::vec3{-104.0F, 11.0F, -2.0F},
-            glm::vec3{104.0F, 3.0F, 25.0F},
+            glm::vec3{91.0F, 3.0F, 14.5F},
             glm::vec3{31.0F, 10.0F, -24.0F},
             glm::vec3{56.0F, 4.0F, -11.0F},
             glm::vec3{-72.0F, 4.0F, -61.0F},
@@ -711,6 +682,7 @@ void Application::useSelectedTool() {
     --resource.health;
     if (resource.health <= 0) {
         inventory_.addWood(resource.woodYield);
+        craftMessage_ = crafting_.nextHint(inventory_, nearCraftStation());
         registry_.destroy(target);
         physics_.rebuildStaticIndex(registry_);
     }
@@ -731,16 +703,61 @@ void Application::useContextAction() {
     if (near(arrivalCamp, 14.0F) && !fireLit_ && inventory_.wood() > 0 && inventory_.stone() > 0) {
         if (inventory_.spendWood(1) && inventory_.spendStone(1)) {
             fireLit_ = true;
+            craftMessage_ = crafting_.nextHint(inventory_, nearCraftStation());
         }
         return;
     }
     if (near(grantLake, 24.0F) || near(mercyRiverMouth, 24.0F)) {
         inventory_.addWater(1);
+        survival_.drinkCleanWater(1);
+        return;
+    }
+    if (near(arrivalCamp, 12.0F) && fireLit_) {
+        survival_.restNearFire(18.0F);
+        return;
+    }
+    if (survival_.forageFood()) {
+        return;
+    }
+    if (survival_.canGatherMaterials()) {
+        LocationResourceYield yield = survival_.gatherMaterials();
+        if (inventory_.selectedTool() == Tool::Pickaxe && (yield.stone > 0 || yield.metal > 0)) {
+            yield.stone += 2;
+            yield.metal += 1;
+        }
+        inventory_.addWood(yield.wood);
+        inventory_.addStone(yield.stone);
+        inventory_.addFiber(yield.fiber);
+        inventory_.addMetal(yield.metal);
+        craftMessage_ = crafting_.nextHint(inventory_, nearCraftStation());
+        return;
+    }
+    if (inventory_.water() > 0 && survival_.status().thirst < 86.0F && inventory_.spendWater(1)) {
+        survival_.drinkCleanWater(1);
         return;
     }
     if (near(naturalHarbor, 42.0F) || glm::length(glm::vec2{position.x, position.z}) < 56.0F) {
-        inventory_.addStone(1);
+        inventory_.addStone(inventory_.selectedTool() == Tool::Pickaxe ? 3 : 1);
+        if (inventory_.selectedTool() == Tool::Pickaxe) {
+            inventory_.addMetal(1);
+        }
+        craftMessage_ = crafting_.nextHint(inventory_, nearCraftStation());
     }
+}
+
+void Application::craftNextItem() {
+    const CraftingResult result = crafting_.craftNextAvailable(inventory_, nearCraftStation());
+    craftMessage_ = result.crafted ? result.message : result.message + " | " + crafting_.nextHint(inventory_, nearCraftStation());
+}
+
+bool Application::nearCraftStation() const {
+    const glm::vec3 position = playerPosition();
+    const auto near = [&position](glm::vec3 point, float radius) {
+        return glm::length(glm::vec2{position.x - point.x, position.z - point.z}) <= radius;
+    };
+    return (fireLit_ && near(arrivalCamp, 16.0F))
+        || near(graniteHouse, 24.0F)
+        || near(watchtower, 20.0F);
 }
 
 ObjectiveHudState Application::objectiveHudState() const {
@@ -752,10 +769,22 @@ ObjectiveHudState Application::objectiveHudState() const {
     if (near(arrivalCamp, 14.0F) && !fireLit_) {
         hint = inventory_.wood() > 0 && inventory_.stone() > 0 ? "E: КОСТЕР" : "НУЖНЫ ДЕРЕВО/КАМЕНЬ";
     } else if (near(grantLake, 24.0F) || near(mercyRiverMouth, 24.0F)) {
-        hint = "E: НАБРАТЬ ВОДУ";
+        hint = "E: ПИТЬ / НАБРАТЬ ВОДУ";
+    } else if (near(arrivalCamp, 12.0F) && fireLit_) {
+        hint = "E: ОТДОХНУТЬ У КОСТРА";
+    } else if (survival_.canForageFood()) {
+        hint = "E: СОБРАТЬ ЕДУ";
+    } else if (survival_.canGatherMaterials()) {
+        hint = "E: СОБРАТЬ МАТЕРИАЛЫ";
+    } else if (discovery_.status().blocked) {
+        hint = discovery_.status().lastMessage;
+    } else if (inventory_.water() > 0 && survival_.status().thirst < 86.0F) {
+        hint = "E: ВЫПИТЬ ВОДУ";
     } else if (near(naturalHarbor, 42.0F) || glm::length(glm::vec2{position.x, position.z}) < 56.0F) {
         hint = "E: ДОБЫТЬ КАМЕНЬ";
     }
+    const SurvivalStatus& survival = survival_.status();
+    const DiscoveryStatus& discovery = discovery_.status();
     return {
         position,
         inventory_.wood() > 0,
@@ -765,6 +794,25 @@ ObjectiveHudState Application::objectiveHudState() const {
         near(graniteHouse, 22.0F),
         near(standingStones, 20.0F) || near(watchtower, 18.0F),
         hint,
+        survival.health,
+        survival.thirst,
+        survival.hunger,
+        survival.fatigue,
+        survival.bodyTemperature,
+        survival.sick,
+        survival.biomeName,
+        survival_.currentLocationName(),
+        survival.warning,
+        craftMessage_,
+        discovery.discoveredLocations,
+        discovery.totalLocations,
+        discovery.storyClues,
+        discovery.totalStoryClues,
+        discovery.secretsFound,
+        discovery.totalSecrets,
+        discovery.blocked,
+        discovery.lastMessage,
+        discovery.clueMessage,
     };
 }
 

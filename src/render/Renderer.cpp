@@ -10,6 +10,7 @@
 #include <glad/gl.h>
 #include <glm/common.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/vec4.hpp>
 
 #include <algorithm>
 #include <array>
@@ -19,6 +20,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace {
@@ -55,13 +57,57 @@ struct FireLightUniform {
     float falloff = 0.72F;
 };
 
+struct FrustumPlane {
+    glm::vec3 normal{0.0F};
+    float distance = 0.0F;
+};
+
+using Frustum = std::array<FrustumPlane, 6>;
+
+FrustumPlane normalizedPlane(glm::vec4 plane) {
+    const float length = glm::length(glm::vec3{plane});
+    return length > 0.0F
+        ? FrustumPlane{glm::vec3{plane} / length, plane.w / length}
+        : FrustumPlane{};
+}
+
+Frustum cameraFrustum(const pcolonist::Camera& camera, float aspectRatio) {
+    const glm::mat4 clip = glm::perspective(glm::radians(70.0F), aspectRatio, 0.1F, cameraFarPlane)
+        * camera.viewMatrix();
+    return {
+        normalizedPlane({clip[0][3] + clip[0][0], clip[1][3] + clip[1][0], clip[2][3] + clip[2][0], clip[3][3] + clip[3][0]}),
+        normalizedPlane({clip[0][3] - clip[0][0], clip[1][3] - clip[1][0], clip[2][3] - clip[2][0], clip[3][3] - clip[3][0]}),
+        normalizedPlane({clip[0][3] + clip[0][1], clip[1][3] + clip[1][1], clip[2][3] + clip[2][1], clip[3][3] + clip[3][1]}),
+        normalizedPlane({clip[0][3] - clip[0][1], clip[1][3] - clip[1][1], clip[2][3] - clip[2][1], clip[3][3] - clip[3][1]}),
+        normalizedPlane({clip[0][3] + clip[0][2], clip[1][3] + clip[1][2], clip[2][3] + clip[2][2], clip[3][3] + clip[3][2]}),
+        normalizedPlane({clip[0][3] - clip[0][2], clip[1][3] - clip[1][2], clip[2][3] - clip[2][2], clip[3][3] - clip[3][2]}),
+    };
+}
+
+bool sphereInFrustum(const Frustum& frustum, glm::vec3 center, float radius) {
+    return std::all_of(frustum.begin(), frustum.end(), [center, radius](const FrustumPlane& plane) {
+        return glm::dot(plane.normal, center) + plane.distance >= -radius;
+    });
+}
+
+float meshRadius(const pcolonist::Mesh& mesh) {
+    float radius = 0.0F;
+    for (const pcolonist::Vertex& vertex : mesh.vertices) {
+        radius = std::max(radius, glm::length(vertex.position));
+    }
+    return radius;
+}
+
 std::vector<RenderBatch> collectBatches(
     pcolonist::Registry& registry,
-    const glm::vec3& cameraPosition,
+    const pcolonist::Camera& camera,
+    float aspectRatio,
     bool shadows) {
     std::vector<RenderBatch> batches;
+    const glm::vec3& cameraPosition = camera.position();
+    const Frustum frustum = cameraFrustum(camera, aspectRatio);
     registry.each<pcolonist::Transform, pcolonist::MeshRenderer>(
-        [&batches, &registry, cameraPosition, shadows](
+        [&batches, &registry, cameraPosition, &frustum, shadows](
             pcolonist::Entity entity,
             const pcolonist::Transform& transform,
             const pcolonist::MeshRenderer& renderer) {
@@ -77,6 +123,9 @@ std::vector<RenderBatch> collectBatches(
             const bool lava = registry.has<pcolonist::LavaSurface>(entity);
             const bool fire = registry.has<pcolonist::FireSurface>(entity);
             const bool smoke = registry.has<pcolonist::SmokeSurface>(entity);
+            const float scale = std::max({transform.scale.x, transform.scale.y, transform.scale.z});
+            glm::vec3 cullCenter = transform.position;
+            float cullRadius = meshRadius(*renderer.mesh) * scale;
             if (registry.has<pcolonist::TerrainChunk>(entity)) {
                 const pcolonist::TerrainChunk& chunk = registry.get<pcolonist::TerrainChunk>(entity);
                 const float chunkDistance = glm::distance(glm::vec2{cameraPosition.x, cameraPosition.z}, chunk.center);
@@ -93,9 +142,13 @@ std::vector<RenderBatch> collectBatches(
                     && registry.get<pcolonist::TerrainLod>(entity).minDistance > 0.0F) {
                     return;
                 }
+                cullRadius = chunk.radius;
+                cullCenter = {chunk.center.x, transform.position.y, chunk.center.y};
+            }
+            if (!sphereInFrustum(frustum, cullCenter, cullRadius) && !water) {
+                return;
             }
             const float distance = glm::length(transform.position - cameraPosition);
-            const float scale = std::max({transform.scale.x, transform.scale.y, transform.scale.z});
             if (!terrain && !water && distance > objectDrawDistance + scale * 10.0F) {
                 return;
             }
@@ -224,7 +277,7 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, shadowDepths_[1]);
 
-    std::vector<RenderBatch> batches = collectBatches(registry, camera.position(), false);
+    std::vector<RenderBatch> batches = collectBatches(registry, camera, aspectRatio, false);
     std::stable_sort(batches.begin(), batches.end(), [](const RenderBatch& left, const RenderBatch& right) {
         const int leftOrder = left.fire ? 2 : left.smoke ? 1 : 0;
         const int rightOrder = right.fire ? 2 : right.smoke ? 1 : 0;
@@ -309,6 +362,28 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
                     && camera.position().y < transform.position.y);
         });
     postProcess(weather, underwater);
+}
+
+void Renderer::releaseUnusedMeshes(Registry& registry) {
+    std::unordered_set<const Mesh*> liveMeshes;
+    registry.each<Transform, MeshRenderer>(
+        [&liveMeshes](Entity, const Transform&, const MeshRenderer& renderer) {
+            if (renderer.mesh) {
+                liveMeshes.insert(renderer.mesh.get());
+            }
+        });
+
+    for (auto iterator = meshes_.begin(); iterator != meshes_.end();) {
+        if (liveMeshes.contains(iterator->first)) {
+            ++iterator;
+            continue;
+        }
+        glDeleteBuffers(1, &iterator->second.instanceBuffer);
+        glDeleteBuffers(1, &iterator->second.indexBuffer);
+        glDeleteBuffers(1, &iterator->second.vertexBuffer);
+        glDeleteVertexArrays(1, &iterator->second.vertexArray);
+        iterator = meshes_.erase(iterator);
+    }
 }
 
 void Renderer::setShadowsEnabled(bool enabled) {
@@ -448,7 +523,8 @@ void Renderer::renderShadowMap(const Camera& camera, Registry& registry, const W
     glCullFace(GL_FRONT);
     Shader& shader = shaders_.get("shadow");
     shader.use();
-    const std::vector<RenderBatch> batches = collectBatches(registry, camera.position(), true);
+    const float aspectRatio = height_ > 0 ? static_cast<float>(width_) / static_cast<float>(height_) : 1.0F;
+    const std::vector<RenderBatch> batches = collectBatches(registry, camera, aspectRatio, true);
     for (std::size_t cascade = 0; cascade < shadowFramebuffers_.size(); ++cascade) {
         glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffers_[cascade]);
         glClear(GL_DEPTH_BUFFER_BIT);

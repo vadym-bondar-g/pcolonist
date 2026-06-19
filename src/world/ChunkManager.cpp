@@ -1,0 +1,177 @@
+#include "pcolonist/world/ChunkManager.hpp"
+
+#include "pcolonist/ecs/Components.hpp"
+#include "pcolonist/ecs/Registry.hpp"
+#include "pcolonist/physics/PhysicsSystem.hpp"
+#include "pcolonist/world/AssetManager.hpp"
+
+#include <glm/geometric.hpp>
+
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <stdexcept>
+
+namespace {
+
+int chebyshevDistance(pcolonist::ChunkKey a, pcolonist::ChunkKey b) {
+    return std::max(std::abs(a.x - b.x), std::abs(a.z - b.z));
+}
+
+bool ready(std::future<std::shared_ptr<pcolonist::Mesh>>& future) {
+    using namespace std::chrono_literals;
+    return future.wait_for(0ms) == std::future_status::ready;
+}
+
+} // namespace
+
+namespace pcolonist {
+
+ChunkManager::ChunkManager()
+    : ChunkManager(Config{}) {}
+
+ChunkManager::ChunkManager(Config config)
+    : config_(config) {}
+
+void ChunkManager::loadInitial(glm::vec3 playerPosition, Registry& registry, AssetManager& assets) {
+    const ChunkKey center = chunkFor(playerPosition);
+    for (int z = center.z - config_.loadRadius; z <= center.z + config_.loadRadius; ++z) {
+        for (int x = center.x - config_.loadRadius; x <= center.x + config_.loadRadius; ++x) {
+            const ChunkId id = desiredId({x, z}, center);
+            if (active_.contains(id) || missing_.contains(id)) {
+                continue;
+            }
+            TerrainTile tile = terrainTile(id);
+            try {
+                Chunk chunk{tile, assets.loadMesh(tile.meshPath), {}};
+                spawnChunk(std::move(chunk), registry);
+            } catch (const std::exception&) {
+                missing_.insert(id);
+            }
+        }
+    }
+}
+
+void ChunkManager::update(glm::vec3 playerPosition, Registry& registry, AssetManager& assets, JobSystem& jobs) {
+    const ChunkKey center = chunkFor(playerPosition);
+    unloadDistantChunks(center, registry);
+    integrateReadyChunks(registry);
+    requestMissingChunks(center, assets, jobs);
+    assets.clearExpired();
+}
+
+void ChunkManager::unloadAll(Registry& registry) {
+    for (auto& [id, chunk] : active_) {
+        static_cast<void>(id);
+        for (Entity entity : chunk.entities) {
+            registry.destroy(entity);
+        }
+    }
+    active_.clear();
+    pending_.clear();
+}
+
+ChunkKey ChunkManager::chunkFor(glm::vec3 position) const {
+    return {
+        static_cast<int>(std::floor(position.x / config_.chunkSize)),
+        static_cast<int>(std::floor(position.z / config_.chunkSize)),
+    };
+}
+
+std::size_t ChunkManager::activeChunkCount() const {
+    return active_.size();
+}
+
+std::size_t ChunkManager::pendingChunkCount() const {
+    return pending_.size();
+}
+
+ChunkId ChunkManager::desiredId(ChunkKey key, ChunkKey center) const {
+    const int distance = chebyshevDistance(key, center);
+    const int lod = distance <= config_.lod0Radius ? 0 : distance <= config_.lod1Radius ? 1 : 2;
+    return {key, lod};
+}
+
+TerrainTile ChunkManager::terrainTile(ChunkId id) const {
+    return {
+        id,
+        "maps/chunks/terrain_lod" + std::to_string(id.lod) + "_" + std::to_string(id.key.x) + "_"
+            + std::to_string(id.key.z) + ".obj",
+        {
+            (static_cast<float>(id.key.x) + 0.5F) * config_.chunkSize,
+            (static_cast<float>(id.key.z) + 0.5F) * config_.chunkSize,
+        },
+        config_.chunkSize,
+    };
+}
+
+bool ChunkManager::shouldKeep(ChunkId id, ChunkKey center) const {
+    if (chebyshevDistance(id.key, center) > config_.unloadRadius) {
+        return false;
+    }
+    const ChunkId replacement = desiredId(id.key, center);
+    if (replacement.lod == id.lod) {
+        return true;
+    }
+    return !active_.contains(replacement);
+}
+
+void ChunkManager::requestMissingChunks(ChunkKey center, AssetManager& assets, JobSystem& jobs) {
+    for (int z = center.z - config_.loadRadius; z <= center.z + config_.loadRadius; ++z) {
+        for (int x = center.x - config_.loadRadius; x <= center.x + config_.loadRadius; ++x) {
+            const ChunkId id = desiredId({x, z}, center);
+            if (active_.contains(id) || pending_.contains(id) || missing_.contains(id)) {
+                continue;
+            }
+            TerrainTile tile = terrainTile(id);
+            pending_.emplace(id, PendingChunk{tile, assets.loadMeshAsync(tile.meshPath, jobs)});
+        }
+    }
+}
+
+void ChunkManager::integrateReadyChunks(Registry& registry) {
+    for (auto iterator = pending_.begin(); iterator != pending_.end();) {
+        if (!ready(iterator->second.mesh)) {
+            ++iterator;
+            continue;
+        }
+
+        try {
+            Chunk chunk{iterator->second.terrain, iterator->second.mesh.get(), {}};
+            spawnChunk(std::move(chunk), registry);
+        } catch (const std::exception&) {
+            missing_.insert(iterator->first);
+        }
+        iterator = pending_.erase(iterator);
+    }
+}
+
+void ChunkManager::unloadDistantChunks(ChunkKey center, Registry& registry) {
+    for (auto iterator = active_.begin(); iterator != active_.end();) {
+        if (shouldKeep(iterator->first, center)) {
+            ++iterator;
+            continue;
+        }
+        for (Entity entity : iterator->second.entities) {
+            registry.destroy(entity);
+        }
+        iterator = active_.erase(iterator);
+    }
+}
+
+void ChunkManager::spawnChunk(Chunk chunk, Registry& registry) {
+    if (!chunk.terrainMesh || chunk.terrainMesh->vertices.empty() || chunk.terrainMesh->indices.empty()) {
+        throw std::runtime_error("Cannot spawn empty terrain chunk");
+    }
+
+    const Entity terrain = registry.create();
+    const Transform& transform = registry.emplace<Transform>(terrain);
+    registry.emplace<MeshRenderer>(terrain, chunk.terrainMesh);
+    registry.emplace<TerrainSurface>(terrain);
+    registry.emplace<TerrainChunk>(terrain, chunk.terrain.center, chunk.terrain.size * 0.78F);
+    registry.emplace<TerrainCollider>(terrain, *chunk.terrainMesh, transform);
+    chunk.entities.push_back(terrain);
+    active_.emplace(chunk.terrain.id, std::move(chunk));
+}
+
+} // namespace pcolonist

@@ -34,6 +34,7 @@ SPLIT_MAP_PATHS = {
     "structures": ROOT / "assets" / "maps" / "demo_map_structures.obj",
     "rocks": ROOT / "assets" / "maps" / "demo_map_rocks.obj",
 }
+TERRAIN_CHUNK_DIR = ROOT / "assets" / "maps" / "chunks"
 INTERNAL_WATER_PATH = ROOT / "assets" / "maps" / "internal_water.obj"
 LANDMARKS_PATH = ROOT / "assets" / "maps" / "landmarks.json"
 WALKABILITY_PATH = ROOT / "assets" / "maps" / "walkability.pgm"
@@ -63,7 +64,7 @@ DEBUG_MAP_GRID = 61
 
 def configure_output_root(output_root: Path) -> None:
     global ROOT
-    global MAP_PATH, MAP_LOD_PATHS, SPLIT_MAP_PATHS, INTERNAL_WATER_PATH
+    global MAP_PATH, MAP_LOD_PATHS, SPLIT_MAP_PATHS, TERRAIN_CHUNK_DIR, INTERNAL_WATER_PATH
     global LANDMARKS_PATH, WALKABILITY_PATH, HEIGHTMAP_PATH, BIOME_MAP_PATH
     global SLOPE_MAP_PATH, MOISTURE_MAP_PATH, MATERIAL_MASK_PATHS
     global TERRAIN_REPORT_PATH, QUALITY_REPORT_PATH, DEBUG_PREVIEW_PATH, SCENE_PATH, GAMEPLAY_GOALS_PATH
@@ -73,6 +74,7 @@ def configure_output_root(output_root: Path) -> None:
     MAP_PATH = layout.map_path
     MAP_LOD_PATHS = layout.map_lod_paths
     SPLIT_MAP_PATHS = layout.split_map_paths
+    TERRAIN_CHUNK_DIR = layout.terrain_chunk_dir
     INTERNAL_WATER_PATH = layout.internal_water_path
     LANDMARKS_PATH = layout.landmarks_path
     WALKABILITY_PATH = layout.walkability_path
@@ -247,8 +249,8 @@ class IslandModelConfig:
     volcano: VolcanoConfig = field(default_factory=VolcanoConfig)
     grottos: tuple[GrottoConfig, ...] = (
         GrottoConfig((-72.0, -54.0), (0.45, 0.89), 8.5, 7.5),
-        GrottoConfig((65.0, 70.0), (-0.65, -0.76), 8.0, 7.0),
-        GrottoConfig((-91.0, 67.0), (0.95, -0.31), 7.5, 6.8),
+        GrottoConfig((65.0, 70.0), (-0.65, -0.76), 8.0, 7.0, 0.65),
+        GrottoConfig((-91.0, 67.0), (0.95, -0.31), 7.5, 6.8, 0.75),
     )
     granite_house: tuple[float, float] = (-104.0, -10.0)
     shoreline_features: tuple[ShoreFeatureConfig, ...] = (
@@ -862,6 +864,19 @@ def add_box_on_ground(
     )
 
 
+def add_slab_on_ground(
+    vertices: list[tuple[float, float, float, float, float, float]],
+    faces: list[tuple[int, ...]],
+    x: float,
+    z: float,
+    size: tuple[float, float, float],
+    color: tuple[float, float, float],
+    clearance: float = 0.08,
+) -> None:
+    """Place a walkable rectangular slab just above the sampled terrain."""
+    add_box_on_ground(vertices, faces, x, z, size, color, clearance)
+
+
 def add_rock_spire(
     vertices: list[tuple[float, float, float, float, float, float]],
     faces: list[tuple[int, ...]],
@@ -1042,6 +1057,43 @@ def build_terrain_mesh(
     return vertices, faces
 
 
+def write_chunked_terrain_meshes(
+    lod_index: int,
+    vertices: list[tuple[float, float, float, float, float, float]],
+    faces: list[tuple[int, ...]],
+    chunk_size: float = 64.0,
+) -> list[Path]:
+    TERRAIN_CHUNK_DIR.mkdir(parents=True, exist_ok=True)
+    if lod_index == 0:
+        for stale in TERRAIN_CHUNK_DIR.glob("terrain_lod*.obj"):
+            stale.unlink()
+
+    chunk_faces: dict[tuple[int, int], list[tuple[int, ...]]] = {}
+    for face in faces:
+        center_x = sum(vertices[index - 1][0] for index in face) / len(face)
+        center_z = sum(vertices[index - 1][2] for index in face) / len(face)
+        key = math.floor(center_x / chunk_size), math.floor(center_z / chunk_size)
+        chunk_faces.setdefault(key, []).append(face)
+
+    outputs: list[Path] = []
+    for (chunk_x, chunk_z), faces_for_chunk in sorted(chunk_faces.items()):
+        remap: dict[int, int] = {}
+        chunk_vertices: list[tuple[float, float, float, float, float, float]] = []
+        chunk_indices: list[tuple[int, ...]] = []
+        for face in faces_for_chunk:
+            remapped_face: list[int] = []
+            for source_index in face:
+                if source_index not in remap:
+                    remap[source_index] = len(chunk_vertices) + 1
+                    chunk_vertices.append(vertices[source_index - 1])
+                remapped_face.append(remap[source_index])
+            chunk_indices.append(tuple(remapped_face))
+        path = TERRAIN_CHUNK_DIR / f"terrain_lod{lod_index}_{chunk_x}_{chunk_z}.obj"
+        write_obj(path, f"terrain_lod{lod_index}_{chunk_x}_{chunk_z}", chunk_vertices, chunk_indices)
+        outputs.append(path)
+    return outputs
+
+
 def add_structure_geometry(
     vertices: list[tuple[float, float, float, float, float, float]],
     faces: list[tuple[int, ...]],
@@ -1051,25 +1103,25 @@ def add_structure_geometry(
     glow_stone = (0.18, 0.48, 0.5)
 
     # Sunken temple in the northern valley.
-    add_box(vertices, faces, (0.0, 0.45, -84.0), (18.0, 0.9, 14.0), dark_stone)
+    add_slab_on_ground(vertices, faces, 0.0, -84.0, (18.0, 0.9, 14.0), dark_stone)
     for x in (-8.0, 8.0):
         for z in (-90.0, -78.0):
-            add_box(vertices, faces, (x, 3.0, z), (2.0, 6.0, 2.0), stone)
-    add_box(vertices, faces, (0.0, 4.0, -90.0), (18.0, 1.2, 2.0), stone)
-    add_box(vertices, faces, (0.0, 2.6, -84.0), (1.2, 5.2, 1.2), glow_stone)
+            add_box_on_ground(vertices, faces, x, z, (2.0, 6.0, 2.0), stone, 0.04)
+    add_box_on_ground(vertices, faces, 0.0, -90.0, (18.0, 1.2, 2.0), stone, 3.1)
+    add_box_on_ground(vertices, faces, 0.0, -84.0, (1.2, 5.2, 1.2), glow_stone, 0.04)
 
     # Broken watchtower overlooking the eastern bay.
-    add_box(vertices, faces, (91.0, 2.5, 18.0), (8.0, 5.0, 8.0), dark_stone)
-    add_box(vertices, faces, (91.0, 6.2, 18.0), (10.0, 1.0, 10.0), stone)
-    add_box(vertices, faces, (88.0, 9.0, 15.0), (1.5, 5.0, 1.5), glow_stone)
+    add_box_on_ground(vertices, faces, 91.0, 18.0, (8.0, 5.0, 8.0), dark_stone, 0.04)
+    add_box_on_ground(vertices, faces, 91.0, 18.0, (10.0, 1.0, 10.0), stone, 5.05)
+    add_box_on_ground(vertices, faces, 88.0, 15.0, (1.5, 5.0, 1.5), glow_stone, 5.65)
 
     # Western standing-stone circle.
     for index in range(9):
         angle = index / 9.0 * math.tau
         x = -82.0 + math.cos(angle) * 11.0
         z = 38.0 + math.sin(angle) * 11.0
-        add_box(vertices, faces, (x, 2.3, z), (1.3, 4.6 + (index % 3) * 0.7, 1.3), stone)
-    add_box(vertices, faces, (-82.0, 0.35, 38.0), (8.0, 0.7, 8.0), glow_stone)
+        add_box_on_ground(vertices, faces, x, z, (1.3, 4.6 + (index % 3) * 0.7, 1.3), stone, 0.04)
+    add_slab_on_ground(vertices, faces, -82.0, 38.0, (8.0, 0.7, 8.0), glow_stone)
 
     # Granite House facade, recessed entrance and elevated lookout terrace.
     granite_x, granite_z = GRANITE_HOUSE
@@ -1082,19 +1134,19 @@ def add_structure_geometry(
     add_box(vertices, faces, (granite_x, granite_y + 9.4, granite_z + 1.0), (18.0, 0.8, 12.0), stone)
 
     # Walkable bridges cross the lake's outlet and lower river.
-    add_box(vertices, faces, (63.0, 0.0, -12.0), (5.0, 0.8, 17.0), dark_stone)
-    add_box(vertices, faces, (91.0, 0.0, 8.0), (5.0, 0.8, 16.0), dark_stone)
+    add_slab_on_ground(vertices, faces, 63.0, -12.0, (5.0, 0.8, 17.0), dark_stone, 0.18)
+    add_slab_on_ground(vertices, faces, 91.0, 8.0, (5.0, 0.8, 16.0), dark_stone, 0.18)
     for bridge_x, bridge_z in ((63.0, -19.0), (63.0, -5.0), (91.0, 1.5), (91.0, 14.5)):
-        add_box(vertices, faces, (bridge_x, 0.9, bridge_z), (1.2, 2.2, 1.2), stone)
+        add_box_on_ground(vertices, faces, bridge_x, bridge_z, (1.2, 2.2, 1.2), stone, 0.04)
 
     # Summit observatory and a southern landing pier create long-distance goals.
     summit_y = terrain_height(-54.0, -34.0)
     add_box(vertices, faces, (-54.0, summit_y + 0.4, -34.0), (10.0, 0.8, 10.0), dark_stone)
     add_box(vertices, faces, (-54.0, summit_y + 3.5, -34.0), (1.5, 6.2, 1.5), glow_stone)
-    add_box(vertices, faces, (-25.0, -0.05, 110.0), (8.0, 0.8, 28.0), dark_stone)
+    add_slab_on_ground(vertices, faces, -25.0, 110.0, (8.0, 0.8, 28.0), dark_stone, 0.12)
     for z in (99.0, 109.0, 119.0):
         for x in (-28.0, -22.0):
-            add_box(vertices, faces, (x, -1.1, z), (1.0, 2.6, 1.0), stone)
+            add_box_on_ground(vertices, faces, x, z, (1.0, 2.6, 1.0), stone, -1.55)
 
 
 def add_rock_geometry(
@@ -1139,6 +1191,7 @@ def add_landmark_geometry(
 def generate_map() -> None:
     vertices, faces = build_terrain_mesh(1)
     write_obj(SPLIT_MAP_PATHS["terrain"], "mysterious_island_terrain", vertices, faces)
+    write_chunked_terrain_meshes(0, vertices, faces)
     add_landmark_geometry(vertices, faces)
     write_obj(MAP_PATH, "mysterious_island", vertices, faces)
 
@@ -1158,6 +1211,7 @@ def generate_split_maps() -> None:
 def generate_lod_maps() -> None:
     for index, (path, step) in enumerate(zip(MAP_LOD_PATHS, LOD_STEPS), start=1):
         vertices, faces = build_terrain_mesh(step)
+        write_chunked_terrain_meshes(index, vertices, faces)
         add_landmark_geometry(vertices, faces)
         write_obj(path, f"mysterious_island_lod{index}", vertices, faces)
 
@@ -1613,6 +1667,112 @@ def generate_debug_preview() -> Path:
         if minimap_uri
         else "<div class=\"minimap-empty\">Нет карты</div>"
     )
+    locations_path = ROOT / "assets" / "scripts" / "island_locations_100.json"
+    location_payload = load_json_if_available(locations_path)
+    locations = location_payload if isinstance(location_payload, list) else []
+    location_styles = ""
+    location_markup = ""
+    location_script = ""
+    if locations:
+        location_data = json.dumps(locations, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+        location_styles = """
+    .location-panel { margin-top: 14px; }
+    .location-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 12px; }
+    .location-toolbar button { border: 1px solid #46524c; background: #151917; color: #d7dddf; border-radius: 6px; padding: 6px 9px; cursor: pointer; }
+    .location-toolbar button.active { background: #2b6f68; border-color: #47a79c; color: #f4fffb; }
+    .location-map { position: relative; aspect-ratio: 7 / 6; overflow: hidden; border: 1px solid #303633; background: #0f1211; border-radius: 6px; }
+    .location-map img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 0; opacity: .78; }
+    .location-marker { position: absolute; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #101412; box-shadow: 0 0 0 1px rgba(255,255,255,.45), 0 4px 10px rgba(0,0,0,.45); transform: translate(-50%, -50%); cursor: pointer; }
+    .location-marker.hidden { display: none; }
+    .location-marker:hover, .location-marker.selected { width: 14px; height: 14px; z-index: 3; }
+    .location-details { margin-top: 12px; color: #c9d1cd; min-height: 74px; }
+    .location-details strong { display: block; color: #f0f3ef; margin-bottom: 4px; }
+    .location-details span { color: #8fb9b0; }
+    .location-list { max-height: 280px; overflow: auto; margin-top: 12px; border-top: 1px solid #303633; }
+    .location-list button { width: 100%; border: 0; border-bottom: 1px solid #303633; background: transparent; color: #d7dddf; text-align: left; padding: 8px 4px; cursor: pointer; }
+    .location-list button:hover { background: #242b28; }
+"""
+        location_markup = f"""
+        <section class="panel location-panel">
+          <h2>{len(locations)} объектов острова</h2>
+          <p>Интерактивный слой поверх карты биомов. Координаты: x/z из world space, y из дизайн-данных.</p>
+          <div class="location-toolbar" id="location-filters"></div>
+          <div class="location-map" id="location-map">
+            <img src="{minimap_uri}" alt="Location overlay map">
+          </div>
+          <div class="location-details" id="location-details">Выберите маркер, чтобы увидеть ресурсы, угрозы, лут и сюжетные следы.</div>
+          <div class="location-list" id="location-list"></div>
+        </section>"""
+        location_script = """
+  <script id="location-data" type="application/json">{data}</script>
+  <script>
+    (() => {{
+      const locations = JSON.parse(document.getElementById('location-data').textContent);
+      const map = document.getElementById('location-map');
+      const filters = document.getElementById('location-filters');
+      const details = document.getElementById('location-details');
+      const list = document.getElementById('location-list');
+      const colors = {{
+        'Побережье': '#e7c46a',
+        'Тропический лес': '#45b26b',
+        'Болота': '#6aa68a',
+        'Горы': '#b5b8b1',
+        'Пещеры': '#9b7bd8',
+        'Вулкан': '#df604c',
+        'Тайные зоны': '#55c7d8'
+      }};
+      const bounds = {{ minX: -145, maxX: 145, minZ: -125, maxZ: 125 }};
+      let activeBiome = 'Все';
+      let selected = null;
+      const biomes = ['Все', ...Array.from(new Set(locations.map(location => location.biome)))];
+      const markers = [];
+      const show = (location, marker) => {{
+        selected?.classList.remove('selected');
+        selected = marker || markers.find(entry => entry.location === location)?.node || null;
+        selected?.classList.add('selected');
+        details.innerHTML = `<strong>${{location.name}} <span>${{location.biome}} [${{location.position.join(', ')}}]</span></strong>${{location.description}}<br><span>Ресурсы:</span> ${{location.resources.join(', ') || 'нет'}}<br><span>Враги:</span> ${{location.enemies.join(', ') || 'нет'}}<br><span>Лут:</span> ${{location.loot.join(', ') || 'нет'}}<br><span>Следы:</span> ${{location.story_clues.join('; ') || 'нет'}}<br><span>Инструменты:</span> ${{location.required_tools.join(', ') || 'нет'}}`;
+      }};
+      const applyFilter = () => {{
+        markers.forEach(({{ location, node, row }}) => {{
+          const visible = activeBiome === 'Все' || location.biome === activeBiome;
+          node.classList.toggle('hidden', !visible);
+          row.style.display = visible ? '' : 'none';
+        }});
+      }};
+      biomes.forEach(biome => {{
+        const button = document.createElement('button');
+        button.textContent = biome;
+        button.className = biome === activeBiome ? 'active' : '';
+        button.addEventListener('click', () => {{
+          activeBiome = biome;
+          filters.querySelectorAll('button').forEach(filter => filter.classList.toggle('active', filter === button));
+          applyFilter();
+        }});
+        filters.appendChild(button);
+      }});
+      locations.forEach((location, index) => {{
+        const [x, y, z] = location.position;
+        const left = ((x - bounds.minX) / (bounds.maxX - bounds.minX)) * 100;
+        const top = ((bounds.maxZ - z) / (bounds.maxZ - bounds.minZ)) * 100;
+        const marker = document.createElement('button');
+        marker.className = 'location-marker';
+        marker.style.left = `${{left}}%`;
+        marker.style.top = `${{top}}%`;
+        marker.style.background = colors[location.biome] || '#fff';
+        marker.title = `${{index + 1}}. ${{location.name}} - ${{location.biome}}`;
+        marker.setAttribute('aria-label', marker.title);
+        marker.addEventListener('click', () => show(location, marker));
+        map.appendChild(marker);
+        const row = document.createElement('button');
+        row.textContent = `${{String(index + 1).padStart(2, '0')}}. ${{location.name}} - ${{location.biome}}`;
+        row.addEventListener('click', () => show(location, marker));
+        list.appendChild(row);
+        markers.push({{ location, node: marker, row }});
+      }});
+      show(locations[0], markers[0].node);
+    }})();
+  </script>
+""".format(data=location_data)
     document = f"""<!doctype html>
 <html lang="ru">
 <head>
@@ -1646,6 +1806,7 @@ def generate_debug_preview() -> Path:
     .minimap h2 {{ font-size: 13px; margin-bottom: 8px; }}
     .minimap img {{ display: block; aspect-ratio: 1 / 1; object-fit: cover; }}
     .minimap-empty {{ display: grid; place-items: center; aspect-ratio: 1 / 1; border: 1px solid #303633; color: #9ba6a2; }}
+    {location_styles}
     @media (max-width: 860px) {{
       .layout {{ display: block; }}
       .goals {{ position: static; height: auto; border-right: 0; border-bottom: 1px solid #343b38; }}
@@ -1674,6 +1835,7 @@ def generate_debug_preview() -> Path:
         <div class="grid">
           {card_markup}
         </div>
+        {location_markup}
         <section class="panel">
           <h2>Placement</h2>
           <table><thead><tr><th>Rule</th><th>Requested</th><th>Spawned</th><th>Skipped</th></tr></thead><tbody>
@@ -1691,6 +1853,7 @@ def generate_debug_preview() -> Path:
     <h2>Миникарта</h2>
     {minimap_markup}
   </aside>
+  {location_script}
 </body>
 </html>
 """
@@ -1723,7 +1886,7 @@ def generate_landmarks() -> None:
     landmarks: list[dict[str, object]] = [
         landmark_entry("arrival_camp", "camp", -32.0, 77.0, 1.2, 10.0),
         landmark_entry("granite_house", "shelter", GRANITE_HOUSE[0], GRANITE_HOUSE[1], 2.0, 12.0),
-        landmark_entry("natural_harbor", "harbor", HARBOR_CENTER[0], HARBOR_CENTER[1], 1.2, 18.0),
+        landmark_entry("natural_harbor", "harbor", 91.0, 14.5, 1.2, 18.0),
         landmark_entry("grant_lake", "water", LAKE_CENTER[0], LAKE_CENTER[1], 1.2, 18.0),
         landmark_entry("mercy_river_source", "water", RIVER_PATH[0][0], RIVER_PATH[0][1], 1.0, 7.0),
         landmark_entry("mercy_river_mouth", "water", RIVER_PATH[-1][0], RIVER_PATH[-1][1], 1.0, 9.0),
@@ -1810,6 +1973,11 @@ def generate_scene() -> None:
         "model bush models/bush.obj",
         "model grotto models/grotto.obj",
         "model palm models/palm.obj",
+        "model basalt_scree_tiny models/basalt_scree_tiny.obj",
+        "model basalt_scree_small models/basalt_scree_small.obj",
+        "model basalt_scree_medium models/basalt_scree_medium.obj",
+        "model basalt_scree_large models/basalt_scree_large.obj",
+        "model basalt_scree_shard models/basalt_scree_shard.obj",
         "",
         "# Arrival camp.",
     ]
@@ -1827,6 +1995,35 @@ def generate_scene() -> None:
         spawn_collider(lines, (grotto_x - 3.75, ground + 2.0, grotto_z), (0.65, 2.0, 5.0))
         spawn_collider(lines, (grotto_x + 3.75, ground + 2.0, grotto_z), (0.65, 2.0, 5.0))
         spawn_collider(lines, (grotto_x, ground + 4.0, grotto_z), (3.1, 0.45, 5.0))
+
+    lines.extend(("", "# Basalt scree on volcanic slopes. Small decor-only stones keep traversal clear."))
+    basalt_scree = [
+        ("basalt_scree_large", -38.0, -4.0, 1.18, 0.35),
+        ("basalt_scree_medium", -34.0, -7.0, 1.05, 1.24),
+        ("basalt_scree_small", -42.0, -1.0, 0.88, 2.60),
+        ("basalt_scree_tiny", -31.0, -2.0, 0.76, 4.30),
+        ("basalt_scree_shard", -26.0, 14.0, 1.12, 0.80),
+        ("basalt_scree_medium", -22.0, 11.0, 1.02, 2.10),
+        ("basalt_scree_tiny", -29.0, 18.0, 0.72, 3.35),
+        ("basalt_scree_large", 12.0, -28.0, 1.16, 1.75),
+        ("basalt_scree_small", 16.0, -31.0, 0.88, 4.90),
+        ("basalt_scree_shard", 9.0, -24.0, 1.08, 2.95),
+        ("basalt_scree_medium", 6.0, 18.0, 1.06, 0.45),
+        ("basalt_scree_small", 10.0, 20.0, 0.86, 2.80),
+        ("basalt_scree_tiny", 3.0, 15.0, 0.72, 5.10),
+        ("basalt_scree_large", 0.0, 0.0, 1.22, 1.30),
+        ("basalt_scree_medium", -5.0, 4.0, 1.02, 3.20),
+        ("basalt_scree_small", 4.0, -6.0, 0.84, 4.70),
+        ("basalt_scree_shard", -18.0, -8.0, 1.08, 0.20),
+        ("basalt_scree_tiny", -15.0, -12.0, 0.72, 2.40),
+        ("basalt_scree_large", 0.0, 18.0, 1.25, 0.15),
+        ("basalt_scree_medium", -3.5, 19.5, 1.05, 1.65),
+        ("basalt_scree_shard", 3.8, 16.5, 1.10, 3.10),
+        ("basalt_scree_small", 1.6, 21.8, 0.92, 4.40),
+        ("basalt_scree_tiny", -1.8, 15.2, 0.78, 2.55),
+    ]
+    for model, x, z, scale, yaw in basalt_scree:
+        spawn_decor(lines, model, x, z, scale, yaw)
 
     lines.extend(("", "# Dense forest, with clearings around landmarks and the main trail."))
     forest_rule = DECORATION_RULES["forest"]
@@ -1908,22 +2105,26 @@ def generate_scene() -> None:
     rock_rule = DECORATION_RULES["coastal_rocks"]
     begin_placement_rule("coastal_rocks", rock_rule.count)
     for _ in range(rock_rule.count):
-        angle = random.uniform(0.0, math.tau)
-        radius = random.uniform(98.0, 126.0)
-        x = math.cos(angle) * radius
-        z = math.sin(angle) * radius * 0.86
-        height, slope, moisture = biome_metrics(x, z)
-        biome = classify_biome(x, height, z, slope, moisture)
-        if (
-            not (rock_rule.min_radius < island_radius(x, z) < rock_rule.max_radius)
-            or not (rock_rule.min_height < height < rock_rule.max_height)
-            or biome.name not in rock_rule.allowed_biomes
-        ):
+        candidate: tuple[float, float] | None = None
+        for _attempt in range(60):
+            angle = random.uniform(0.0, math.tau)
+            radius = random.uniform(92.0, 126.0)
+            x = math.cos(angle) * radius
+            z = math.sin(angle) * radius * 0.86
+            height, slope, moisture = biome_metrics(x, z)
+            biome = classify_biome(x, height, z, slope, moisture)
+            if (
+                rock_rule.min_radius < island_radius(x, z) < rock_rule.max_radius
+                and rock_rule.min_height < height < rock_rule.max_height
+                and biome.name in rock_rule.allowed_biomes
+                and not (height > 3.0 and slope < 0.35)
+            ):
+                candidate = (x, z)
+                break
+        if candidate is None:
             record_placement("coastal_rocks", False)
             continue
-        if height > 3.0 and slope < 0.35:
-            record_placement("coastal_rocks", False)
-            continue
+        x, z = candidate
         scale = random.uniform(0.7, 1.8)
         spawn(lines, "rock", x, z, scale, (0.82, 0.7, 0.74), random.uniform(0.0, math.tau))
         record_placement("coastal_rocks", True)
@@ -2421,6 +2622,7 @@ def map_output_paths() -> list[Path]:
         MAP_PATH,
         *SPLIT_MAP_PATHS.values(),
         *MAP_LOD_PATHS,
+        *sorted(TERRAIN_CHUNK_DIR.glob("*.obj")),
         INTERNAL_WATER_PATH,
         LANDMARKS_PATH,
     ]
