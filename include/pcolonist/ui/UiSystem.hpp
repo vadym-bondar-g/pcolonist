@@ -2,10 +2,12 @@
 
 #include "pcolonist/render/Shader.hpp"
 #include "pcolonist/ui/MainMenu.hpp"
+#include "pcolonist/ui/PauseMenu.hpp"
 
 #include <glm/vec3.hpp>
 
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <string_view>
 #include <unordered_map>
@@ -17,6 +19,7 @@ namespace pcolonist {
 enum class UiAction {
     None,
     Resume,
+    ContinueGame,
     ToggleFullscreen,
     ToggleVsync,
     CycleFrameLimit,
@@ -30,6 +33,11 @@ enum class UiAction {
     SetNoon,
     SetNight,
     Quit,
+    NewGame,
+    SaveGame,
+    LoadGame,
+    MainMenu,
+    CycleLanguage,
 };
 
 class AudioSystem;
@@ -72,11 +80,14 @@ public:
     UiSystem() = default;
     ~UiSystem();
 
-    void initialize();
+    void initialize(const std::filesystem::path& assetRoot = PCOLONIST_ASSET_DIR);
     void shutdown();
     void resize(int width, int height);
+    void setLanguage(UiLanguage language);
+    [[nodiscard]] UiLanguage language() const;
     void setPointerPosition(double x, double y);
     void setFrameCounterVisible(bool visible);
+    void resetMenuAnimation();
     void render(
         bool fullscreen,
         bool cursorCaptured,
@@ -90,7 +101,9 @@ public:
         const Inventory& inventory,
         const ObjectiveHudState& objectives,
         bool inventoryOpen,
-        bool debugPanelOpen);
+        bool debugPanelOpen,
+        bool saveAvailable,
+        bool gameStarted);
     void updateTitle(
         GLFWwindow* window,
         const Registry& registry,
@@ -99,6 +112,7 @@ public:
         bool menuOpen);
     [[nodiscard]] bool fullscreenButtonContains(double x, double y) const;
     [[nodiscard]] UiAction menuActionAt(double x, double y);
+    [[nodiscard]] UiAction menuKeyAction(int key);
     [[nodiscard]] UiAction debugActionAt(double x, double y) const;
 
 private:
@@ -127,10 +141,14 @@ private:
     float animationTime_ = 0.0F;
     std::uint32_t frames_ = 0;
     unsigned int currentFps_ = 0;
+    float menuFade_ = 0.0F;
+    UiLanguage language_ = UiLanguage::English;
     bool frameCounterVisible_ = false;
+    bool pauseMenuActive_ = false;
     double pointerX_ = 0.0;
     double pointerY_ = 0.0;
     MainMenu mainMenu_;
+    PauseMenu pauseMenu_;
     void* fontLibrary_ = nullptr;
     void* fontFace_ = nullptr;
     int fontPixelSize_ = 0;

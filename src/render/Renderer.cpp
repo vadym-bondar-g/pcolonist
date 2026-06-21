@@ -193,7 +193,11 @@ std::array<FireLightUniform, maxFireLights> collectFireLights(pcolonist::Registr
 namespace pcolonist {
 
 Renderer::Renderer()
-    : shaders_(std::filesystem::path(PCOLONIST_ASSET_DIR) / "shaders") {
+    : Renderer(PCOLONIST_ASSET_DIR) {}
+
+Renderer::Renderer(std::filesystem::path assetRoot)
+    : shaders_(assetRoot / "shaders"),
+      assetRoot_(std::move(assetRoot)) {
     shaders_.preload();
     glGenVertexArrays(1, &screenVertexArray_);
     createShadowMap();
@@ -619,7 +623,7 @@ unsigned int Renderer::loadTexture(const std::filesystem::path& path) {
         return iterator->second;
     }
 
-    const Image image = PngLoader::load(std::filesystem::path(PCOLONIST_ASSET_DIR) / path);
+    const Image image = PngLoader::load(assetRoot_ / path);
     unsigned int texture = 0;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);

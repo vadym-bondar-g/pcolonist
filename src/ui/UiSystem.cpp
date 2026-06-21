@@ -27,15 +27,33 @@ namespace {
 
 using Glyph = std::array<unsigned char, 7>;
 
-constexpr glm::vec4 panel{0.018F, 0.022F, 0.028F, 0.96F};
-constexpr glm::vec4 panelRaised{0.032F, 0.039F, 0.048F, 0.98F};
-constexpr glm::vec4 panelHover{0.055F, 0.072F, 0.084F, 1.0F};
-constexpr glm::vec4 border{0.20F, 0.24F, 0.27F, 0.92F};
-constexpr glm::vec4 textPrimary{0.88F, 0.90F, 0.91F, 1.0F};
-constexpr glm::vec4 textMuted{0.46F, 0.51F, 0.54F, 1.0F};
-constexpr glm::vec4 cyan{0.20F, 0.68F, 0.76F, 1.0F};
-constexpr glm::vec4 green{0.32F, 0.68F, 0.53F, 1.0F};
-constexpr glm::vec4 amber{0.78F, 0.61F, 0.30F, 1.0F};
+constexpr glm::vec4 panel{0.012F, 0.016F, 0.021F, 0.78F};
+constexpr glm::vec4 panelRaised{0.026F, 0.034F, 0.043F, 0.88F};
+constexpr glm::vec4 panelHover{0.060F, 0.086F, 0.100F, 0.96F};
+constexpr glm::vec4 border{0.36F, 0.48F, 0.54F, 0.46F};
+constexpr glm::vec4 textPrimary{0.90F, 0.93F, 0.94F, 1.0F};
+constexpr glm::vec4 textMuted{0.52F, 0.58F, 0.61F, 1.0F};
+constexpr glm::vec4 cyan{0.24F, 0.82F, 0.90F, 1.0F};
+constexpr glm::vec4 green{0.38F, 0.78F, 0.58F, 1.0F};
+constexpr glm::vec4 amber{0.88F, 0.66F, 0.34F, 1.0F};
+constexpr glm::vec4 danger{0.90F, 0.26F, 0.22F, 1.0F};
+
+pcolonist::UiAction toUiAction(pcolonist::PauseMenuAction action) {
+    switch (action) {
+    case pcolonist::PauseMenuAction::ResumeGame: return pcolonist::UiAction::Resume;
+    case pcolonist::PauseMenuAction::SaveGame: return pcolonist::UiAction::SaveGame;
+    case pcolonist::PauseMenuAction::LoadGame: return pcolonist::UiAction::LoadGame;
+    case pcolonist::PauseMenuAction::MainMenu: return pcolonist::UiAction::MainMenu;
+    case pcolonist::PauseMenuAction::ExitGame: return pcolonist::UiAction::Quit;
+    case pcolonist::PauseMenuAction::None:
+    case pcolonist::PauseMenuAction::OpenSettings:
+    case pcolonist::PauseMenuAction::OpenControls:
+    case pcolonist::PauseMenuAction::OpenAchievements:
+    case pcolonist::PauseMenuAction::Back:
+        return pcolonist::UiAction::None;
+    }
+    return pcolonist::UiAction::None;
+}
 
 struct DebugLayout {
     float left;
@@ -152,8 +170,8 @@ void UiSystem::shutdown() {
     }
 }
 
-void UiSystem::initialize() {
-    const std::filesystem::path directory = std::filesystem::path(PCOLONIST_ASSET_DIR) / "shaders";
+void UiSystem::initialize(const std::filesystem::path& assetRoot) {
+    const std::filesystem::path directory = assetRoot / "shaders";
     shader_ = std::make_unique<Shader>(directory / "ui.vert", directory / "ui.frag");
     shader_->use();
     if (!shader_->validate()) {
@@ -171,6 +189,14 @@ void UiSystem::resize(int width, int height) {
     height_ = height;
 }
 
+void UiSystem::setLanguage(UiLanguage language) {
+    language_ = language;
+}
+
+UiLanguage UiSystem::language() const {
+    return language_;
+}
+
 void UiSystem::setPointerPosition(double x, double y) {
     pointerX_ = x;
     pointerY_ = y;
@@ -178,6 +204,10 @@ void UiSystem::setPointerPosition(double x, double y) {
 
 void UiSystem::setFrameCounterVisible(bool visible) {
     frameCounterVisible_ = visible;
+}
+
+void UiSystem::resetMenuAnimation() {
+    menuFade_ = 0.0F;
 }
 
 void UiSystem::render(
@@ -193,136 +223,153 @@ void UiSystem::render(
     const Inventory& inventory,
     const ObjectiveHudState& objectives,
     bool inventoryOpen,
-    bool debugPanelOpen) {
+    bool debugPanelOpen,
+    bool saveAvailable,
+    bool gameStarted) {
+    menuFade_ = menuOpen ? std::min(menuFade_ + 0.085F, 1.0F) : std::max(menuFade_ - 0.12F, 0.0F);
+
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glBindVertexArray(vertexArray_);
 
-    const auto card = [this](float x, float y, float width, float height, float radius = 2.0F) {
-        rectangle(x + 2.0F, y + 3.0F, width, height, {0.0F, 0.0F, 0.0F, 0.35F}, radius);
-        rectangle(x, y, width, height, border, radius);
-        rectangle(x + 1.0F, y + 1.0F, width - 2.0F, height - 2.0F, panel, radius - 1.0F);
+    const bool compact = width_ < 1120 || height_ < 690;
+    const float margin = compact ? 12.0F : 22.0F;
+    const UiLanguage language = language_;
+    const auto alpha = [](glm::vec4 color, float value) {
+        color.a *= value;
+        return color;
     };
-    const auto statusPill = [this](float x, float y, std::string_view label, const glm::vec4& accent) {
-        rectangle(x, y, 94.0F, 24.0F, panelRaised, 1.0F);
-        rectangle(x, y, 2.0F, 24.0F, accent);
-        rectangle(x + 10.0F, y + 10.0F, 4.0F, 4.0F, accent);
-        text(x + 22.0F, y + 6.0F, label, 1.5F, textPrimary);
+    const auto card = [this, alpha](float x, float y, float width, float height, float radius = 8.0F) {
+        rectangle(x + 3.0F, y + 5.0F, width, height, {0.0F, 0.0F, 0.0F, 0.26F}, radius);
+        rectangle(x, y, width, height, alpha(border, 0.72F), radius);
+        rectangle(x + 1.0F, y + 1.0F, width - 2.0F, height - 2.0F, panel, std::max(0.0F, radius - 1.0F));
+        rectangle(x + 1.0F, y + 1.0F, width - 2.0F, 1.0F, {0.70F, 0.94F, 0.98F, 0.12F}, 0.0F);
     };
-    const auto questRow = [this](float x, float y, std::string_view number, std::string_view label, bool done, bool active) {
+    const auto statusPill = [this](float x, float y, float width, std::string_view label, const glm::vec4& accent) {
+        rectangle(x, y, width, 26.0F, {0.030F, 0.042F, 0.052F, 0.78F}, 8.0F);
+        rectangle(x + 1.0F, y + 1.0F, width - 2.0F, 1.0F, {0.70F, 0.94F, 0.98F, 0.10F}, 0.0F);
+        rectangle(x + 12.0F, y + 10.0F, 6.0F, 6.0F, accent, 3.0F);
+        text(x + 28.0F, y + 7.0F, label, 1.28F, textPrimary);
+    };
+    const auto questRow = [this, alpha](float x, float y, float width, std::string_view number, std::string_view label, bool done, bool active) {
         const glm::vec4 accent = done ? green : (active ? cyan : textMuted);
-        rectangle(x, y, 286.0F, 40.0F, active ? panelRaised : panel, 1.0F);
-        rectangle(x, y, 4.0F, 40.0F, accent);
-        text(x + 14.0F, y + 10.0F, done ? "OK" : number, 1.7F, accent);
-        text(x + 46.0F, y + 10.0F, label, 1.7F, done ? textMuted : textPrimary);
+        rectangle(x, y, width, 36.0F, active ? panelRaised : glm::vec4{0.014F, 0.020F, 0.026F, 0.58F}, 7.0F);
+        rectangle(x + 1.0F, y + 1.0F, active ? width - 2.0F : 5.0F, 2.0F, alpha(accent, active ? 0.85F : 0.50F), 1.0F);
+        rectangle(x + 14.0F, y + 11.0F, 6.0F, 14.0F, accent, 3.0F);
+        text(x + 32.0F, y + 10.0F, done ? "OK" : number, 1.35F, accent);
+        text(x + 62.0F, y + 10.0F, label, 1.35F, done ? textMuted : textPrimary);
     };
-    const auto survivalBar = [this](float x, float y, std::string_view label, float value, const glm::vec4& accent) {
+    const auto survivalBar = [this](float x, float y, float width, std::string_view label, float value, const glm::vec4& accent) {
         const float clamped = std::clamp(value, 0.0F, 100.0F);
-        rectangle(x, y, 184.0F, 16.0F, {0.07F, 0.08F, 0.09F, 1.0F}, 1.0F);
-        rectangle(x, y, 184.0F * (clamped / 100.0F), 16.0F, accent, 1.0F);
-        text(x + 7.0F, y + 3.0F, label, 1.15F, textPrimary);
+        rectangle(x, y, width, 18.0F, {0.046F, 0.052F, 0.058F, 0.82F}, 5.0F);
+        rectangle(x, y, width * (clamped / 100.0F), 18.0F, accent, 5.0F);
+        rectangle(x, y, width, 1.0F, {1.0F, 1.0F, 1.0F, 0.10F}, 0.0F);
+        text(x + 8.0F, y + 4.0F, label, 1.02F, textPrimary);
         const std::string valueText = std::to_string(static_cast<int>(std::round(clamped)));
-        text(x + 150.0F, y + 3.0F, valueText, 1.15F, textPrimary);
+        text(x + width - 34.0F, y + 4.0F, valueText, 1.02F, textPrimary);
     };
 
-    const float playerY = static_cast<float>(height_ - 82);
-    card(18.0F, playerY, 244.0F, 62.0F);
-    rectangle(18.0F, playerY, 3.0F, 62.0F, cyan);
-    text(36.0F, playerY + 13.0F, "ИССЛЕДОВАТЕЛЬ", 1.5F, textPrimary);
-    text(36.0F, playerY + 37.0F, cursorCaptured ? "РЕЖИМ ИГРЫ" : "КУРСОР СВОБОДЕН", 1.3F, textMuted);
-    rectangle(153.0F, playerY + 39.0F, 91.0F, 4.0F, {0.08F, 0.09F, 0.1F, 1.0F});
-    rectangle(153.0F, playerY + 39.0F, 75.0F, 4.0F, cyan);
-
-    const float questX = 18.0F;
-    const float questY = 86.0F;
-    card(questX, questY, 316.0F, 340.0F);
-    rectangle(questX, questY, 4.0F, 340.0F, amber);
-    text(questX + 20.0F, questY + 18.0F, "ЗАДАЧИ", 2.4F, textPrimary);
-    text(questX + 20.0F, questY + 48.0F, objectives.contextHint, 1.35F, cyan);
-    text(questX + 20.0F, questY + 66.0F, objectives.craftingHint, 1.15F, textMuted);
-    rectangle(questX + 20.0F, questY + 84.0F, 276.0F, 1.0F, border);
-    questRow(questX + 14.0F, questY + 96.0F, "1", "ДОБЫТЬ ДЕРЕВО", objectives.hasWood, !objectives.hasWood);
-    questRow(questX + 14.0F, questY + 142.0F, "2", "ДОБЫТЬ КАМЕНЬ", objectives.hasStone, objectives.hasWood && !objectives.hasStone);
-    questRow(questX + 14.0F, questY + 188.0F, "3", "РАЗЖЕЧЬ КОСТЕР", objectives.fireLit, objectives.hasWood && objectives.hasStone && !objectives.fireLit);
-    questRow(questX + 14.0F, questY + 234.0F, "4", "НАЙТИ ВОДУ", objectives.hasWater, !objectives.hasWater);
-    questRow(questX + 14.0F, questY + 280.0F, "5", "НАЙТИ УКРЫТИЕ", objectives.nearShelter, !objectives.nearShelter);
-
-    const float timePanelX = static_cast<float>(width_) * 0.5F - 178.0F;
-    card(timePanelX, 18.0F, 356.0F, 58.0F);
-    rectangle(timePanelX + 18.0F, 31.0F, 2.0F, 32.0F, cyan);
+    const float topBarWidth = compact ? 314.0F : 420.0F;
+    const float timePanelX = static_cast<float>(width_) * 0.5F - topBarWidth * 0.5F;
+    card(timePanelX, margin, topBarWidth, 56.0F, 10.0F);
     const int totalMinutes = static_cast<int>(weather.dayProgress() * 24.0F * 60.0F);
     const int hours = totalMinutes / 60;
     const int minutes = totalMinutes % 60;
     std::ostringstream clock;
     clock << std::setfill('0') << std::setw(2) << hours << ':' << std::setw(2) << minutes;
-    text(timePanelX + 34.0F, 31.0F, clock.str(), 3.0F, textPrimary);
-    const std::string dayLabel = "ДЕНЬ " + std::to_string(weather.dayNumber());
-    statusPill(timePanelX + 145.0F, 35.0F, dayLabel, weather.daylight() > 0.2F ? amber : cyan);
-    statusPill(timePanelX + 250.0F, 35.0F, weather.weatherName(), cyan);
+    rectangle(timePanelX + 18.0F, margin + 17.0F, 3.0F, 22.0F, weather.daylight() > 0.2F ? amber : cyan, 1.0F);
+    text(timePanelX + 34.0F, margin + 18.0F, clock.str(), 2.45F, textPrimary);
+    const std::string dayLabel = std::string(tr(language, UiText::Day)) + " " + std::to_string(weather.dayNumber());
+    statusPill(timePanelX + 126.0F, margin + 15.0F, 104.0F, dayLabel, weather.daylight() > 0.2F ? amber : cyan);
+    if (!compact) {
+        statusPill(timePanelX + 242.0F, margin + 15.0F, 150.0F, weather.weatherName(), cyan);
+    }
 
-    const float survivalX = static_cast<float>(width_) - 246.0F;
-    const float survivalY = 126.0F;
-    card(survivalX, survivalY, 228.0F, 202.0F);
-    rectangle(survivalX, survivalY, 4.0F, 202.0F, objectives.sick ? amber : green);
-    text(survivalX + 18.0F, survivalY + 15.0F, "ВЫЖИВАНИЕ", 1.8F, textPrimary);
-    text(survivalX + 18.0F, survivalY + 38.0F, objectives.survivalBiome, 1.2F, cyan);
-    text(survivalX + 18.0F, survivalY + 58.0F, objectives.survivalLocation, 1.05F, textMuted);
-    survivalBar(survivalX + 18.0F, survivalY + 82.0F, "HP", objectives.health, green);
-    survivalBar(survivalX + 18.0F, survivalY + 104.0F, "H2O", objectives.thirst, cyan);
-    survivalBar(survivalX + 18.0F, survivalY + 126.0F, "FOOD", objectives.hunger, amber);
-    survivalBar(survivalX + 18.0F, survivalY + 148.0F, "FAT", 100.0F - objectives.fatigue, {0.58F, 0.62F, 0.70F, 1.0F});
+    const float questWidth = compact ? 282.0F : 326.0F;
+    const float questX = margin;
+    const float questY = margin + 70.0F;
+    const float questHeight = compact ? 178.0F : 284.0F;
+    card(questX, questY, questWidth, questHeight, 10.0F);
+    rectangle(questX + 1.0F, questY + 1.0F, 3.0F, questHeight - 2.0F, amber, 2.0F);
+    text(questX + 20.0F, questY + 18.0F, tr(language, UiText::Mission), 1.40F, amber);
+    text(questX + 20.0F, questY + 42.0F, objectives.contextHint, compact ? 1.02F : 1.16F, textPrimary);
+    text(questX + 20.0F, questY + 64.0F, objectives.craftingHint, 0.96F, textMuted);
+    rectangle(questX + 20.0F, questY + 86.0F, questWidth - 40.0F, 1.0F, alpha(border, 0.68F), 0.0F);
+    questRow(questX + 14.0F, questY + 100.0F, questWidth - 28.0F, "1", tr(language, UiText::TaskWood), objectives.hasWood, !objectives.hasWood);
+    questRow(questX + 14.0F, questY + 140.0F, questWidth - 28.0F, "2", tr(language, UiText::TaskStone), objectives.hasStone, objectives.hasWood && !objectives.hasStone);
+    if (!compact) {
+        questRow(questX + 14.0F, questY + 180.0F, questWidth - 28.0F, "3", tr(language, UiText::TaskFire), objectives.fireLit, objectives.hasWood && objectives.hasStone && !objectives.fireLit);
+        questRow(questX + 14.0F, questY + 220.0F, questWidth - 28.0F, "4", tr(language, UiText::TaskWater), objectives.hasWater, !objectives.hasWater);
+    }
+
+    const float statusWidth = compact ? 210.0F : 246.0F;
+    const float survivalX = static_cast<float>(width_) - statusWidth - margin;
+    const float survivalY = margin + 86.0F;
+    card(survivalX, survivalY, statusWidth, 224.0F, 10.0F);
+    rectangle(survivalX + 1.0F, survivalY + 1.0F, 3.0F, 222.0F, objectives.sick ? amber : green, 2.0F);
+    text(survivalX + 18.0F, survivalY + 16.0F, tr(language, UiText::Status), 1.35F, textPrimary);
+    text(survivalX + 18.0F, survivalY + 40.0F, objectives.survivalBiome, 1.02F, cyan);
+    text(survivalX + 18.0F, survivalY + 58.0F, objectives.survivalLocation, 0.90F, textMuted);
+    const glm::vec4 healthColor = objectives.health < 35.0F ? danger : green;
+    survivalBar(survivalX + 18.0F, survivalY + 82.0F, statusWidth - 36.0F, "HP", objectives.health, healthColor);
+    survivalBar(survivalX + 18.0F, survivalY + 106.0F, statusWidth - 36.0F, "H2O", objectives.thirst, cyan);
+    survivalBar(survivalX + 18.0F, survivalY + 130.0F, statusWidth - 36.0F, tr(language, UiText::Food), objectives.hunger, amber);
+    survivalBar(survivalX + 18.0F, survivalY + 154.0F, statusWidth - 36.0F, tr(language, UiText::Rest), 100.0F - objectives.fatigue, {0.62F, 0.68F, 0.78F, 1.0F});
     const std::string temperature = "TEMP " + std::to_string(static_cast<int>(std::round(objectives.bodyTemperature))) + "C";
-    text(survivalX + 18.0F, survivalY + 174.0F, temperature, 1.15F, textMuted);
-    text(survivalX + 96.0F, survivalY + 174.0F, objectives.survivalWarning, 1.05F, objectives.sick ? amber : textPrimary);
+    text(survivalX + 18.0F, survivalY + 184.0F, temperature, 1.02F, textMuted);
+    text(survivalX + 92.0F, survivalY + 184.0F, objectives.survivalWarning, 0.92F, objectives.sick ? amber : textPrimary);
 
-    const float discoveryY = survivalY + 208.0F;
-    card(survivalX, discoveryY, 228.0F, 94.0F);
-    rectangle(survivalX, discoveryY, 4.0F, 94.0F, objectives.discoveryBlocked ? amber : cyan);
-    text(survivalX + 18.0F, discoveryY + 14.0F, "ОТКРЫТИЯ", 1.65F, textPrimary);
-    const std::string poiProgress = "POI " + std::to_string(objectives.discoveredLocations)
-        + "/" + std::to_string(objectives.totalLocations);
-    const std::string clueProgress = "УЛИКИ " + std::to_string(objectives.storyClues)
-        + "/" + std::to_string(objectives.totalStoryClues);
-    const std::string secretProgress = "ТАЙНЫ " + std::to_string(objectives.secretsFound)
-        + "/" + std::to_string(objectives.totalSecrets);
-    text(survivalX + 18.0F, discoveryY + 38.0F, poiProgress, 1.15F, cyan);
-    text(survivalX + 98.0F, discoveryY + 38.0F, clueProgress, 1.15F, textMuted);
-    text(survivalX + 18.0F, discoveryY + 58.0F, secretProgress, 1.15F, objectives.discoveryBlocked ? amber : green);
-    text(survivalX + 18.0F, discoveryY + 76.0F, objectives.discoveryMessage, 0.9F, textPrimary);
+    if (!compact) {
+        const float discoveryY = survivalY + 236.0F;
+        card(survivalX, discoveryY, statusWidth, 112.0F, 10.0F);
+        rectangle(survivalX + 1.0F, discoveryY + 1.0F, 3.0F, 110.0F, objectives.discoveryBlocked ? amber : cyan, 2.0F);
+        text(survivalX + 18.0F, discoveryY + 14.0F, tr(language, UiText::Discovery), 1.24F, textPrimary);
+        const std::string poiProgress = std::string(tr(language, UiText::Poi)) + " " + std::to_string(objectives.discoveredLocations)
+            + "/" + std::to_string(objectives.totalLocations);
+        const std::string clueProgress = std::string(tr(language, UiText::Clues)) + " " + std::to_string(objectives.storyClues)
+            + "/" + std::to_string(objectives.totalStoryClues);
+        const std::string secretProgress = std::string(tr(language, UiText::Secrets)) + " " + std::to_string(objectives.secretsFound)
+            + "/" + std::to_string(objectives.totalSecrets);
+        text(survivalX + 18.0F, discoveryY + 42.0F, poiProgress, 1.02F, cyan);
+        text(survivalX + 104.0F, discoveryY + 42.0F, clueProgress, 1.02F, textMuted);
+        text(survivalX + 18.0F, discoveryY + 64.0F, secretProgress, 1.02F, objectives.discoveryBlocked ? amber : green);
+        text(survivalX + 18.0F, discoveryY + 86.0F, objectives.discoveryMessage, 0.80F, textPrimary);
+    }
 
     const float centerX = static_cast<float>(width_) * 0.5F;
     const float centerY = static_cast<float>(height_) * 0.5F;
-    rectangle(centerX - 1.0F, centerY - 13.0F, 2.0F, 7.0F, {0.85F, 0.95F, 1.0F, 0.82F}, 1.0F);
-    rectangle(centerX - 1.0F, centerY + 6.0F, 2.0F, 7.0F, {0.85F, 0.95F, 1.0F, 0.82F}, 1.0F);
-    rectangle(centerX - 13.0F, centerY - 1.0F, 7.0F, 2.0F, {0.85F, 0.95F, 1.0F, 0.82F}, 1.0F);
-    rectangle(centerX + 6.0F, centerY - 1.0F, 7.0F, 2.0F, {0.85F, 0.95F, 1.0F, 0.82F}, 1.0F);
-    rectangle(centerX - 1.5F, centerY - 1.5F, 3.0F, 3.0F, cyan, 1.5F);
+    rectangle(centerX - 1.0F, centerY - 16.0F, 2.0F, 8.0F, {0.86F, 0.96F, 1.0F, 0.70F}, 1.0F);
+    rectangle(centerX - 1.0F, centerY + 8.0F, 2.0F, 8.0F, {0.86F, 0.96F, 1.0F, 0.70F}, 1.0F);
+    rectangle(centerX - 16.0F, centerY - 1.0F, 8.0F, 2.0F, {0.86F, 0.96F, 1.0F, 0.70F}, 1.0F);
+    rectangle(centerX + 8.0F, centerY - 1.0F, 8.0F, 2.0F, {0.86F, 0.96F, 1.0F, 0.70F}, 1.0F);
+    rectangle(centerX - 2.0F, centerY - 2.0F, 4.0F, 4.0F, {0.24F, 0.82F, 0.90F, 0.78F}, 2.0F);
 
-    constexpr float slotSize = 62.0F;
-    constexpr float slotGap = 8.0F;
-    constexpr float hotbarWidth = slotSize * static_cast<float>(Inventory::hotbarSize)
+    const float slotSize = compact ? 52.0F : 62.0F;
+    const float slotGap = compact ? 6.0F : 8.0F;
+    const float hotbarWidth = slotSize * static_cast<float>(Inventory::hotbarSize)
         + slotGap * static_cast<float>(Inventory::hotbarSize - 1);
     const float hotbarX = centerX - hotbarWidth * 0.5F;
-    const float hotbarY = static_cast<float>(height_) - 82.0F;
+    const float hotbarY = static_cast<float>(height_) - slotSize - margin;
+    rectangle(hotbarX - 14.0F, hotbarY - 12.0F, hotbarWidth + 28.0F, slotSize + 24.0F, {0.0F, 0.0F, 0.0F, 0.22F}, 12.0F);
     for (std::size_t slot = 0; slot < Inventory::hotbarSize; ++slot) {
         const float x = hotbarX + static_cast<float>(slot) * (slotSize + slotGap);
         const bool selected = inventory.selectedSlot() == slot;
-        rectangle(x + 2.0F, hotbarY + 3.0F, slotSize, slotSize, {0.0F, 0.0F, 0.0F, 0.32F}, 1.0F);
-        rectangle(x, hotbarY, slotSize, slotSize, selected ? cyan : border, 1.0F);
-        rectangle(x + 2.0F, hotbarY + 2.0F, slotSize - 4.0F, slotSize - 4.0F, panelRaised, 0.0F);
-        rectangle(x + 2.0F, hotbarY + 2.0F, selected ? slotSize - 4.0F : 0.0F, 2.0F, cyan);
-        text(x + 7.0F, hotbarY + 6.0F, std::to_string(slot + 1), 1.5F, selected ? cyan : textMuted);
+        rectangle(x + 3.0F, hotbarY + 5.0F, slotSize, slotSize, {0.0F, 0.0F, 0.0F, 0.34F}, 8.0F);
+        rectangle(x, hotbarY, slotSize, slotSize, selected ? cyan : border, 8.0F);
+        rectangle(x + 2.0F, hotbarY + 2.0F, slotSize - 4.0F, slotSize - 4.0F, selected ? glm::vec4{0.038F, 0.068F, 0.078F, 0.94F} : panelRaised, 7.0F);
+        rectangle(x + 2.0F, hotbarY + 2.0F, selected ? slotSize - 4.0F : 7.0F, 2.0F, selected ? cyan : alpha(border, 0.55F), 1.0F);
+        text(x + 8.0F, hotbarY + 7.0F, std::to_string(slot + 1), compact ? 1.20F : 1.35F, selected ? cyan : textMuted);
         if (!inventory.toolName(slot).empty()) {
-            text(x + 14.0F, hotbarY + 34.0F, inventory.toolName(slot), 1.5F, textPrimary);
+            text(x + 13.0F, hotbarY + slotSize - 24.0F, inventory.toolName(slot), compact ? 1.15F : 1.35F, textPrimary);
         }
     }
 
     const float fullscreenX = static_cast<float>(width_ - 72);
     const bool fullscreenHovered = !cursorCaptured && contains(pointerX_, pointerY_, fullscreenX, 18.0F, 54.0F, 44.0F);
-    card(fullscreenX, 18.0F, 54.0F, 44.0F);
+    card(fullscreenX, 18.0F, 54.0F, 44.0F, 8.0F);
     if (fullscreenHovered || fullscreen) {
-        rectangle(fullscreenX + 1.0F, 19.0F, 52.0F, 42.0F, fullscreen ? glm::vec4{0.045F, 0.22F, 0.26F, 0.98F} : panelHover, 0.0F);
+        rectangle(fullscreenX + 1.0F, 19.0F, 52.0F, 42.0F, fullscreen ? glm::vec4{0.045F, 0.22F, 0.26F, 0.82F} : panelHover, 7.0F);
     }
     rectangle(fullscreenX + 15.0F, 31.0F, 24.0F, 2.0F, textPrimary);
     rectangle(fullscreenX + 15.0F, 47.0F, 24.0F, 2.0F, textPrimary);
@@ -332,66 +379,80 @@ void UiSystem::render(
     if (frameCounterVisible_) {
         const std::string fpsLabel = "FPS " + std::to_string(currentFps_);
         const float frameCounterX = static_cast<float>(width_ - 126);
-        card(frameCounterX, 72.0F, 108.0F, 38.0F);
+        card(frameCounterX, 72.0F, 108.0F, 38.0F, 8.0F);
         rectangle(frameCounterX + 12.0F, 86.0F, 3.0F, 10.0F, green);
         text(frameCounterX + 26.0F, 84.0F, fpsLabel, 1.45F, textPrimary);
     }
 
-    const float minimapSize = 168.0F;
-    const float minimapX = static_cast<float>(width_) - minimapSize - 18.0F;
-    const float minimapY = static_cast<float>(height_) - minimapSize - 112.0F;
-    card(minimapX, minimapY, minimapSize, minimapSize);
-    text(minimapX + 16.0F, minimapY + 13.0F, "МИНИКАРТА", 1.35F, textPrimary);
-    rectangle(minimapX + 16.0F, minimapY + 36.0F, 136.0F, 112.0F, {0.018F, 0.085F, 0.105F, 1.0F}, 1.0F);
-    rectangle(minimapX + 39.0F, minimapY + 54.0F, 84.0F, 70.0F, {0.10F, 0.26F, 0.13F, 1.0F}, 2.0F);
-    rectangle(minimapX + 55.0F, minimapY + 46.0F, 46.0F, 22.0F, {0.16F, 0.31F, 0.17F, 1.0F}, 2.0F);
-    rectangle(minimapX + 77.0F, minimapY + 69.0F, 24.0F, 24.0F, {0.19F, 0.16F, 0.14F, 1.0F}, 2.0F);
-    rectangle(minimapX + 103.0F, minimapY + 86.0F, 24.0F, 20.0F, {0.04F, 0.22F, 0.30F, 1.0F}, 2.0F);
-    rectangle(minimapX + 28.0F, minimapY + 130.0F, 12.0F, 7.0F, {0.18F, 0.30F, 0.12F, 1.0F}, 1.0F);
-    rectangle(minimapX + 130.0F, minimapY + 57.0F, 10.0F, 7.0F, {0.18F, 0.30F, 0.12F, 1.0F}, 1.0F);
-    const float markerX = minimapX + 16.0F + std::clamp((objectives.playerPosition.x + 132.0F) / 264.0F, 0.0F, 1.0F) * 136.0F;
-    const float markerY = minimapY + 36.0F + std::clamp((objectives.playerPosition.z + 112.0F) / 224.0F, 0.0F, 1.0F) * 112.0F;
-    rectangle(markerX - 5.0F, markerY - 5.0F, 10.0F, 10.0F, cyan, 4.0F);
-    rectangle(markerX - 2.0F, markerY - 2.0F, 4.0F, 4.0F, textPrimary, 2.0F);
+    if (!compact) {
+        const float minimapSize = 166.0F;
+        const float minimapX = static_cast<float>(width_) - minimapSize - margin;
+        const float minimapY = static_cast<float>(height_) - minimapSize - slotSize - margin - 46.0F;
+        card(minimapX, minimapY, minimapSize, minimapSize, 10.0F);
+        text(minimapX + 16.0F, minimapY + 13.0F, tr(language, UiText::LocalMap), 1.18F, textPrimary);
+        rectangle(minimapX + 16.0F, minimapY + 36.0F, 134.0F, 112.0F, {0.014F, 0.065F, 0.078F, 0.92F}, 7.0F);
+        rectangle(minimapX + 38.0F, minimapY + 54.0F, 84.0F, 70.0F, {0.10F, 0.25F, 0.15F, 0.94F}, 6.0F);
+        rectangle(minimapX + 55.0F, minimapY + 46.0F, 46.0F, 22.0F, {0.16F, 0.31F, 0.18F, 0.96F}, 6.0F);
+        rectangle(minimapX + 77.0F, minimapY + 69.0F, 24.0F, 24.0F, {0.20F, 0.16F, 0.15F, 0.98F}, 6.0F);
+        rectangle(minimapX + 103.0F, minimapY + 86.0F, 24.0F, 20.0F, {0.04F, 0.22F, 0.30F, 0.98F}, 6.0F);
+        const float markerX = minimapX + 16.0F + std::clamp((objectives.playerPosition.x + 132.0F) / 264.0F, 0.0F, 1.0F) * 134.0F;
+        const float markerY = minimapY + 36.0F + std::clamp((objectives.playerPosition.z + 112.0F) / 224.0F, 0.0F, 1.0F) * 112.0F;
+        rectangle(markerX - 6.0F, markerY - 6.0F, 12.0F, 12.0F, {0.24F, 0.82F, 0.90F, 0.36F}, 6.0F);
+        rectangle(markerX - 3.0F, markerY - 3.0F, 6.0F, 6.0F, cyan, 3.0F);
+    }
 
     if (!cursorCaptured) {
-        card(18.0F, 18.0F, 216.0F, 40.0F);
-        rectangle(31.0F, 32.0F, 3.0F, 12.0F, cyan);
-        text(51.0F, 30.0F, "F1 ЗАХВАТ КУРСОРА", 1.3F, textPrimary);
+        card(margin, margin, 206.0F, 40.0F, 8.0F);
+        rectangle(margin + 13.0F, margin + 14.0F, 3.0F, 12.0F, cyan, 1.0F);
+        text(margin + 32.0F, margin + 12.0F, tr(language, UiText::CaptureCursor), 1.18F, textPrimary);
     }
 
     if (inventoryOpen) {
-        rectangle(0.0F, 0.0F, static_cast<float>(width_), static_cast<float>(height_), {0.005F, 0.009F, 0.016F, 0.62F});
-        const float left = centerX - 310.0F;
-        const float top = centerY - 220.0F;
-        rectangle(left + 5.0F, top + 6.0F, 620.0F, 440.0F, {0.0F, 0.0F, 0.0F, 0.4F}, 2.0F);
-        rectangle(left, top, 620.0F, 440.0F, border, 2.0F);
-        rectangle(left + 1.0F, top + 1.0F, 618.0F, 438.0F, panel, 1.0F);
-        rectangle(left + 1.0F, top + 1.0F, 4.0F, 438.0F, cyan);
-        text(left + 30.0F, top + 28.0F, "ИНВЕНТАРЬ", 2.5F, textPrimary);
-        text(left + 420.0F, top + 34.0F, "TAB ЗАКРЫТЬ", 1.25F, textMuted);
-        rectangle(left + 30.0F, top + 76.0F, 560.0F, 1.0F, border);
-        text(left + 34.0F, top + 105.0F, "РЕСУРСЫ", 1.5F, cyan);
-        text(left + 34.0F, top + 138.0F, "ДЕРЕВО", 2.0F, textPrimary);
-        text(left + 180.0F, top + 138.0F, std::to_string(inventory.wood()), 2.0F, cyan);
-        text(left + 34.0F, top + 165.0F, "КАМЕНЬ", 2.0F, textPrimary);
-        text(left + 180.0F, top + 165.0F, std::to_string(inventory.stone()), 2.0F, cyan);
-        text(left + 34.0F, top + 192.0F, "ВОДА", 2.0F, textPrimary);
-        text(left + 180.0F, top + 192.0F, std::to_string(inventory.water()), 2.0F, cyan);
-        text(left + 300.0F, top + 138.0F, "ВОЛОКНО", 2.0F, textPrimary);
-        text(left + 470.0F, top + 138.0F, std::to_string(inventory.fiber()), 2.0F, cyan);
-        text(left + 300.0F, top + 165.0F, "МЕТАЛЛ", 2.0F, textPrimary);
-        text(left + 470.0F, top + 165.0F, std::to_string(inventory.metal()), 2.0F, cyan);
-        text(left + 300.0F, top + 192.0F, objectives.craftingHint, 1.2F, textMuted);
-        text(left + 300.0F, top + 214.0F, objectives.discoveryClue, 0.95F, textMuted);
-        text(left + 34.0F, top + 232.0F, "ИНСТРУМЕНТЫ", 1.5F, cyan);
+        rectangle(0.0F, 0.0F, static_cast<float>(width_), static_cast<float>(height_), {0.005F, 0.009F, 0.016F, 0.58F});
+        const float invWidth = std::min(660.0F, static_cast<float>(width_) - 48.0F);
+        const float invHeight = std::min(456.0F, static_cast<float>(height_) - 72.0F);
+        const float left = centerX - invWidth * 0.5F;
+        const float top = centerY - invHeight * 0.5F;
+        rectangle(left + 8.0F, top + 10.0F, invWidth, invHeight, {0.0F, 0.0F, 0.0F, 0.38F}, 14.0F);
+        rectangle(left, top, invWidth, invHeight, alpha(border, 0.84F), 14.0F);
+        rectangle(left + 1.0F, top + 1.0F, invWidth - 2.0F, invHeight - 2.0F, {0.014F, 0.020F, 0.027F, 0.88F}, 13.0F);
+        rectangle(left + 1.0F, top + 1.0F, 5.0F, invHeight - 2.0F, cyan, 3.0F);
+        text(left + 32.0F, top + 28.0F, tr(language, UiText::Inventory), 2.28F, textPrimary);
+        text(left + invWidth - 150.0F, top + 34.0F, tr(language, UiText::CloseTab), 1.10F, textMuted);
+        rectangle(left + 32.0F, top + 78.0F, invWidth - 64.0F, 1.0F, alpha(border, 0.75F), 0.0F);
+        text(left + 34.0F, top + 104.0F, tr(language, UiText::Resources), 1.28F, cyan);
+
+        const auto resourceCell = [this](float x, float y, float width, std::string_view label, int amount, const glm::vec4& accent) {
+            rectangle(x, y, width, 48.0F, panelRaised, 8.0F);
+            rectangle(x + 1.0F, y + 1.0F, width - 2.0F, 1.0F, {1.0F, 1.0F, 1.0F, 0.08F}, 0.0F);
+            rectangle(x + 14.0F, y + 15.0F, 5.0F, 18.0F, accent, 3.0F);
+            text(x + 30.0F, y + 13.0F, label, 1.14F, textMuted);
+            text(x + width - 48.0F, y + 13.0F, std::to_string(amount), 1.56F, textPrimary);
+        };
+        const float cellGap = 12.0F;
+        const float cellWidth = (invWidth - 76.0F - cellGap) * 0.5F;
+        resourceCell(left + 34.0F, top + 132.0F, cellWidth, tr(language, UiText::Wood), inventory.wood(), amber);
+        resourceCell(left + 46.0F + cellWidth, top + 132.0F, cellWidth, tr(language, UiText::Stone), inventory.stone(), textMuted);
+        resourceCell(left + 34.0F, top + 190.0F, cellWidth, tr(language, UiText::Water), inventory.water(), cyan);
+        resourceCell(left + 46.0F + cellWidth, top + 190.0F, cellWidth, tr(language, UiText::Fiber), inventory.fiber(), green);
+        resourceCell(left + 34.0F, top + 248.0F, cellWidth, tr(language, UiText::Metal), inventory.metal(), {0.62F, 0.68F, 0.78F, 1.0F});
+        rectangle(left + 46.0F + cellWidth, top + 248.0F, cellWidth, 48.0F, panelRaised, 8.0F);
+        text(left + 64.0F + cellWidth, top + 260.0F, objectives.craftingHint, 1.00F, textMuted);
+        text(left + 64.0F + cellWidth, top + 280.0F, objectives.discoveryClue, 0.82F, textMuted);
+
+        text(left + 34.0F, top + 322.0F, tr(language, UiText::Tools), 1.28F, cyan);
+        const float toolGap = 10.0F;
+        const float toolSize = std::min(88.0F, (invWidth - 68.0F - toolGap * static_cast<float>(Inventory::hotbarSize - 1))
+            / static_cast<float>(Inventory::hotbarSize));
         for (std::size_t slot = 0; slot < Inventory::hotbarSize; ++slot) {
-            const float x = left + 34.0F + static_cast<float>(slot) * 106.0F;
-            rectangle(x, top + 252.0F, 88.0F, 88.0F, inventory.selectedSlot() == slot ? cyan : border, 1.0F);
-            rectangle(x + 2.0F, top + 254.0F, 84.0F, 84.0F, panelRaised);
-            text(x + 10.0F, top + 263.0F, std::to_string(slot + 1), 1.5F, textMuted);
+            const float x = left + 34.0F + static_cast<float>(slot) * (toolSize + toolGap);
+            const bool selected = inventory.selectedSlot() == slot;
+            rectangle(x, top + 346.0F, toolSize, toolSize, selected ? cyan : alpha(border, 0.78F), 9.0F);
+            rectangle(x + 2.0F, top + 348.0F, toolSize - 4.0F, toolSize - 4.0F, selected ? glm::vec4{0.038F, 0.068F, 0.078F, 0.94F} : panelRaised, 8.0F);
+            rectangle(x + 9.0F, top + 358.0F, 6.0F, 14.0F, selected ? cyan : textMuted, 3.0F);
+            text(x + 22.0F, top + 356.0F, std::to_string(slot + 1), 1.22F, selected ? cyan : textMuted);
             if (!inventory.toolName(slot).empty()) {
-                text(x + 22.0F, top + 300.0F, inventory.toolName(slot), 1.5F, textPrimary);
+                text(x + 16.0F, top + 346.0F + toolSize - 30.0F, inventory.toolName(slot), 1.12F, textPrimary);
             }
         }
     }
@@ -438,7 +499,39 @@ void UiSystem::render(
         debugButton(0, 4, "SKY QUALITY", skyQuality, cyan);
     }
 
-    if (menuOpen) {
+    pauseMenuActive_ = menuOpen && gameStarted;
+    if (gameStarted && (pauseMenuActive_ || menuFade_ > 0.0F)) {
+        const std::string saveInfo = std::string(saveAvailable ? tr(language, UiText::SaveAvailable) : tr(language, UiText::SaveEmpty));
+        const int level = std::max(1, objectives.discoveredLocations / 5 + 1);
+        const int money = inventory.metal() * 3 + inventory.stone();
+        const PauseMenuState state{
+            width_,
+            height_,
+            animationTime_,
+            menuFade_,
+            pointerX_,
+            pointerY_,
+            saveAvailable,
+            currentFps_,
+            "v0.1-dev",
+            saveInfo,
+            "CASTAWAY-01",
+            objectives.survivalLocation.empty() ? std::string_view{"UNKNOWN"} : objectives.survivalLocation,
+            objectives.health,
+            level,
+            money,
+            weather.time(),
+            language,
+        };
+        pauseMenu_.render(
+            state,
+            [this](float x, float y, float width, float height, const glm::vec4& color, float radius) {
+                rectangle(x, y, width, height, color, radius);
+            },
+            [this](float x, float y, std::string_view value, float scale, const glm::vec4& color) {
+                text(x, y, value, scale, color);
+            });
+    } else if (menuOpen) {
         const MainMenuState state{
             width_,
             height_,
@@ -450,6 +543,9 @@ void UiSystem::render(
             frameLimit,
             shadows,
             bloom,
+            saveAvailable,
+            gameStarted,
+            language,
         };
         mainMenu_.render(
             state,
@@ -479,10 +575,12 @@ void UiSystem::updateTitle(
     }
     currentFps_ = static_cast<unsigned int>(static_cast<float>(frames_) / elapsed_);
     const std::string title = menuOpen
-        ? "pcolonist | Меню: Играть / Загрузить игру / Настройки / Выход"
+        ? "pcolonist | " + std::string(tr(language_, UiText::WindowTitleMenu))
         : "pcolonist | FPS " + std::to_string(currentFps_)
             + " | entities " + std::to_string(registry.size())
-            + " | ESC меню | F11 экран | F1 курсор";
+            + " | " + std::string(tr(language_, UiText::WindowTitleEsc))
+            + " | " + std::string(tr(language_, UiText::WindowTitleScreen))
+            + " | " + std::string(tr(language_, UiText::WindowTitleCursor));
     glfwSetWindowTitle(window, title.c_str());
     static_cast<void>(audio);
     elapsed_ = 0.0F;
@@ -494,9 +592,24 @@ bool UiSystem::fullscreenButtonContains(double x, double y) const {
 }
 
 UiAction UiSystem::menuActionAt(double x, double y) {
+    if (pauseMenuActive_) {
+        return toUiAction(pauseMenu_.actionAt(x, y, width_, height_));
+    }
+
     switch (mainMenu_.actionAt(x, y, width_, height_)) {
-    case MainMenuAction::Play:
-        return UiAction::Resume;
+    case MainMenuAction::Continue:
+        return UiAction::ContinueGame;
+    case MainMenuAction::NewGame:
+        return UiAction::NewGame;
+    case MainMenuAction::SaveGame:
+        return UiAction::SaveGame;
+    case MainMenuAction::LoadGame:
+        return UiAction::LoadGame;
+    case MainMenuAction::OpenLoadGame:
+    case MainMenuAction::OpenSettings:
+    case MainMenuAction::OpenMods:
+    case MainMenuAction::Back:
+        return UiAction::None;
     case MainMenuAction::ToggleFullscreen:
         return UiAction::ToggleFullscreen;
     case MainMenuAction::ToggleVsync:
@@ -507,10 +620,31 @@ UiAction UiSystem::menuActionAt(double x, double y) {
         return UiAction::ToggleShadows;
     case MainMenuAction::ToggleBloom:
         return UiAction::ToggleBloom;
+    case MainMenuAction::CycleLanguage:
+        return UiAction::CycleLanguage;
     case MainMenuAction::Quit:
         return UiAction::Quit;
     case MainMenuAction::None:
         return UiAction::None;
+    }
+    return UiAction::None;
+}
+
+UiAction UiSystem::menuKeyAction(int key) {
+    if (!pauseMenuActive_) {
+        return UiAction::None;
+    }
+    if (key == GLFW_KEY_UP || key == GLFW_KEY_W || key == GLFW_GAMEPAD_BUTTON_DPAD_UP) {
+        return toUiAction(pauseMenu_.command(PauseMenuCommand::Up));
+    }
+    if (key == GLFW_KEY_DOWN || key == GLFW_KEY_S || key == GLFW_GAMEPAD_BUTTON_DPAD_DOWN) {
+        return toUiAction(pauseMenu_.command(PauseMenuCommand::Down));
+    }
+    if (key == GLFW_KEY_ENTER || key == GLFW_KEY_SPACE || key == GLFW_GAMEPAD_BUTTON_A) {
+        return toUiAction(pauseMenu_.command(PauseMenuCommand::Activate));
+    }
+    if (key == GLFW_KEY_BACKSPACE || key == GLFW_GAMEPAD_BUTTON_B) {
+        return toUiAction(pauseMenu_.command(PauseMenuCommand::Back));
     }
     return UiAction::None;
 }

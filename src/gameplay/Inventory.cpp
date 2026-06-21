@@ -171,4 +171,43 @@ int Inventory::metal() const {
     return metal_;
 }
 
+InventorySnapshot Inventory::snapshot() const {
+    return {
+        {
+            hasTool(Tool::Axe),
+            hasTool(Tool::Knife),
+            hasTool(Tool::Pickaxe),
+            hasTool(Tool::Torch),
+        },
+        selectedSlot_,
+        wood_,
+        stone_,
+        water_,
+        fiber_,
+        metal_,
+    };
+}
+
+void Inventory::applySnapshot(const InventorySnapshot& snapshot) {
+    tools_.fill(Tool::Empty);
+    if (snapshot.tools[0]) {
+        tools_[slotForTool(Tool::Axe)] = Tool::Axe;
+    }
+    if (snapshot.tools[1]) {
+        tools_[slotForTool(Tool::Knife)] = Tool::Knife;
+    }
+    if (snapshot.tools[2]) {
+        tools_[slotForTool(Tool::Pickaxe)] = Tool::Pickaxe;
+    }
+    if (snapshot.tools[3]) {
+        tools_[slotForTool(Tool::Torch)] = Tool::Torch;
+    }
+    selectedSlot_ = snapshot.selectedSlot < hotbarSize ? snapshot.selectedSlot : 0;
+    wood_ = std::max(snapshot.wood, 0);
+    stone_ = std::max(snapshot.stone, 0);
+    water_ = std::max(snapshot.water, 0);
+    fiber_ = std::max(snapshot.fiber, 0);
+    metal_ = std::max(snapshot.metal, 0);
+}
+
 } // namespace pcolonist

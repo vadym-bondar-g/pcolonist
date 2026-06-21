@@ -20,6 +20,7 @@ class WeatherSystem;
 class Renderer {
 public:
     Renderer();
+    explicit Renderer(std::filesystem::path assetRoot);
     ~Renderer();
 
     Renderer(const Renderer&) = delete;
@@ -55,6 +56,7 @@ private:
 
     ShaderLibrary shaders_;
     Skybox skybox_;
+    std::filesystem::path assetRoot_;
     std::unordered_map<const Mesh*, GpuMesh> meshes_;
     std::unordered_map<std::filesystem::path, unsigned int> textures_;
     unsigned int hdrFramebuffer_ = 0;

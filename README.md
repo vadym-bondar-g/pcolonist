@@ -26,6 +26,17 @@ include/pcolonist/
 Implementations mirror this layout under `src/`. Runtime content is stored
 under `assets/maps`, `assets/models`, `assets/scripts` and `assets/shaders`.
 
+The executable accepts a small launch configuration layer:
+
+```bash
+pcolonist --help
+pcolonist --assets assets --window-size 1600x900 --no-vsync
+pcolonist --load pcolonist.save
+pcolonist --validate-assets --assets assets
+```
+
+`--validate-assets` checks required runtime files without opening a window.
+
 The generated world is a large survival-adventure island inspired by Jules
 Verne's *The Mysterious Island*. It has a dominant dormant volcano, Grant Lake,
 Mercy River, waterfall shelves, a sheltered natural harbor, a high Granite

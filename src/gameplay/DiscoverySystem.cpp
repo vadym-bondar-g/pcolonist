@@ -187,6 +187,30 @@ bool DiscoverySystem::hasDiscoveredCurrentLocation() const {
     return currentLocation_ != nullptr && currentLocation_->discovered;
 }
 
+DiscoverySnapshot DiscoverySystem::snapshot() const {
+    DiscoverySnapshot snapshot;
+    snapshot.discovered.reserve(locations_.size());
+    snapshot.clueClaimed.reserve(locations_.size());
+    for (const Location& location : locations_) {
+        snapshot.discovered.push_back(location.discovered);
+        snapshot.clueClaimed.push_back(location.clueClaimed);
+    }
+    return snapshot;
+}
+
+void DiscoverySystem::applySnapshot(const DiscoverySnapshot& snapshot) {
+    for (std::size_t index = 0; index < locations_.size(); ++index) {
+        locations_[index].discovered = index < snapshot.discovered.size() && snapshot.discovered[index];
+        locations_[index].clueClaimed = index < snapshot.clueClaimed.size() && snapshot.clueClaimed[index];
+    }
+    currentLocation_ = nullptr;
+    status_.currentLocation = "Неизведанная местность";
+    status_.lastMessage = "Сохранение загружено";
+    status_.clueMessage = "Следов пока нет";
+    status_.blocked = false;
+    recount();
+}
+
 bool DiscoverySystem::hasRequiredTools(const Location& location, const Inventory& inventory) const {
     for (const std::string& tool : location.requiredTools) {
         if (tool.find("топор") != std::string::npos && !inventory.hasTool(Tool::Axe)) {

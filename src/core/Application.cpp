@@ -7,6 +7,7 @@
 #include "pcolonist/physics/PhysicsSystem.hpp"
 #include "pcolonist/render/MeshFactory.hpp"
 #include "pcolonist/render/Renderer.hpp"
+#include "pcolonist/serialization/SaveGameSerializer.hpp"
 #include "pcolonist/serialization/SceneSerializer.hpp"
 #include "pcolonist/world/WorldStreamer.hpp"
 
@@ -22,13 +23,13 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
+#include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace {
 
-constexpr int windowWidth = 1280;
-constexpr int windowHeight = 720;
 constexpr float maximumDeltaTime = 0.1F;
 const glm::vec3 arrivalCamp{-32.0F, 3.0F, 77.0F};
 const glm::vec3 grantLake{31.0F, 4.0F, -24.0F};
@@ -85,26 +86,41 @@ std::optional<float> rayBoxDistance(
 namespace pcolonist {
 
 Application::Application()
-    : input_(events_),
-      assets_(PCOLONIST_ASSET_DIR),
-      assetManager_(assets_) {
+    : Application(ApplicationConfig{}) {}
+
+Application::Application(ApplicationConfig config)
+    : config_(std::move(config)),
+      input_(events_),
+      assets_(config_.assetRoot),
+      assetManager_(assets_) {}
+
+Application::~Application() {
+    shutdown();
+}
+
+void Application::initialize() {
+    if (initialized_) {
+        return;
+    }
+
     if (glfwInit() != GLFW_TRUE) {
         throw std::runtime_error("GLFW initialization failed");
     }
+    glfwInitialized_ = true;
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SAMPLES, 4);
 
-    window_ = glfwCreateWindow(windowWidth, windowHeight, "pcolonist", nullptr, nullptr);
+    window_ = glfwCreateWindow(config_.windowWidth, config_.windowHeight, "pcolonist", nullptr, nullptr);
     if (window_ == nullptr) {
-        glfwTerminate();
+        shutdown();
         throw std::runtime_error("Window creation failed");
     }
 
     glfwMakeContextCurrent(window_);
-    glfwSwapInterval(1);
+    glfwSwapInterval(config_.vsync ? 1 : 0);
     glfwSetWindowUserPointer(window_, this);
     glfwSetKeyCallback(window_, keyCallback);
     glfwSetCursorPosCallback(window_, mouseCallback);
@@ -113,16 +129,15 @@ Application::Application()
     glfwSetWindowCloseCallback(window_, closeCallback);
 
     if (gladLoadGL(reinterpret_cast<GLADloadfunc>(glfwGetProcAddress)) == 0) {
-        glfwDestroyWindow(window_);
-        window_ = nullptr;
-        glfwTerminate();
+        shutdown();
         throw std::runtime_error("OpenGL function loading failed");
     }
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
-    renderer_ = std::make_unique<Renderer>();
-    ui_.initialize();
+    renderer_ = std::make_unique<Renderer>(config_.assetRoot);
+    ui_.initialize(config_.assetRoot);
+    ui_.setLanguage(config_.language);
     survival_.loadLocations(assets_);
     discovery_.loadLocations(assets_);
     loadMap();
@@ -138,18 +153,33 @@ Application::Application()
     registerEventHandlers();
     buildPipeline();
     updateCursorMode();
+    vsync_ = config_.vsync;
+    initialized_ = true;
+
+    if (config_.loadGame && !loadGame()) {
+        throw std::runtime_error("Cannot load save file: " + config_.savePath.string());
+    }
 }
 
-Application::~Application() {
+void Application::shutdown() {
+    initialized_ = false;
     ui_.shutdown();
     renderer_.reset();
     if (window_ != nullptr) {
         glfwDestroyWindow(window_);
+        window_ = nullptr;
     }
-    glfwTerminate();
+    if (glfwInitialized_) {
+        glfwTerminate();
+        glfwInitialized_ = false;
+    }
 }
 
 void Application::run() {
+    if (!initialized_) {
+        throw std::runtime_error("Application must be initialized before run");
+    }
+
     FrameContext context;
     double previousTime = glfwGetTime();
 
@@ -198,6 +228,14 @@ void Application::registerEventHandlers() {
             } else {
                 toggleMenu();
             }
+            return;
+        }
+        if (menuOpen_ && event.action == KeyAction::Press) {
+            const UiAction action = ui_.menuKeyAction(event.key);
+            if (action != UiAction::None) {
+                handleUiAction(action);
+            }
+            return;
         }
         if (event.key == GLFW_KEY_TAB && event.action == KeyAction::Press && !menuOpen_ && !debugPanelOpen_) {
             toggleInventory();
@@ -300,7 +338,7 @@ void Application::buildPipeline() {
     });
     pipeline_.add(FrameStage::Render, "render scene", [this](FrameContext& context) {
         static_cast<void>(context);
-        if (menuOpen_) {
+        if (menuOpen_ && !gameStarted_) {
             return;
         }
         renderer_->render(camera_, registry_, weather_);
@@ -319,12 +357,26 @@ void Application::buildPipeline() {
             inventory_,
             objectiveHudState(),
             inventoryOpen_,
-            debugPanelOpen_);
+            debugPanelOpen_,
+            saveAvailable(),
+            gameStarted_);
         ui_.updateTitle(window_, registry_, audio_, context.deltaTime, menuOpen_);
     });
     pipeline_.add(FrameStage::Present, "present frame", [this](FrameContext&) {
         glfwSwapBuffers(window_);
     });
+}
+
+void Application::resetWorldState() {
+    registry_ = Registry{};
+    worldStreamer_.reset();
+    physicsTimestep_ = FixedTimestep{};
+    loadMap();
+    createWorld();
+    scripts_.execute(assets_, "scripts/startup.script", registry_, physics_, resources_, jobs_);
+    scripts_.execute(assets_, "scripts/models.scene", registry_, physics_, resources_, jobs_);
+    ui_.setFrameCounterVisible(scripts_.frameCounterVisible());
+    physics_.rebuildStaticIndex(registry_);
 }
 
 void Application::loadMap() {
@@ -438,7 +490,7 @@ void Application::createWorld() {
 
     createCampfireFire({-26.48F, 0.86F, 75.48F}, 0.52F);
 
-    player_.create(registry_, {-25.0F, 2.0F, 75.0F});
+    player_.create(registry_, arrivalCamp);
     Enemy::create(registry_, {-14.0F, 1.0F, -22.0F}, enemyMesh);
     Enemy::create(registry_, {45.0F, 3.0F, -45.0F}, enemyMesh);
     Enemy::create(registry_, {-60.0F, 4.0F, 55.0F}, enemyMesh);
@@ -527,6 +579,25 @@ void Application::handleUiAction(UiAction action) {
     case UiAction::Resume:
         toggleMenu();
         break;
+    case UiAction::ContinueGame:
+        if (gameStarted_) {
+            toggleMenu();
+        } else {
+            static_cast<void>(loadGame());
+        }
+        break;
+    case UiAction::NewGame:
+        startNewGame();
+        break;
+    case UiAction::SaveGame:
+        saveGame();
+        break;
+    case UiAction::LoadGame:
+        static_cast<void>(loadGame());
+        break;
+    case UiAction::MainMenu:
+        returnToMainMenu();
+        break;
     case UiAction::ToggleFullscreen:
         toggleFullscreen();
         break;
@@ -551,6 +622,9 @@ void Application::handleUiAction(UiAction action) {
         break;
     case UiAction::CycleSkyQuality:
         renderer_->cycleSkyQuality();
+        break;
+    case UiAction::CycleLanguage:
+        ui_.setLanguage(nextLanguage(ui_.language()));
         break;
     case UiAction::RespawnPlayer:
         teleportPlayer({-25.0F, 2.0F, 75.0F});
@@ -595,12 +669,156 @@ void Application::handleUiAction(UiAction action) {
     }
 }
 
+void Application::startNewGame() {
+    resetWorldState();
+    inventory_ = Inventory{};
+    survival_ = SurvivalSystem{};
+    survival_.loadLocations(assets_);
+    discovery_ = DiscoverySystem{};
+    discovery_.loadLocations(assets_);
+    weather_ = WeatherSystem{};
+    fireLit_ = false;
+    nextLandmark_ = 0;
+    physicsTime_ = weather_.time();
+    craftMessage_ = crafting_.nextHint(inventory_, nearCraftStation());
+    teleportPlayer(arrivalCamp);
+    gameStarted_ = true;
+    menuOpen_ = false;
+    inventoryOpen_ = false;
+    debugPanelOpen_ = false;
+    input_.setCursorCaptured(true);
+    updateCursorMode();
+}
+
+void Application::saveGame() {
+    if (!gameStarted_ || !registry_.alive(player_.entity())) {
+        return;
+    }
+
+    const Transform& transform = registry_.get<Transform>(player_.entity());
+    const RigidBody& body = registry_.get<RigidBody>(player_.entity());
+    SaveGameSnapshot snapshot;
+    snapshot.playerPosition = transform.position;
+    snapshot.playerVelocity = body.velocity;
+    snapshot.inventory = inventory_.snapshot();
+    snapshot.survival = survival_.snapshot();
+    snapshot.discovery = discovery_.snapshot();
+    snapshot.weather = weather_.snapshot();
+    snapshot.fireLit = fireLit_;
+    snapshot.nextLandmark = nextLandmark_;
+    snapshot.hasResourceState = true;
+    snapshot.hasEnemyState = true;
+
+    registry_.each<ResourceNode>([&snapshot](Entity entity, const ResourceNode& resource) {
+        snapshot.resources.push_back({entity, resource.health, resource.woodYield});
+    });
+    registry_.each<Transform, RigidBody, EnemyComponent>(
+        [&snapshot](Entity entity, const Transform& transform, const RigidBody& body, const EnemyComponent&) {
+            snapshot.enemies.push_back({entity, transform.position, body.velocity});
+        });
+
+    SaveGameSerializer::save(config_.savePath, snapshot);
+    craftMessage_ = "ИГРА СОХРАНЕНА";
+}
+
+bool Application::loadGame() {
+    const std::optional<SaveGameSnapshot> loadedSnapshot = SaveGameSerializer::load(config_.savePath);
+    if (!loadedSnapshot) {
+        craftMessage_ = "СОХРАНЕНИЕ НЕ НАЙДЕНО";
+        return false;
+    }
+    const SaveGameSnapshot& snapshot = *loadedSnapshot;
+
+    resetWorldState();
+    inventory_.applySnapshot(snapshot.inventory);
+    survival_.applySnapshot(snapshot.survival);
+    discovery_.applySnapshot(snapshot.discovery);
+    weather_.applySnapshot(snapshot.weather);
+    fireLit_ = snapshot.fireLit;
+    nextLandmark_ = snapshot.nextLandmark;
+    physicsTime_ = weather_.time();
+    if (snapshot.hasResourceState) {
+        std::unordered_map<Entity, SavedResourceNode> resourceByEntity;
+        resourceByEntity.reserve(snapshot.resources.size());
+        for (const SavedResourceNode& resource : snapshot.resources) {
+            resourceByEntity.emplace(resource.entity, resource);
+        }
+
+        std::vector<Entity> resourcesToDestroy;
+        registry_.each<ResourceNode>([&resourceByEntity, &resourcesToDestroy](Entity entity, ResourceNode& resource) {
+            const auto iterator = resourceByEntity.find(entity);
+            if (iterator == resourceByEntity.end()) {
+                resourcesToDestroy.push_back(entity);
+                return;
+            }
+            resource.health = iterator->second.health;
+            resource.woodYield = iterator->second.woodYield;
+        });
+        for (Entity entity : resourcesToDestroy) {
+            registry_.destroy(entity);
+        }
+        physics_.rebuildStaticIndex(registry_);
+    }
+    if (snapshot.hasEnemyState) {
+        std::unordered_map<Entity, SavedEnemy> enemyByEntity;
+        enemyByEntity.reserve(snapshot.enemies.size());
+        for (const SavedEnemy& enemy : snapshot.enemies) {
+            enemyByEntity.emplace(enemy.entity, enemy);
+        }
+
+        std::vector<Entity> enemiesToDestroy;
+        registry_.each<Transform, RigidBody, EnemyComponent>(
+            [&enemyByEntity, &enemiesToDestroy](
+                Entity entity,
+                Transform& transform,
+                RigidBody& body,
+                const EnemyComponent&) {
+                const auto iterator = enemyByEntity.find(entity);
+                if (iterator == enemyByEntity.end()) {
+                    enemiesToDestroy.push_back(entity);
+                    return;
+                }
+                transform.position = iterator->second.position;
+                body.velocity = iterator->second.velocity;
+            });
+        for (Entity entity : enemiesToDestroy) {
+            registry_.destroy(entity);
+        }
+    }
+    teleportPlayer(snapshot.playerPosition);
+    registry_.get<RigidBody>(player_.entity()).velocity = snapshot.playerVelocity;
+    craftMessage_ = "СОХРАНЕНИЕ ЗАГРУЖЕНО";
+    gameStarted_ = true;
+    menuOpen_ = false;
+    inventoryOpen_ = false;
+    debugPanelOpen_ = false;
+    input_.setCursorCaptured(true);
+    updateCursorMode();
+    return true;
+}
+
+bool Application::saveAvailable() const {
+    return std::filesystem::exists(config_.savePath);
+}
+
+void Application::returnToMainMenu() {
+    gameStarted_ = false;
+    menuOpen_ = true;
+    inventoryOpen_ = false;
+    debugPanelOpen_ = false;
+    stopPlayerMotion();
+    input_.setCursorCaptured(false);
+    ui_.resetMenuAnimation();
+    updateCursorMode();
+}
+
 void Application::toggleMenu() {
     menuOpen_ = !menuOpen_;
     if (menuOpen_) {
         inventoryOpen_ = false;
         debugPanelOpen_ = false;
         stopPlayerMotion();
+        ui_.resetMenuAnimation();
     }
     input_.setCursorCaptured(!menuOpen_ && !inventoryOpen_);
     updateCursorMode();

@@ -14,6 +14,16 @@ enum class Tool {
     Empty,
 };
 
+struct InventorySnapshot {
+    std::array<bool, 4> tools{};
+    std::size_t selectedSlot = 0;
+    int wood = 0;
+    int stone = 0;
+    int water = 0;
+    int fiber = 0;
+    int metal = 0;
+};
+
 class Inventory {
 public:
     static constexpr std::size_t hotbarSize = 5;
@@ -44,6 +54,8 @@ public:
     [[nodiscard]] int water() const;
     [[nodiscard]] int fiber() const;
     [[nodiscard]] int metal() const;
+    [[nodiscard]] InventorySnapshot snapshot() const;
+    void applySnapshot(const InventorySnapshot& snapshot);
 
 private:
     std::array<Tool, hotbarSize> tools_{};

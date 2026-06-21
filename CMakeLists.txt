@@ -85,6 +85,7 @@ add_executable(pcolonist
     src/core/FrameLimiter.cpp
     src/core/FramePipeline.cpp
     src/core/JobSystem.cpp
+    src/core/RuntimeOptions.cpp
     src/gameplay/Enemy.cpp
     src/gameplay/CraftingSystem.cpp
     src/gameplay/DiscoverySystem.cpp
@@ -104,8 +105,10 @@ add_executable(pcolonist
     src/render/ShaderLibrary.cpp
     src/render/Skybox.cpp
     src/scripting/ScriptSystem.cpp
+    src/serialization/SaveGameSerializer.cpp
     src/serialization/SceneSerializer.cpp
     src/ui/MainMenu.cpp
+    src/ui/PauseMenu.cpp
     src/ui/UiSystem.cpp
     src/world/WeatherSystem.cpp
     src/world/WaterWaves.cpp
@@ -201,6 +204,7 @@ if(BUILD_TESTING)
         tests/TerrainColliderTests.cpp
         tests/WorldSystemTests.cpp
         tests/PngLoaderTests.cpp
+        tests/SaveGameSerializerTests.cpp
         src/assets/Assets.cpp
         src/assets/ObjLoader.cpp
         src/gameplay/Inventory.cpp
@@ -208,6 +212,7 @@ if(BUILD_TESTING)
         src/physics/StaticColliderGrid.cpp
         src/physics/TerrainCollider.cpp
         src/render/PngLoader.cpp
+        src/serialization/SaveGameSerializer.cpp
         src/world/WaterWaves.cpp
         src/world/WeatherSystem.cpp
     )

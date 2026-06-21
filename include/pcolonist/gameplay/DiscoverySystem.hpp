@@ -24,6 +24,11 @@ struct DiscoveryStatus {
     std::string clueMessage = "Следов пока нет";
 };
 
+struct DiscoverySnapshot {
+    std::vector<bool> discovered;
+    std::vector<bool> clueClaimed;
+};
+
 class DiscoverySystem {
 public:
     void loadLocations(const AssetSystem& assets, const std::filesystem::path& relativePath = "scripts/island_locations_100.json");
@@ -31,6 +36,8 @@ public:
 
     [[nodiscard]] const DiscoveryStatus& status() const;
     [[nodiscard]] bool hasDiscoveredCurrentLocation() const;
+    [[nodiscard]] DiscoverySnapshot snapshot() const;
+    void applySnapshot(const DiscoverySnapshot& snapshot);
 
 private:
     struct Location {

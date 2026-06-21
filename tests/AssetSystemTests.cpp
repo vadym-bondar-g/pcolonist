@@ -13,6 +13,7 @@ void runObjLoaderTests();
 void runWorldSystemTests();
 void runInventoryTests();
 void runPngLoaderTests();
+void runSaveGameSerializerTests();
 
 namespace {
 
@@ -118,6 +119,7 @@ int main() {
         runWorldSystemTests();
         runInventoryTests();
         runPngLoaderTests();
+        runSaveGameSerializerTests();
     } catch (const std::exception& error) {
         std::cerr << "AssetSystem test failed: " << error.what() << '\n';
         return EXIT_FAILURE;

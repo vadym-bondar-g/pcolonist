@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pcolonist/core/ApplicationConfig.hpp"
 #include "pcolonist/animation/AnimationSystem.hpp"
 #include "pcolonist/assets/AssetSystem.hpp"
 #include "pcolonist/assets/ResourceManager.hpp"
@@ -39,16 +40,20 @@ struct Mesh;
 class Application {
 public:
     Application();
+    explicit Application(ApplicationConfig config);
     ~Application();
 
     Application(const Application&) = delete;
     Application& operator=(const Application&) = delete;
 
+    void initialize();
     void run();
+    void shutdown();
 
 private:
     void registerEventHandlers();
     void buildPipeline();
+    void resetWorldState();
     void loadMap();
     void createWorld();
     Entity createCampfireFire(glm::vec3 position, float size);
@@ -68,6 +73,11 @@ private:
         float bob);
     void initializeSystems();
     void handleUiAction(UiAction action);
+    void startNewGame();
+    void saveGame();
+    bool loadGame();
+    [[nodiscard]] bool saveAvailable() const;
+    void returnToMainMenu();
     void toggleMenu();
     void toggleInventory();
     void toggleDebugPanel();
@@ -89,6 +99,7 @@ private:
     static void closeCallback(GLFWwindow* window);
 
     GLFWwindow* window_ = nullptr;
+    ApplicationConfig config_;
     EventBus events_;
     FramePipeline pipeline_;
     FrameLimiter frameLimiter_;
@@ -122,6 +133,7 @@ private:
     bool inventoryOpen_ = false;
     bool debugPanelOpen_ = false;
     bool fireLit_ = false;
+    bool gameStarted_ = false;
     bool vsync_ = true;
     std::string craftMessage_ = "C: КАМЕННЫЙ НОЖ Д:1 К:2 ВЛ:1";
     std::size_t nextLandmark_ = 0;
@@ -133,6 +145,8 @@ private:
     double lastMouseY_ = 0.0;
     FixedTimestep physicsTimestep_;
     float physicsTime_ = 0.0F;
+    bool initialized_ = false;
+    bool glfwInitialized_ = false;
 };
 
 } // namespace pcolonist

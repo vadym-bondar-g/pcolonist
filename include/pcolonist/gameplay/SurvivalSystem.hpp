@@ -38,6 +38,13 @@ struct LocationResourceYield {
     }
 };
 
+struct SurvivalSnapshot {
+    SurvivalStatus status;
+    float sicknessRisk = 0.0F;
+    float forageCooldown = 0.0F;
+    float materialCooldown = 0.0F;
+};
+
 class SurvivalSystem {
 public:
     void loadLocations(const AssetSystem& assets, const std::filesystem::path& relativePath = "scripts/island_locations_100.json");
@@ -53,6 +60,8 @@ public:
     [[nodiscard]] LocationResourceYield gatherMaterials();
     [[nodiscard]] const SurvivalStatus& status() const;
     [[nodiscard]] const std::string& currentLocationName() const;
+    [[nodiscard]] SurvivalSnapshot snapshot() const;
+    void applySnapshot(const SurvivalSnapshot& snapshot);
 
 private:
     struct Location {

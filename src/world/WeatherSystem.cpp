@@ -31,6 +31,10 @@ void WeatherSystem::setDayProgress(float progress) {
     time_ = (day + static_cast<double>(glm::clamp(progress, 0.0F, 0.9999F))) * dayDuration;
 }
 
+void WeatherSystem::setTime(float time) {
+    time_ = std::max(static_cast<double>(time), 0.0);
+}
+
 glm::vec3 WeatherSystem::skyColor() const {
     const float light = daylight();
     const glm::vec3 clear = glm::mix(glm::vec3{0.003F, 0.008F, 0.035F}, glm::vec3{0.22F, 0.52F, 0.92F}, light);
@@ -156,6 +160,16 @@ std::string_view WeatherSystem::weatherName() const {
 
 float WeatherSystem::time() const {
     return static_cast<float>(time_);
+}
+
+WeatherSnapshot WeatherSystem::snapshot() const {
+    return {weather_, static_cast<float>(time_)};
+}
+
+void WeatherSystem::applySnapshot(const WeatherSnapshot& snapshot) {
+    weather_ = snapshot.weather;
+    automaticWeather_ = false;
+    setTime(snapshot.time);
 }
 
 } // namespace pcolonist

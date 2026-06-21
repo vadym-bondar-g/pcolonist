@@ -293,6 +293,20 @@ const std::string& SurvivalSystem::currentLocationName() const {
     return currentLocationName_;
 }
 
+SurvivalSnapshot SurvivalSystem::snapshot() const {
+    return {status_, sicknessRisk_, forageCooldown_, materialCooldown_};
+}
+
+void SurvivalSystem::applySnapshot(const SurvivalSnapshot& snapshot) {
+    status_ = snapshot.status;
+    sicknessRisk_ = std::clamp(snapshot.sicknessRisk, 0.0F, 100.0F);
+    forageCooldown_ = std::max(snapshot.forageCooldown, 0.0F);
+    materialCooldown_ = std::max(snapshot.materialCooldown, 0.0F);
+    currentLocationName_ = status_.biomeName;
+    currentLocation_ = nullptr;
+    updateWarnings();
+}
+
 void SurvivalSystem::updateCurrentLocation(glm::vec3 playerPosition) {
     const Location* nearest = nullptr;
     float nearestDistance = std::numeric_limits<float>::max();

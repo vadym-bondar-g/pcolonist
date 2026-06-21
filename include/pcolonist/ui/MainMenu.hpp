@@ -1,7 +1,10 @@
 #pragma once
 
+#include "pcolonist/ui/Localization.hpp"
+
 #include <glm/vec4.hpp>
 
+#include <array>
 #include <functional>
 #include <string_view>
 
@@ -9,12 +12,20 @@ namespace pcolonist {
 
 enum class MainMenuAction {
     None,
-    Play,
+    Continue,
     ToggleFullscreen,
     ToggleVsync,
     CycleFrameLimit,
     ToggleShadows,
     ToggleBloom,
+    CycleLanguage,
+    NewGame,
+    SaveGame,
+    LoadGame,
+    OpenLoadGame,
+    OpenSettings,
+    OpenMods,
+    Back,
     Quit,
 };
 
@@ -29,6 +40,9 @@ struct MainMenuState {
     int frameLimit = 0;
     bool shadows = true;
     bool bloom = true;
+    bool saveAvailable = false;
+    bool gameStarted = false;
+    UiLanguage language = UiLanguage::English;
 };
 
 class MainMenu {
@@ -44,6 +58,7 @@ private:
         Home,
         LoadGame,
         Settings,
+        Mods,
     };
 
     struct Layout {
@@ -56,10 +71,30 @@ private:
         float buttonWidth = 330.0F;
     };
 
+    struct ButtonSpec {
+        MainMenuAction action = MainMenuAction::None;
+        float y = 0.0F;
+        std::string_view label;
+        std::string_view hint;
+        glm::vec4 accent{1.0F};
+        bool disabled = false;
+        bool destructive = false;
+    };
+
     [[nodiscard]] static Layout layout(int width, int height);
     [[nodiscard]] static bool contains(double x, double y, float left, float top, float width, float height);
+    [[nodiscard]] std::array<ButtonSpec, 6> homeButtons(const MainMenuState& state, const Layout& frame) const;
+    void renderBackground(const MainMenuState& state, const Rectangle& rectangle, const Text& text, const Layout& frame, float intro) const;
+    void renderBottomBar(const MainMenuState& state, const Rectangle& rectangle, const Text& text, float intro) const;
+    void renderShell(const MainMenuState& state, const Rectangle& rectangle, const Text& text, const Layout& frame, float intro) const;
+    void renderButton(const MainMenuState& state, const Rectangle& rectangle, const Text& text, const Layout& frame, const ButtonSpec& button, float intro) const;
+    void renderHome(const MainMenuState& state, const Rectangle& rectangle, const Text& text, const Layout& frame, float intro) const;
+    void renderLoadGame(const MainMenuState& state, const Rectangle& rectangle, const Text& text, const Layout& frame, float intro) const;
+    void renderSettings(const MainMenuState& state, const Rectangle& rectangle, const Text& text, const Layout& frame, float intro) const;
+    void renderMods(const MainMenuState& state, const Rectangle& rectangle, const Text& text, const Layout& frame, float intro) const;
 
     Screen screen_ = Screen::Home;
+    mutable MainMenuState lastState_;
 };
 
 } // namespace pcolonist

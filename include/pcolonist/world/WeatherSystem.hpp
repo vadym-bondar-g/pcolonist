@@ -14,11 +14,17 @@ enum class WeatherType {
     Storm,
 };
 
+struct WeatherSnapshot {
+    WeatherType weather = WeatherType::Clear;
+    float time = 45.0F;
+};
+
 class WeatherSystem {
 public:
     void update(float deltaTime);
     void setWeather(WeatherType weather);
     void setDayProgress(float progress);
+    void setTime(float time);
 
     [[nodiscard]] glm::vec3 skyColor() const;
     [[nodiscard]] glm::vec3 horizonColor() const;
@@ -41,6 +47,8 @@ public:
     [[nodiscard]] std::uint32_t dayNumber() const;
     [[nodiscard]] std::string_view weatherName() const;
     [[nodiscard]] float time() const;
+    [[nodiscard]] WeatherSnapshot snapshot() const;
+    void applySnapshot(const WeatherSnapshot& snapshot);
 
 private:
     WeatherType weather_ = WeatherType::Clear;
