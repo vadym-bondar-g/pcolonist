@@ -38,6 +38,8 @@ const glm::vec3 naturalHarbor{91.0F, 1.0F, 14.5F};
 const glm::vec3 graniteHouse{-104.0F, 7.0F, -10.0F};
 const glm::vec3 standingStones{-82.0F, 2.0F, 38.0F};
 const glm::vec3 watchtower{91.0F, 2.0F, 18.0F};
+const glm::vec3 craterLavaCenter{0.4F, 13.24F, -0.2F};
+const glm::vec3 craterLavaOverflow{2.8F, 13.12F, 10.8F};
 
 pcolonist::KeyAction toKeyAction(int action) {
     if (action == GLFW_PRESS) {
@@ -429,7 +431,10 @@ void Application::createWorld() {
         return MeshFactory::gridPlane(640.0F, 224, {0.02F, 0.24F, 0.42F});
     });
     const auto lavaMesh = resources_.load<Mesh>("builtin/lava", [] {
-        return MeshFactory::disc(1.0F, 96, {1.0F, 0.12F, 0.005F});
+        return MeshFactory::lavaLake(1.0F, 1.0F, 128, 5, {1.0F, 0.12F, 0.005F});
+    });
+    const auto lavaTongueMesh = resources_.load<Mesh>("builtin/lava_tongue", [] {
+        return MeshFactory::lavaLake(1.0F, 0.42F, 96, 4, {1.0F, 0.12F, 0.005F});
     });
     const auto internalWaterMesh = resources_.load<Mesh>("maps/internal_water.obj", [this] {
         return MeshLoader::load(assets_, "maps/internal_water.obj");
@@ -462,36 +467,21 @@ void Application::createWorld() {
     registry_.emplace<MeshRenderer>(internalWater, internalWaterMesh);
     registry_.emplace<WaterSurface>(internalWater, WaterSurface{{0.0F, 0.0F}, false});
 
-    const std::array<Transform, 22> lavaPools = {
-        Transform{{0.0F, 13.43F, 0.0F}, {}, {17.8F, 1.0F, 14.6F}},
-        Transform{{0.1F, 13.46F, 0.3F}, {0.0F, 0.18F, 0.0F}, {9.2F, 1.0F, 7.0F}},
-        Transform{{-6.6F, 13.40F, 2.9F}, {0.0F, 0.32F, 0.0F}, {7.8F, 1.0F, 4.2F}},
-        Transform{{6.4F, 13.39F, -3.3F}, {0.0F, -0.54F, 0.0F}, {7.4F, 1.0F, 3.8F}},
-        Transform{{2.0F, 13.38F, 7.3F}, {0.0F, 1.02F, 0.0F}, {6.7F, 1.0F, 3.0F}},
-        Transform{{-2.3F, 13.37F, -7.1F}, {0.0F, -1.15F, 0.0F}, {6.2F, 1.0F, 2.8F}},
-        Transform{{-10.2F, 13.34F, -1.7F}, {0.0F, 1.36F, 0.0F}, {5.1F, 1.0F, 1.8F}},
-        Transform{{10.0F, 13.33F, 1.9F}, {0.0F, -1.28F, 0.0F}, {4.9F, 1.0F, 1.7F}},
-        Transform{{-7.8F, 13.32F, 7.0F}, {0.0F, 0.78F, 0.0F}, {4.8F, 1.0F, 1.8F}},
-        Transform{{8.2F, 13.31F, -7.0F}, {0.0F, -0.92F, 0.0F}, {4.6F, 1.0F, 1.7F}},
-        Transform{{-0.5F, 13.30F, 10.2F}, {0.0F, 0.05F, 0.0F}, {5.0F, 1.0F, 1.5F}},
-        Transform{{0.8F, 13.29F, -10.0F}, {0.0F, 0.12F, 0.0F}, {4.8F, 1.0F, 1.45F}},
-        Transform{{-12.0F, 13.28F, 3.8F}, {0.0F, 0.35F, 0.0F}, {3.0F, 1.0F, 1.15F}},
-        Transform{{0.0F, 31.28F, 15.2F}, {0.0F, 0.08F, 0.0F}, {8.8F, 1.0F, 3.2F}},
-        Transform{{-3.8F, 31.18F, 16.8F}, {0.0F, -0.42F, 0.0F}, {4.2F, 1.0F, 1.4F}},
-        Transform{{3.9F, 31.16F, 16.7F}, {0.0F, 0.46F, 0.0F}, {4.1F, 1.0F, 1.35F}},
-        Transform{{0.3F, 31.10F, 18.6F}, {0.0F, 0.02F, 0.0F}, {5.6F, 1.0F, 1.2F}},
-        Transform{{-5.8F, 31.02F, 13.4F}, {0.0F, 0.82F, 0.0F}, {2.9F, 1.0F, 0.95F}},
-        Transform{{5.6F, 31.00F, 13.2F}, {0.0F, -0.78F, 0.0F}, {2.8F, 1.0F, 0.92F}},
-        Transform{{-1.4F, 30.92F, 12.0F}, {0.0F, 1.08F, 0.0F}, {3.8F, 1.0F, 1.05F}},
-        Transform{{1.7F, 30.90F, 11.7F}, {0.0F, -1.02F, 0.0F}, {3.6F, 1.0F, 1.0F}},
-        Transform{{0.1F, 31.34F, 15.6F}, {0.0F, 0.21F, 0.0F}, {4.2F, 1.0F, 1.7F}},
-    };
-    for (const Transform& transform : lavaPools) {
-        const Entity lava = registry_.create();
-        registry_.emplace<Transform>(lava, transform);
-        registry_.emplace<MeshRenderer>(lava, lavaMesh);
-        registry_.emplace<LavaSurface>(lava);
-    }
+    const Entity craterLake = registry_.create();
+    registry_.emplace<Transform>(craterLake, Transform{craterLavaCenter, {0.0F, 0.16F, 0.0F}, {13.9F, 1.0F, 11.6F}});
+    registry_.emplace<MeshRenderer>(craterLake, lavaMesh);
+    registry_.emplace<LavaSurface>(craterLake);
+    registry_.emplace<FireLight>(craterLake, FireLight{{1.0F, 0.16F, 0.025F}, 4.8F, 0.055F});
+
+    const Entity innerCurrent = registry_.create();
+    registry_.emplace<Transform>(innerCurrent, Transform{{-3.7F, 13.31F, 3.6F}, {0.0F, 0.72F, 0.0F}, {8.4F, 1.0F, 2.7F}});
+    registry_.emplace<MeshRenderer>(innerCurrent, lavaTongueMesh);
+    registry_.emplace<LavaSurface>(innerCurrent);
+
+    const Entity overflow = registry_.create();
+    registry_.emplace<Transform>(overflow, Transform{craterLavaOverflow, {0.0F, 1.48F, 0.0F}, {7.8F, 1.0F, 1.95F}});
+    registry_.emplace<MeshRenderer>(overflow, lavaTongueMesh);
+    registry_.emplace<LavaSurface>(overflow);
 
     createCampfireFire({-26.48F, 0.86F, 75.48F}, 0.52F);
 

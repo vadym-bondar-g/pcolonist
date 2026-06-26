@@ -103,6 +103,61 @@ Mesh MeshFactory::disc(float radius, std::size_t segments, glm::vec3 color) {
     return mesh;
 }
 
+Mesh MeshFactory::lavaLake(float radiusX, float radiusZ, std::size_t segments, std::size_t rings, glm::vec3 color) {
+    segments = std::max<std::size_t>(segments, 12);
+    rings = std::max<std::size_t>(rings, 2);
+
+    Mesh mesh;
+    mesh.vertices.reserve(1 + segments * rings);
+    mesh.indices.reserve(segments * (1 + (rings - 1) * 6));
+    mesh.vertices.push_back({{0.0F, 0.0F, 0.0F}, color, {0.0F, 1.0F, 0.0F}, {0.5F, 0.5F}});
+
+    constexpr float tau = 6.28318530718F;
+    for (std::size_t ring = 1; ring <= rings; ++ring) {
+        const float progress = static_cast<float>(ring) / static_cast<float>(rings);
+        for (std::size_t index = 0; index < segments; ++index) {
+            const float angle = static_cast<float>(index) / static_cast<float>(segments) * tau;
+            const float outline = 1.0F
+                + std::sin(angle * 3.0F + 0.35F) * 0.085F
+                + std::sin(angle * 5.0F - 1.2F) * 0.050F
+                + std::cos(angle * 7.0F + 0.8F) * 0.030F;
+            const float innerPull = glm::mix(1.0F, outline, progress * progress);
+            const glm::vec2 radial{std::cos(angle), std::sin(angle)};
+            const glm::vec2 position{
+                radial.x * radiusX * progress * innerPull,
+                radial.y * radiusZ * progress * innerPull,
+            };
+            mesh.vertices.push_back({
+                {position.x, 0.0F, position.y},
+                color,
+                {0.0F, 1.0F, 0.0F},
+                {position.x / (radiusX * 2.25F) + 0.5F, position.y / (radiusZ * 2.25F) + 0.5F},
+            });
+        }
+    }
+
+    for (std::size_t index = 0; index < segments; ++index) {
+        mesh.indices.insert(mesh.indices.end(), {
+            0,
+            static_cast<std::uint32_t>(index + 1),
+            static_cast<std::uint32_t>((index + 1) % segments + 1),
+        });
+    }
+    for (std::size_t ring = 2; ring <= rings; ++ring) {
+        const std::uint32_t innerBase = 1U + static_cast<std::uint32_t>((ring - 2) * segments);
+        const std::uint32_t outerBase = 1U + static_cast<std::uint32_t>((ring - 1) * segments);
+        for (std::size_t index = 0; index < segments; ++index) {
+            const std::uint32_t next = static_cast<std::uint32_t>((index + 1) % segments);
+            const std::uint32_t innerA = innerBase + static_cast<std::uint32_t>(index);
+            const std::uint32_t innerB = innerBase + next;
+            const std::uint32_t outerA = outerBase + static_cast<std::uint32_t>(index);
+            const std::uint32_t outerB = outerBase + next;
+            mesh.indices.insert(mesh.indices.end(), {innerA, outerA, outerB, innerA, outerB, innerB});
+        }
+    }
+    return mesh;
+}
+
 Mesh MeshFactory::flame(glm::vec3 baseColor, glm::vec3 tipColor) {
     Mesh mesh;
     constexpr std::array<float, 3> rotations = {0.0F, 2.09439510239F, 4.18879020479F};
