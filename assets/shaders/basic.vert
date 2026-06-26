@@ -23,6 +23,10 @@ uniform float fire;
 uniform float smoke;
 uniform float time;
 
+vec2 waterFlow() {
+    return length(waterFlowDirection) > 0.001 ? normalize(waterFlowDirection) : vec2(0.0, 1.0);
+}
+
 float waveHeight(vec2 worldXZ) {
     float height = sin(dot(vec2(0.940376, 0.340136), worldXZ) * 0.18 + time * 1.05) * 0.16
         + sin(dot(vec2(-0.28, 0.96), worldXZ) * 0.31 + time * 0.72) * 0.09
@@ -30,11 +34,25 @@ float waveHeight(vec2 worldXZ) {
         + sin(dot(vec2(-0.819232, -0.573462), worldXZ) * 0.93 + time * 1.86) * 0.022
         + sin(dot(vec2(0.196116, -0.980581), worldXZ) * 1.41 + time * 2.24) * 0.012;
     if (waterKind == 1) {
-        vec2 flow = length(waterFlowDirection) > 0.001 ? normalize(waterFlowDirection) : vec2(0.0, 1.0);
+        vec2 flow = waterFlow();
         float current = sin(dot(flow, worldXZ) * 0.72 - time * 1.35) * 0.018;
         return height * 0.35 + current;
     }
-    return height;
+    float slowSwell = sin(dot(normalize(vec2(0.54, 0.84)), worldXZ) * 0.055 + time * 0.38) * 0.22
+        + sin(dot(normalize(vec2(-0.82, 0.57)), worldXZ) * 0.072 - time * 0.31) * 0.14;
+    return height * 1.85 + slowSwell;
+}
+
+vec2 waveHorizontalOffset(vec2 worldXZ) {
+    if (waterKind == 1) {
+        return waterFlow() * cos(dot(waterFlow(), worldXZ) * 0.72 - time * 1.35) * 0.025;
+    }
+    vec2 offset = vec2(0.0);
+    offset += vec2(0.940376, 0.340136) * cos(dot(vec2(0.940376, 0.340136), worldXZ) * 0.18 + time * 1.05) * 0.34;
+    offset += vec2(-0.28, 0.96) * cos(dot(vec2(-0.28, 0.96), worldXZ) * 0.31 + time * 0.72) * 0.16;
+    offset += normalize(vec2(0.54, 0.84)) * cos(dot(normalize(vec2(0.54, 0.84)), worldXZ) * 0.055 + time * 0.38) * 0.42;
+    offset += normalize(vec2(-0.82, 0.57)) * cos(dot(normalize(vec2(-0.82, 0.57)), worldXZ) * 0.072 - time * 0.31) * 0.24;
+    return offset;
 }
 
 vec3 waveNormal(vec2 worldXZ) {
@@ -45,8 +63,12 @@ vec3 waveNormal(vec2 worldXZ) {
         + vec2(-0.819232, -0.573462) * cos(dot(vec2(-0.819232, -0.573462), worldXZ) * 0.93 + time * 1.86) * 0.022 * 0.93
         + vec2(0.196116, -0.980581) * cos(dot(vec2(0.196116, -0.980581), worldXZ) * 1.41 + time * 2.24) * 0.012 * 1.41;
     if (waterKind == 1) {
-        vec2 flow = length(waterFlowDirection) > 0.001 ? normalize(waterFlowDirection) : vec2(0.0, 1.0);
+        vec2 flow = waterFlow();
         gradient = gradient * 0.35 + flow * cos(dot(flow, worldXZ) * 0.72 - time * 1.35) * 0.018 * 0.72;
+    } else {
+        gradient *= 1.85;
+        gradient += normalize(vec2(0.54, 0.84)) * cos(dot(normalize(vec2(0.54, 0.84)), worldXZ) * 0.055 + time * 0.38) * 0.22 * 0.055;
+        gradient += normalize(vec2(-0.82, 0.57)) * cos(dot(normalize(vec2(-0.82, 0.57)), worldXZ) * 0.072 - time * 0.31) * 0.14 * 0.072;
     }
     return normalize(vec3(-gradient.x, 1.0, -gradient.y));
 }
@@ -55,8 +77,10 @@ void main() {
     vec4 world = instanceModel * vec4(position, 1.0);
     vec3 transformedNormal = normalize(mat3(transpose(inverse(instanceModel))) * normal);
     if (water > 0.5) {
-        world.y += waveHeight(world.xz);
-        transformedNormal = waveNormal(world.xz);
+        vec2 wavePosition = world.xz;
+        world.xz += waveHorizontalOffset(wavePosition);
+        world.y += waveHeight(wavePosition);
+        transformedNormal = waveNormal(wavePosition);
     }
     if (lava > 0.5) {
         vec2 centeredUv = textureCoordinate - vec2(0.5);

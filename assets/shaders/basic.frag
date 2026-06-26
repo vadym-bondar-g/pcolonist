@@ -209,6 +209,7 @@ void main() {
         normal = normalize(normal + vec3(-gradient.x, 0.0, -gradient.y) * 0.32);
     }
     if (water > 0.5) {
+        bool inlandNormal = waterKind == 1;
         float swellA = sin(worldPosition.x * 0.38 + worldPosition.z * 0.17 + time * 0.78);
         float swellB = cos(worldPosition.z * 0.44 - worldPosition.x * 0.21 - time * 0.61);
         vec2 rippleA = vec2(
@@ -219,7 +220,8 @@ void main() {
             sin(dot(worldPosition.xz, vec2(1.7, -2.2)) + time * 2.4),
             cos(dot(worldPosition.xz, vec2(-2.6, 1.3)) - time * 2.1)
         );
-        normal = normalize(normal + vec3(rippleA * 0.021 + rippleB * 0.012 + vec2(swellA, swellB) * 0.018, 0.0).xzy);
+        float normalStrength = inlandNormal ? 0.55 : 1.55;
+        normal = normalize(normal + vec3((rippleA * 0.021 + rippleB * 0.012 + vec2(swellA, swellB) * 0.018) * normalStrength, 0.0).xzy);
     }
     vec3 viewDirection = normalize(cameraPosition - worldPosition);
     vec3 lightDirection = normalize(sunDirection);
