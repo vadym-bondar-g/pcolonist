@@ -14,6 +14,7 @@ enum class LaunchMode {
     Help,
     Version,
     ValidateAssets,
+    DumpConfig,
 };
 
 enum class ExitCode : int {
