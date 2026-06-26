@@ -465,7 +465,9 @@ void Application::createWorld() {
     const Entity internalWater = registry_.create();
     registry_.emplace<Transform>(internalWater);
     registry_.emplace<MeshRenderer>(internalWater, internalWaterMesh);
-    registry_.emplace<WaterSurface>(internalWater, WaterSurface{{0.0F, 0.0F}, false});
+    registry_.emplace<WaterSurface>(
+        internalWater,
+        WaterSurface{{0.0F, 0.0F}, false, WaterKind::Inland, glm::normalize(glm::vec2{0.78F, -0.32F}), 0.55F});
 
     const Entity craterLake = registry_.create();
     registry_.emplace<Transform>(craterLake, Transform{craterLavaCenter, {0.0F, 0.16F, 0.0F}, {13.9F, 1.0F, 11.6F}});

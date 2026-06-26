@@ -19,6 +19,9 @@ uniform float daylight;
 uniform float nightFactor;
 uniform float cloudiness;
 uniform float water;
+uniform int waterKind;
+uniform vec2 waterFlowDirection;
+uniform float waterFoamStrength;
 uniform float terrain;
 uniform float lava;
 uniform float fire;
@@ -392,6 +395,9 @@ void main() {
     }
 
     if (water > 0.5) {
+        bool inlandWater = waterKind == 1;
+        vec2 flow = length(waterFlowDirection) > 0.001 ? normalize(waterFlowDirection) : vec2(0.0, 1.0);
+        vec2 crossFlow = vec2(-flow.y, flow.x);
         float shimmer = sin(worldPosition.x * 0.18 + time * 0.7) * 0.026 + sin(worldPosition.z * 0.33 - time * 0.55) * 0.018;
         float crest = smoothstep(0.09, 0.24, worldPosition.y - oceanWaterLevel);
         float islandRadius = length(worldPosition.xz / scaledIslandShore);
@@ -401,10 +407,24 @@ void main() {
         float distanceFade = smoothstep(36.0, 450.0, length(cameraPosition.xz - worldPosition.xz));
         float shallow = smoothstep(1.08, 0.70, islandRadius);
         float turbidity = valueNoise(worldPosition.xz * 0.045 + vec2(time * 0.015, -time * 0.01));
+        float currentBands = smoothstep(0.48, 0.88, valueNoise(vec2(dot(worldPosition.xz, crossFlow) * 0.08, dot(worldPosition.xz, flow) * 0.18 - time * 0.42)));
+        if (inlandWater) {
+            shimmer *= 0.45;
+            crest *= 0.25;
+            shoreBand = max(shoreBand * 0.35, currentBands * 0.28);
+            outerBreak = 0.0;
+            shallow = 0.74;
+            turbidity = mix(turbidity, currentBands, 0.38);
+        }
         vec3 deepWater = vec3(0.004, 0.050, 0.115);
         vec3 surfaceWater = vec3(0.018, 0.135 + shimmer, 0.245);
         vec3 shallowWater = vec3(0.105, 0.275, 0.245);
         vec3 sandyBottom = vec3(0.34, 0.30, 0.18);
+        if (inlandWater) {
+            deepWater = vec3(0.012, 0.065, 0.070);
+            surfaceWater = vec3(0.030, 0.160 + shimmer, 0.145);
+            shallowWater = vec3(0.130, 0.245, 0.170);
+        }
         vec3 waterColor = mix(surfaceWater, shallowWater, shallow * 0.48);
         waterColor = mix(waterColor, sandyBottom, shallow * shoreBand * 0.34 * daylight);
         waterColor = mix(waterColor, deepWater, distanceFade * 0.68);
@@ -415,14 +435,24 @@ void main() {
         vec3 foam = mix(vec3(0.30, 0.38, 0.40), vec3(0.78, 0.86, 0.82), daylight);
         float caustic = smoothstep(0.58, 0.92, valueNoise(worldPosition.xz * 2.1 + vec2(time * 0.21, -time * 0.14)))
             * shallow * (1.0 - distanceFade);
+        if (inlandWater) {
+            caustic *= 0.55 + currentBands * 0.35;
+        }
         color = mix(waterColor * mix(0.46, 0.96, daylight), reflection, fresnel * 0.48)
             + reflectedLight * mix(moonSpecular, specular, daylight) * 0.72;
         color += vec3(0.12, 0.34, 0.26) * caustic * daylight * 0.75;
         float foamAmount = crest * (0.04 + valueNoise(worldPosition.xz * 4.0 + time * 0.06) * 0.08)
             + shoreBand * shoreBreak * (0.20 + cloudiness * 0.08)
             + outerBreak * shoreBreak * 0.08;
+        foamAmount *= waterFoamStrength;
+        if (inlandWater) {
+            foamAmount += currentBands * shoreBreak * 0.035 * waterFoamStrength;
+        }
         color = mix(color, foam, clamp(foamAmount, 0.0, 0.42));
         alpha = mix(0.88, 0.58, shallow * shoreBand);
+        if (inlandWater) {
+            alpha = mix(0.72, 0.90, currentBands * 0.35);
+        }
         alpha = mix(alpha, 0.96, distanceFade * 0.45);
     }
 

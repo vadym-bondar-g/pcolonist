@@ -16,17 +16,25 @@ uniform mat4 view;
 uniform mat4 projection;
 uniform mat4 lightSpaceMatrices[2];
 uniform float water;
+uniform int waterKind;
+uniform vec2 waterFlowDirection;
 uniform float lava;
 uniform float fire;
 uniform float smoke;
 uniform float time;
 
 float waveHeight(vec2 worldXZ) {
-    return sin(dot(vec2(0.940376, 0.340136), worldXZ) * 0.18 + time * 1.05) * 0.16
+    float height = sin(dot(vec2(0.940376, 0.340136), worldXZ) * 0.18 + time * 1.05) * 0.16
         + sin(dot(vec2(-0.28, 0.96), worldXZ) * 0.31 + time * 0.72) * 0.09
         + sin(dot(vec2(0.707107, -0.707107), worldXZ) * 0.57 + time * 1.42) * 0.045
         + sin(dot(vec2(-0.819232, -0.573462), worldXZ) * 0.93 + time * 1.86) * 0.022
         + sin(dot(vec2(0.196116, -0.980581), worldXZ) * 1.41 + time * 2.24) * 0.012;
+    if (waterKind == 1) {
+        vec2 flow = length(waterFlowDirection) > 0.001 ? normalize(waterFlowDirection) : vec2(0.0, 1.0);
+        float current = sin(dot(flow, worldXZ) * 0.72 - time * 1.35) * 0.018;
+        return height * 0.35 + current;
+    }
+    return height;
 }
 
 vec3 waveNormal(vec2 worldXZ) {
@@ -36,6 +44,10 @@ vec3 waveNormal(vec2 worldXZ) {
         + vec2(0.707107, -0.707107) * cos(dot(vec2(0.707107, -0.707107), worldXZ) * 0.57 + time * 1.42) * 0.045 * 0.57
         + vec2(-0.819232, -0.573462) * cos(dot(vec2(-0.819232, -0.573462), worldXZ) * 0.93 + time * 1.86) * 0.022 * 0.93
         + vec2(0.196116, -0.980581) * cos(dot(vec2(0.196116, -0.980581), worldXZ) * 1.41 + time * 2.24) * 0.012 * 1.41;
+    if (waterKind == 1) {
+        vec2 flow = length(waterFlowDirection) > 0.001 ? normalize(waterFlowDirection) : vec2(0.0, 1.0);
+        gradient = gradient * 0.35 + flow * cos(dot(flow, worldXZ) * 0.72 - time * 1.35) * 0.018 * 0.72;
+    }
     return normalize(vec3(-gradient.x, 1.0, -gradient.y));
 }
 

@@ -45,6 +45,9 @@ struct RenderBatch {
     const pcolonist::Mesh* mesh = nullptr;
     std::vector<glm::mat4> models;
     bool water = false;
+    int waterKind = 0;
+    glm::vec2 waterFlowDirection{0.0F};
+    float waterFoamStrength = 1.0F;
     bool terrain = false;
     bool lava = false;
     bool fire = false;
@@ -54,6 +57,9 @@ struct RenderBatch {
 struct BatchKey {
     const pcolonist::Mesh* mesh = nullptr;
     bool water = false;
+    int waterKind = 0;
+    glm::vec2 waterFlowDirection{0.0F};
+    float waterFoamStrength = 1.0F;
     bool terrain = false;
     bool lava = false;
     bool fire = false;
@@ -62,6 +68,9 @@ struct BatchKey {
     bool operator==(const BatchKey& other) const {
         return mesh == other.mesh
             && water == other.water
+            && waterKind == other.waterKind
+            && waterFlowDirection == other.waterFlowDirection
+            && waterFoamStrength == other.waterFoamStrength
             && terrain == other.terrain
             && lava == other.lava
             && fire == other.fire
@@ -76,6 +85,10 @@ struct BatchKeyHash {
             hash ^= std::hash<int>{}(value ? 1 : 0) + 0x9e3779b9U + (hash << 6U) + (hash >> 2U);
         };
         mix(key.water);
+        hash ^= std::hash<int>{}(key.waterKind) + 0x9e3779b9U + (hash << 6U) + (hash >> 2U);
+        hash ^= std::hash<float>{}(key.waterFlowDirection.x) + 0x9e3779b9U + (hash << 6U) + (hash >> 2U);
+        hash ^= std::hash<float>{}(key.waterFlowDirection.y) + 0x9e3779b9U + (hash << 6U) + (hash >> 2U);
+        hash ^= std::hash<float>{}(key.waterFoamStrength) + 0x9e3779b9U + (hash << 6U) + (hash >> 2U);
         mix(key.terrain);
         mix(key.lava);
         mix(key.fire);
@@ -169,6 +182,15 @@ std::vector<RenderBatch> collectBatches(
             const bool lava = registry.has<pcolonist::LavaSurface>(entity);
             const bool fire = registry.has<pcolonist::FireSurface>(entity);
             const bool smoke = registry.has<pcolonist::SmokeSurface>(entity);
+            int waterKind = 0;
+            glm::vec2 waterFlowDirection{0.0F};
+            float waterFoamStrength = 1.0F;
+            if (water) {
+                const pcolonist::WaterSurface& surface = registry.get<pcolonist::WaterSurface>(entity);
+                waterKind = static_cast<int>(surface.kind);
+                waterFlowDirection = surface.flowDirection;
+                waterFoamStrength = surface.foamStrength;
+            }
             const float scale = std::max({transform.scale.x, transform.scale.y, transform.scale.z});
             glm::vec3 cullCenter = transform.position;
             float cullRadius = cachedMeshRadius(*renderer.mesh, meshRadii) * scale;
@@ -201,10 +223,31 @@ std::vector<RenderBatch> collectBatches(
             if (!terrain && !water && distance > objectDistance + scale * 10.0F) {
                 return;
             }
-            const BatchKey key{renderer.mesh.get(), water, terrain, lava, fire, smoke};
+            const BatchKey key{
+                renderer.mesh.get(),
+                water,
+                waterKind,
+                waterFlowDirection,
+                waterFoamStrength,
+                terrain,
+                lava,
+                fire,
+                smoke,
+            };
             const auto [batchIndex, inserted] = batchIndices.emplace(key, batches.size());
             if (inserted) {
-                batches.push_back({key.mesh, {}, key.water, key.terrain, key.lava, key.fire, key.smoke});
+                batches.push_back({
+                    key.mesh,
+                    {},
+                    key.water,
+                    key.waterKind,
+                    key.waterFlowDirection,
+                    key.waterFoamStrength,
+                    key.terrain,
+                    key.lava,
+                    key.fire,
+                    key.smoke,
+                });
             }
             batches[batchIndex->second].models.push_back(modelMatrix(transform));
         });
@@ -353,6 +396,9 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
     for (const RenderBatch& batch : batches) {
             const GpuMesh& gpuMesh = upload(*batch.mesh);
             shader.setFloat("water", batch.water ? 1.0F : 0.0F);
+            shader.setInt("waterKind", batch.waterKind);
+            shader.setVec2("waterFlowDirection", batch.waterFlowDirection);
+            shader.setFloat("waterFoamStrength", batch.waterFoamStrength);
             shader.setFloat("terrain", batch.terrain ? 1.0F : 0.0F);
             shader.setFloat("lava", batch.lava ? 1.0F : 0.0F);
             shader.setFloat("fire", batch.fire ? 1.0F : 0.0F);

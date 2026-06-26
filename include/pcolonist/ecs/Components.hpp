@@ -19,9 +19,17 @@ struct MeshRenderer {
     std::shared_ptr<Mesh> mesh;
 };
 
+enum class WaterKind {
+    Ocean = 0,
+    Inland = 1,
+};
+
 struct WaterSurface {
     glm::vec2 halfExtents{320.0F};
     bool affectsPhysics = true;
+    WaterKind kind = WaterKind::Ocean;
+    glm::vec2 flowDirection{0.0F};
+    float foamStrength = 1.0F;
 };
 struct CampfireFire {
     float size = 1.0F;
