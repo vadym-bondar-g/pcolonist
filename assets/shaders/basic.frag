@@ -35,6 +35,7 @@ uniform sampler2D terrainSandTexture;
 uniform sampler2D terrainBasaltTexture;
 uniform int shadowsEnabled;
 uniform int hasDiffuseTexture;
+uniform int sceneQuality;
 uniform int fireLightCount;
 uniform vec3 fireLightPositions[4];
 uniform vec3 fireLightColors[4];
@@ -129,6 +130,10 @@ float cascadeShadow(sampler2D shadowMap, vec4 lightSpacePosition, vec3 normal, v
         return 0.0;
     }
     float bias = max(0.0015 * (1.0 - dot(normal, lightDirection)), 0.00035);
+    if (sceneQuality == 0) {
+        float depth = texture(shadowMap, projected.xy).r;
+        return projected.z - bias > depth ? 1.0 : 0.0;
+    }
     vec2 texel = 1.0 / textureSize(shadowMap, 0);
     float shadow = 0.0;
     for (int x = -1; x <= 1; ++x) {
@@ -177,7 +182,7 @@ void main() {
             discard;
         }
     }
-    if (terrain > 0.5) {
+    if (terrain > 0.5 && sceneQuality >= 1) {
         vec2 gradient = terrainGradient(worldPosition.xz);
         normal = normalize(normal + vec3(-gradient.x, 0.0, -gradient.y) * 0.32);
     }
@@ -222,7 +227,7 @@ void main() {
     if (hasDiffuseTexture != 0) {
         albedo *= texture(diffuseTexture, uv).rgb;
     }
-    if (terrain < 0.5 && water < 0.5 && lava < 0.5 && fire < 0.5 && smoke < 0.5) {
+    if (sceneQuality >= 2 && terrain < 0.5 && water < 0.5 && lava < 0.5 && fire < 0.5 && smoke < 0.5) {
         albedo = objectMaterialDetail(albedo, worldPosition, normal);
     }
     if (terrain > 0.5) {
@@ -230,7 +235,7 @@ void main() {
         float detail = terrainDetail(worldPosition.xz);
         float fine = valueNoise(worldPosition.xz * 5.5);
         float grains = valueNoise(worldPosition.xz * 18.0);
-        float cells = cellular(worldPosition.xz * 0.72);
+        float cells = sceneQuality >= 1 ? cellular(worldPosition.xz * 0.72) : 1.0;
         float moss = smoothstep(0.42, 0.72, detail) * (1.0 - steep);
         float heightJitter = (detail - 0.5) * 0.8;
         float height = worldPosition.y + heightJitter;
@@ -250,9 +255,9 @@ void main() {
         albedo = mix(albedo, mountainRock, smoothstep(4.8, 6.5, height));
         albedo = mix(albedo, mountainRock, steep);
 
-        vec3 earthTexture = triplanarSample(terrainEarthTexture, worldPosition, normal, 0.105);
-        vec3 sandTexture = triplanarSample(terrainSandTexture, worldPosition, normal, 0.12);
-        vec3 basaltTexture = triplanarSample(terrainBasaltTexture, worldPosition, normal, 0.09);
+        vec3 earthTexture = sceneQuality >= 1 ? triplanarSample(terrainEarthTexture, worldPosition, normal, 0.105) : vec3(0.26, 0.29, 0.14);
+        vec3 sandTexture = sceneQuality >= 1 ? triplanarSample(terrainSandTexture, worldPosition, normal, 0.12) : vec3(0.58, 0.49, 0.30);
+        vec3 basaltTexture = sceneQuality >= 1 ? triplanarSample(terrainBasaltTexture, worldPosition, normal, 0.09) : vec3(0.28, 0.27, 0.25);
         float materialNoise = detail * 0.72 + valueNoise(worldPosition.xz * 0.035) * 0.28;
         float blendJitter = (materialNoise - 0.5) * 0.65;
         float sandWeight = (1.0 - smoothstep(-0.05 + blendJitter, 0.85 + blendJitter, height))
@@ -267,22 +272,26 @@ void main() {
             + basaltTexture * basaltWeight) / materialTotal;
         float macroVariation = valueNoise(worldPosition.xz * 0.018);
         texturedTerrain *= mix(vec3(0.82, 0.88, 0.78), vec3(1.10, 1.06, 0.98), macroVariation);
-        albedo = mix(albedo, texturedTerrain, 0.72);
+        albedo = mix(albedo, texturedTerrain, sceneQuality >= 1 ? 0.72 : 0.42);
         terrainSandAmount = sandWeight / materialTotal;
         terrainBasaltAmount = basaltWeight / materialTotal;
 
-        float stoneVeins = 1.0 - smoothstep(0.045, 0.16, cells);
-        albedo = mix(albedo, albedo * vec3(0.58, 0.62, 0.60), stoneVeins * steep * 0.42);
-        float grassFibers = smoothstep(0.73, 0.93, grains) * (1.0 - steep)
-            * smoothstep(0.05, 0.8, height) * (1.0 - smoothstep(4.0, 5.3, height));
-        albedo = mix(albedo, vec3(0.20, 0.43, 0.08), grassFibers * 0.22);
-        albedo = mix(albedo, vec3(0.12, 0.30, 0.08), moss * 0.35 * smoothstep(0.5, 3.0, height));
+        if (sceneQuality >= 1) {
+            float stoneVeins = 1.0 - smoothstep(0.045, 0.16, cells);
+            albedo = mix(albedo, albedo * vec3(0.58, 0.62, 0.60), stoneVeins * steep * 0.42);
+            float grassFibers = smoothstep(0.73, 0.93, grains) * (1.0 - steep)
+                * smoothstep(0.05, 0.8, height) * (1.0 - smoothstep(4.0, 5.3, height));
+            albedo = mix(albedo, vec3(0.20, 0.43, 0.08), grassFibers * 0.22);
+            albedo = mix(albedo, vec3(0.12, 0.30, 0.08), moss * 0.35 * smoothstep(0.5, 3.0, height));
+        }
         float shoreWetness = 1.0 - smoothstep(-0.62, -0.08, height);
         albedo = mix(albedo, albedo * vec3(0.48, 0.60, 0.57), shoreWetness * 0.55);
         terrainWetness = shoreWetness * terrainSandAmount;
-        float terracePhase = abs(fract((height + 0.08) / 1.35) - 0.5) * 2.0;
-        float terraceEdge = smoothstep(0.78, 0.98, terracePhase) * smoothstep(0.35, 1.4, height);
-        albedo = mix(albedo, albedo * vec3(0.68, 0.72, 0.69), terraceEdge * (0.10 + steep * 0.28));
+        if (sceneQuality >= 2) {
+            float terracePhase = abs(fract((height + 0.08) / 1.35) - 0.5) * 2.0;
+            float terraceEdge = smoothstep(0.78, 0.98, terracePhase) * smoothstep(0.35, 1.4, height);
+            albedo = mix(albedo, albedo * vec3(0.68, 0.72, 0.69), terraceEdge * (0.10 + steep * 0.28));
+        }
         float craterProximity = 1.0 - smoothstep(10.0, 31.0, length(worldPosition.xz));
         float hotCracks = smoothstep(0.72, 0.9, grains) * craterProximity * smoothstep(10.0, 18.0, height);
         albedo = mix(albedo, vec3(0.32, 0.035, 0.005), hotCracks * 0.75);

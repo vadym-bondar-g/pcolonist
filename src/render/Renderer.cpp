@@ -1,5 +1,6 @@
 #include "pcolonist/render/Renderer.hpp"
 
+#include "pcolonist/core/ApplicationConfig.hpp"
 #include "pcolonist/ecs/Components.hpp"
 #include "pcolonist/ecs/Registry.hpp"
 #include "pcolonist/render/Camera.hpp"
@@ -50,6 +51,39 @@ struct RenderBatch {
     bool smoke = false;
 };
 
+struct BatchKey {
+    const pcolonist::Mesh* mesh = nullptr;
+    bool water = false;
+    bool terrain = false;
+    bool lava = false;
+    bool fire = false;
+    bool smoke = false;
+
+    bool operator==(const BatchKey& other) const {
+        return mesh == other.mesh
+            && water == other.water
+            && terrain == other.terrain
+            && lava == other.lava
+            && fire == other.fire
+            && smoke == other.smoke;
+    }
+};
+
+struct BatchKeyHash {
+    std::size_t operator()(const BatchKey& key) const {
+        std::size_t hash = std::hash<const pcolonist::Mesh*>{}(key.mesh);
+        const auto mix = [&hash](bool value) {
+            hash ^= std::hash<int>{}(value ? 1 : 0) + 0x9e3779b9U + (hash << 6U) + (hash >> 2U);
+        };
+        mix(key.water);
+        mix(key.terrain);
+        mix(key.lava);
+        mix(key.fire);
+        mix(key.smoke);
+        return hash;
+    }
+};
+
 struct FireLightUniform {
     glm::vec3 position{0.0F};
     glm::vec3 color{1.0F, 0.32F, 0.05F};
@@ -98,16 +132,28 @@ float meshRadius(const pcolonist::Mesh& mesh) {
     return radius;
 }
 
+float cachedMeshRadius(const pcolonist::Mesh& mesh, std::unordered_map<const pcolonist::Mesh*, float>& cache) {
+    if (const auto iterator = cache.find(&mesh); iterator != cache.end()) {
+        return iterator->second;
+    }
+    return cache.emplace(&mesh, meshRadius(mesh)).first->second;
+}
+
 std::vector<RenderBatch> collectBatches(
     pcolonist::Registry& registry,
     const pcolonist::Camera& camera,
     float aspectRatio,
-    bool shadows) {
+    bool shadows,
+    std::unordered_map<const pcolonist::Mesh*, float>& meshRadii,
+    float terrainDistance,
+    float objectDistance,
+    float minimumShadowRadius) {
     std::vector<RenderBatch> batches;
+    std::unordered_map<BatchKey, std::size_t, BatchKeyHash> batchIndices;
     const glm::vec3& cameraPosition = camera.position();
     const Frustum frustum = cameraFrustum(camera, aspectRatio);
     registry.each<pcolonist::Transform, pcolonist::MeshRenderer>(
-        [&batches, &registry, cameraPosition, &frustum, shadows](
+        [&batches, &batchIndices, &registry, cameraPosition, &frustum, shadows, &meshRadii, terrainDistance, objectDistance, minimumShadowRadius](
             pcolonist::Entity entity,
             const pcolonist::Transform& transform,
             const pcolonist::MeshRenderer& renderer) {
@@ -125,11 +171,14 @@ std::vector<RenderBatch> collectBatches(
             const bool smoke = registry.has<pcolonist::SmokeSurface>(entity);
             const float scale = std::max({transform.scale.x, transform.scale.y, transform.scale.z});
             glm::vec3 cullCenter = transform.position;
-            float cullRadius = meshRadius(*renderer.mesh) * scale;
+            float cullRadius = cachedMeshRadius(*renderer.mesh, meshRadii) * scale;
+            if (shadows && cullRadius < minimumShadowRadius) {
+                return;
+            }
             if (registry.has<pcolonist::TerrainChunk>(entity)) {
                 const pcolonist::TerrainChunk& chunk = registry.get<pcolonist::TerrainChunk>(entity);
                 const float chunkDistance = glm::distance(glm::vec2{cameraPosition.x, cameraPosition.z}, chunk.center);
-                if (chunkDistance > chunk.radius + terrainStreamingDistance) {
+                if (chunkDistance > chunk.radius + terrainDistance) {
                     return;
                 }
                 if (registry.has<pcolonist::TerrainLod>(entity)) {
@@ -149,22 +198,15 @@ std::vector<RenderBatch> collectBatches(
                 return;
             }
             const float distance = glm::length(transform.position - cameraPosition);
-            if (!terrain && !water && distance > objectDrawDistance + scale * 10.0F) {
+            if (!terrain && !water && distance > objectDistance + scale * 10.0F) {
                 return;
             }
-            auto batch = std::find_if(batches.begin(), batches.end(), [&](const RenderBatch& candidate) {
-                return candidate.mesh == renderer.mesh.get()
-                    && candidate.water == water
-                    && candidate.terrain == terrain
-                    && candidate.lava == lava
-                    && candidate.fire == fire
-                    && candidate.smoke == smoke;
-            });
-            if (batch == batches.end()) {
-                batches.push_back({renderer.mesh.get(), {}, water, terrain, lava, fire, smoke});
-                batch = std::prev(batches.end());
+            const BatchKey key{renderer.mesh.get(), water, terrain, lava, fire, smoke};
+            const auto [batchIndex, inserted] = batchIndices.emplace(key, batches.size());
+            if (inserted) {
+                batches.push_back({key.mesh, {}, key.water, key.terrain, key.lava, key.fire, key.smoke});
             }
-            batch->models.push_back(modelMatrix(transform));
+            batches[batchIndex->second].models.push_back(modelMatrix(transform));
         });
     return batches;
 }
@@ -259,6 +301,7 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
     shader.setFloat("nightFactor", weather.nightFactor());
     shader.setFloat("cloudiness", weather.cloudiness());
     shader.setFloat("time", weather.time());
+    shader.setInt("sceneQuality", sceneQuality_);
     shader.setInt("shadowMapNear", 3);
     shader.setInt("shadowMapFar", 4);
     shader.setInt("diffuseTexture", 0);
@@ -281,7 +324,15 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, shadowDepths_[1]);
 
-    std::vector<RenderBatch> batches = collectBatches(registry, camera, aspectRatio, false);
+    std::vector<RenderBatch> batches = collectBatches(
+        registry,
+        camera,
+        aspectRatio,
+        false,
+        meshRadii_,
+        terrainStreamingDistance,
+        objectDrawDistance,
+        0.0F);
     std::stable_sort(batches.begin(), batches.end(), [](const RenderBatch& left, const RenderBatch& right) {
         const int leftOrder = left.fire ? 2 : left.smoke ? 1 : 0;
         const int rightOrder = right.fire ? 2 : right.smoke ? 1 : 0;
@@ -382,11 +433,19 @@ void Renderer::releaseUnusedMeshes(Registry& registry) {
             ++iterator;
             continue;
         }
+        meshRadii_.erase(iterator->first);
         glDeleteBuffers(1, &iterator->second.instanceBuffer);
         glDeleteBuffers(1, &iterator->second.indexBuffer);
         glDeleteBuffers(1, &iterator->second.vertexBuffer);
         glDeleteVertexArrays(1, &iterator->second.vertexArray);
         iterator = meshes_.erase(iterator);
+    }
+    for (auto iterator = meshRadii_.begin(); iterator != meshRadii_.end();) {
+        if (liveMeshes.contains(iterator->first)) {
+            ++iterator;
+            continue;
+        }
+        iterator = meshRadii_.erase(iterator);
     }
 }
 
@@ -396,6 +455,21 @@ void Renderer::setShadowsEnabled(bool enabled) {
 
 void Renderer::setBloomEnabled(bool enabled) {
     bloomEnabled_ = enabled;
+}
+
+void Renderer::setGraphicsQuality(GraphicsQuality quality) {
+    switch (quality) {
+    case GraphicsQuality::Low:
+        sceneQuality_ = 0;
+        break;
+    case GraphicsQuality::Medium:
+        sceneQuality_ = 1;
+        break;
+    case GraphicsQuality::High:
+    case GraphicsQuality::Cinematic:
+        sceneQuality_ = 2;
+        break;
+    }
 }
 
 void Renderer::setSkyQuality(SkyQuality quality) {
@@ -532,8 +606,20 @@ void Renderer::renderShadowMap(const Camera& camera, Registry& registry, const W
     Shader& shader = shaders_.get("shadow");
     shader.use();
     const float aspectRatio = height_ > 0 ? static_cast<float>(width_) / static_cast<float>(height_) : 1.0F;
-    const std::vector<RenderBatch> batches = collectBatches(registry, camera, aspectRatio, true);
     for (std::size_t cascade = 0; cascade < shadowFramebuffers_.size(); ++cascade) {
+        const float range = shadowRanges[cascade];
+        const float terrainShadowDistance = range + (cascade == 0 ? 28.0F : 46.0F);
+        const float objectShadowDistance = range + (cascade == 0 ? 22.0F : 32.0F);
+        const float minimumShadowRadius = cascade == 0 ? 0.0F : 1.35F;
+        const std::vector<RenderBatch> batches = collectBatches(
+            registry,
+            camera,
+            aspectRatio,
+            true,
+            meshRadii_,
+            terrainShadowDistance,
+            objectShadowDistance,
+            minimumShadowRadius);
         glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffers_[cascade]);
         glClear(GL_DEPTH_BUFFER_BIT);
         shader.setMat4("lightSpaceMatrix", lightSpaceMatrices_[cascade]);

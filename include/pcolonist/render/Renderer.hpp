@@ -16,6 +16,7 @@ class Camera;
 class Mesh;
 class Registry;
 class WeatherSystem;
+enum class GraphicsQuality;
 
 class Renderer {
 public:
@@ -31,6 +32,7 @@ public:
     void releaseUnusedMeshes(Registry& registry);
     void setShadowsEnabled(bool enabled);
     void setBloomEnabled(bool enabled);
+    void setGraphicsQuality(GraphicsQuality quality);
     void setSkyQuality(SkyQuality quality);
     void cycleSkyQuality();
     [[nodiscard]] bool shadowsEnabled() const;
@@ -59,6 +61,7 @@ private:
     Skybox skybox_;
     std::filesystem::path assetRoot_;
     std::unordered_map<const Mesh*, GpuMesh> meshes_;
+    std::unordered_map<const Mesh*, float> meshRadii_;
     std::unordered_map<std::filesystem::path, unsigned int> textures_;
     unsigned int hdrFramebuffer_ = 0;
     unsigned int hdrColor_ = 0;
@@ -71,6 +74,7 @@ private:
     int height_ = 720;
     bool shadowsEnabled_ = true;
     bool bloomEnabled_ = true;
+    int sceneQuality_ = 2;
     SkyQuality skyQuality_ = SkyQuality::Medium;
 };
 
