@@ -136,6 +136,10 @@ void Application::initialize() {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
     renderer_ = std::make_unique<Renderer>(config_.assetRoot);
+    renderer_->setShadowsEnabled(config_.shadows);
+    renderer_->setBloomEnabled(config_.bloom);
+    renderer_->setSkyQuality(config_.skyQuality);
+    frameLimiter_.setLimit(config_.frameLimit);
     ui_.initialize(config_.assetRoot);
     ui_.setLanguage(config_.language);
     survival_.loadLocations(assets_);

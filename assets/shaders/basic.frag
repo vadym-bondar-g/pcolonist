@@ -416,8 +416,15 @@ void main() {
     float heightFog = exp(-max(worldPosition.y + 2.0, 0.0) * 0.035);
     float horizonFog = smoothstep(95.0, 620.0, horizontalDistance);
     float weatherFog = 1.0 - exp(-fogDensity * horizontalDistance);
+    float seaMist = exp(-pow((worldPosition.y + 0.45) * 0.62, 2.0))
+        * smoothstep(22.0, 210.0, horizontalDistance)
+        * (0.08 + cloudiness * 0.18);
+    float valleyMist = exp(-max(worldPosition.y - 1.2, 0.0) * 0.18)
+        * smoothstep(45.0, 260.0, horizontalDistance)
+        * smoothstep(0.0, 4.2, cameraPosition.y - worldPosition.y)
+        * (0.04 + cloudiness * 0.11);
     float lowMist = heightFog * smoothstep(18.0, 170.0, horizontalDistance) * (0.05 + cloudiness * 0.14);
-    float fog = clamp(weatherFog * (0.34 + horizonFog * 0.72) + lowMist, 0.0, 0.78 + cloudiness * 0.12);
+    float fog = clamp(weatherFog * (0.34 + horizonFog * 0.72) + lowMist + seaMist + valleyMist, 0.0, 0.78 + cloudiness * 0.12);
     color = mix(color, fogColor, fog);
     fragmentColor = vec4(color, alpha);
 }

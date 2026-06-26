@@ -31,6 +31,7 @@ public:
     void releaseUnusedMeshes(Registry& registry);
     void setShadowsEnabled(bool enabled);
     void setBloomEnabled(bool enabled);
+    void setSkyQuality(SkyQuality quality);
     void cycleSkyQuality();
     [[nodiscard]] bool shadowsEnabled() const;
     [[nodiscard]] bool bloomEnabled() const;

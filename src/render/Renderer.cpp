@@ -398,6 +398,10 @@ void Renderer::setBloomEnabled(bool enabled) {
     bloomEnabled_ = enabled;
 }
 
+void Renderer::setSkyQuality(SkyQuality quality) {
+    skyQuality_ = quality;
+}
+
 void Renderer::cycleSkyQuality() {
     switch (skyQuality_) {
     case SkyQuality::Off:

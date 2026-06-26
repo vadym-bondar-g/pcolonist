@@ -28,6 +28,20 @@ int parsePositiveInt(std::string_view value, std::string_view name) {
     return result;
 }
 
+int parseNonNegativeInt(std::string_view value, std::string_view name) {
+    std::size_t parsed = 0;
+    int result = 0;
+    try {
+        result = std::stoi(std::string(value), &parsed);
+    } catch (const std::exception&) {
+        throw pcolonist::ArgumentError("Invalid " + std::string(name) + ": " + std::string(value));
+    }
+    if (parsed != value.size() || result < 0) {
+        throw pcolonist::ArgumentError("Invalid " + std::string(name) + ": " + std::string(value));
+    }
+    return result;
+}
+
 std::filesystem::path defaultAssetRoot() {
     if (const char* environment = std::getenv("PCOLONIST_ASSET_DIR")) {
         if (*environment != '\0') {
@@ -48,6 +62,58 @@ pcolonist::UiLanguage parseLanguage(std::string_view value) {
         return pcolonist::UiLanguage::Polish;
     }
     throw pcolonist::ArgumentError("Language must be one of: en, ru, pl");
+}
+
+pcolonist::SkyQuality parseSkyQuality(std::string_view value) {
+    if (value == "off" || value == "OFF") {
+        return pcolonist::SkyQuality::Off;
+    }
+    if (value == "low" || value == "LOW") {
+        return pcolonist::SkyQuality::Low;
+    }
+    if (value == "medium" || value == "MEDIUM" || value == "med" || value == "MED") {
+        return pcolonist::SkyQuality::Medium;
+    }
+    if (value == "high" || value == "HIGH") {
+        return pcolonist::SkyQuality::High;
+    }
+    throw pcolonist::ArgumentError("Sky quality must be one of: off, low, medium, high");
+}
+
+void applyGraphicsQuality(pcolonist::ApplicationConfig& config, std::string_view value) {
+    if (value == "low" || value == "LOW") {
+        config.graphicsQuality = pcolonist::GraphicsQuality::Low;
+        config.shadows = false;
+        config.bloom = false;
+        config.skyQuality = pcolonist::SkyQuality::Low;
+        config.frameLimit = 60;
+        return;
+    }
+    if (value == "medium" || value == "MEDIUM" || value == "med" || value == "MED") {
+        config.graphicsQuality = pcolonist::GraphicsQuality::Medium;
+        config.shadows = true;
+        config.bloom = false;
+        config.skyQuality = pcolonist::SkyQuality::Medium;
+        config.frameLimit = 120;
+        return;
+    }
+    if (value == "high" || value == "HIGH") {
+        config.graphicsQuality = pcolonist::GraphicsQuality::High;
+        config.shadows = true;
+        config.bloom = true;
+        config.skyQuality = pcolonist::SkyQuality::Medium;
+        config.frameLimit = 120;
+        return;
+    }
+    if (value == "cinematic" || value == "CINEMATIC" || value == "ultra" || value == "ULTRA") {
+        config.graphicsQuality = pcolonist::GraphicsQuality::Cinematic;
+        config.shadows = true;
+        config.bloom = true;
+        config.skyQuality = pcolonist::SkyQuality::High;
+        config.frameLimit = 0;
+        return;
+    }
+    throw pcolonist::ArgumentError("Graphics quality must be one of: low, medium, high, cinematic");
 }
 
 bool checkAsset(pcolonist::AssetSystem& assets, const std::filesystem::path& path, std::ostream& output) {
@@ -106,6 +172,9 @@ RuntimeOptions parseRuntimeOptions(const std::vector<std::string>& arguments) {
             options.application.windowWidth = parsePositiveInt(requireValue("--width"), "window width");
         } else if (argument == "--height") {
             options.application.windowHeight = parsePositiveInt(requireValue("--height"), "window height");
+        } else if (argument == "--fps-limit") {
+            const int limit = parseNonNegativeInt(requireValue("--fps-limit"), "FPS limit");
+            options.application.frameLimit = limit;
         } else if (argument == "--window-size") {
             const std::string& value = requireValue("--window-size");
             const std::size_t separator = value.find('x');
@@ -120,6 +189,18 @@ RuntimeOptions parseRuntimeOptions(const std::vector<std::string>& arguments) {
             options.application.vsync = true;
         } else if (argument == "--language" || argument == "--lang") {
             options.application.language = parseLanguage(requireValue("--language"));
+        } else if (argument == "--graphics") {
+            applyGraphicsQuality(options.application, requireValue("--graphics"));
+        } else if (argument == "--shadows") {
+            options.application.shadows = true;
+        } else if (argument == "--no-shadows") {
+            options.application.shadows = false;
+        } else if (argument == "--bloom") {
+            options.application.bloom = true;
+        } else if (argument == "--no-bloom") {
+            options.application.bloom = false;
+        } else if (argument == "--sky-quality") {
+            options.application.skyQuality = parseSkyQuality(requireValue("--sky-quality"));
         } else {
             throw ArgumentError("Unknown argument: " + argument);
         }
@@ -142,8 +223,15 @@ void printUsage(std::ostream& output, const char* executable) {
         << "      --window-size WxH   Set initial window size, for example 1600x900\n"
         << "      --width N           Set initial window width\n"
         << "      --height N          Set initial window height\n"
+        << "      --fps-limit N       Limit frames per second\n"
         << "      --vsync             Enable vertical sync\n"
         << "      --no-vsync          Disable vertical sync\n"
+        << "      --graphics QUALITY  Set graphics preset: low, medium, high, or cinematic\n"
+        << "      --shadows           Enable shadow rendering\n"
+        << "      --no-shadows        Disable shadow rendering\n"
+        << "      --bloom             Enable bloom post-processing\n"
+        << "      --no-bloom          Disable bloom post-processing\n"
+        << "      --sky-quality Q     Set sky quality: off, low, medium, or high\n"
         << "      --language CODE     Set UI language: en, ru, or pl\n";
 }
 
