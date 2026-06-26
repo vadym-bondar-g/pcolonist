@@ -161,6 +161,22 @@ float shadowAmount(vec3 normal, vec3 lightDirection) {
     return mix(nearShadow, farShadow, smoothstep(28.0, 42.0, distanceToCamera));
 }
 
+vec3 waterSkyReflection(vec3 normal, vec3 viewDirection) {
+    vec3 reflected = reflect(-viewDirection, normal);
+    float skyHeight = clamp(reflected.y * 0.5 + 0.5, 0.0, 1.0);
+    vec3 dayHorizon = mix(fogColor, vec3(0.42, 0.62, 0.78), 0.42);
+    vec3 dayZenith = vec3(0.045, 0.18, 0.34);
+    vec3 nightHorizon = mix(fogColor, vec3(0.012, 0.035, 0.075), 0.48);
+    vec3 nightZenith = vec3(0.004, 0.010, 0.030);
+    vec3 daySky = mix(dayHorizon, dayZenith, smoothstep(0.0, 1.0, skyHeight));
+    vec3 nightSky = mix(nightHorizon, nightZenith + moonColor * 0.10, smoothstep(0.0, 1.0, skyHeight));
+    vec3 sky = mix(nightSky, daySky, daylight);
+    float sunGlint = pow(max(dot(reflected, normalize(sunDirection)), 0.0), 96.0) * daylight;
+    float moonGlint = pow(max(dot(reflected, normalize(moonDirection)), 0.0), 72.0) * nightFactor;
+    sky += sunColor * sunGlint * 0.55 + moonColor * moonGlint * 0.35;
+    return sky;
+}
+
 void main() {
     vec3 normal = normalize(worldNormal);
     float alpha = 1.0;
@@ -431,14 +447,14 @@ void main() {
         waterColor = mix(waterColor, vec3(0.075, 0.125, 0.105), turbidity * shoreBand * 0.20);
         float fresnel = 0.025 + 0.52 * pow(1.0 - max(dot(normal, viewDirection), 0.0), 4.6);
         vec3 reflectedLight = mix(sunColor, moonColor, nightFactor);
-        vec3 reflection = mix(fogColor, reflectedLight, 0.08 + daylight * 0.11);
+        vec3 reflection = mix(waterSkyReflection(normal, viewDirection), reflectedLight, 0.05 + daylight * 0.07);
         vec3 foam = mix(vec3(0.30, 0.38, 0.40), vec3(0.78, 0.86, 0.82), daylight);
         float caustic = smoothstep(0.58, 0.92, valueNoise(worldPosition.xz * 2.1 + vec2(time * 0.21, -time * 0.14)))
             * shallow * (1.0 - distanceFade);
         if (inlandWater) {
             caustic *= 0.55 + currentBands * 0.35;
         }
-        color = mix(waterColor * mix(0.46, 0.96, daylight), reflection, fresnel * 0.48)
+        color = mix(waterColor * mix(0.46, 0.96, daylight), reflection, fresnel * (inlandWater ? 0.28 : 0.58))
             + reflectedLight * mix(moonSpecular, specular, daylight) * 0.72;
         color += vec3(0.12, 0.34, 0.26) * caustic * daylight * 0.75;
         float foamAmount = crest * (0.04 + valueNoise(worldPosition.xz * 4.0 + time * 0.06) * 0.08)

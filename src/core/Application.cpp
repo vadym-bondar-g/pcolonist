@@ -428,7 +428,7 @@ void Application::createWorld() {
         return MeshFactory::cube({0.75F, 0.12F, 0.1F});
     });
     const auto waterMesh = resources_.load<Mesh>("builtin/water", [] {
-        return MeshFactory::gridPlane(1920.0F, 288, {0.02F, 0.24F, 0.42F});
+        return MeshFactory::gridPlane(1920.0F, 160, {0.02F, 0.24F, 0.42F});
     });
     const auto lavaMesh = resources_.load<Mesh>("builtin/lava", [] {
         return MeshFactory::lavaLake(1.0F, 1.0F, 128, 5, {1.0F, 0.12F, 0.005F});
