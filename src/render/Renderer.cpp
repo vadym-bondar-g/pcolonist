@@ -334,8 +334,20 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
         objectDrawDistance,
         0.0F);
     std::stable_sort(batches.begin(), batches.end(), [](const RenderBatch& left, const RenderBatch& right) {
-        const int leftOrder = left.fire ? 2 : left.smoke ? 1 : 0;
-        const int rightOrder = right.fire ? 2 : right.smoke ? 1 : 0;
+        const auto order = [](const RenderBatch& batch) {
+            if (batch.smoke) {
+                return 4;
+            }
+            if (batch.fire) {
+                return 3;
+            }
+            if (batch.water || batch.lava) {
+                return 2;
+            }
+            return 0;
+        };
+        const int leftOrder = order(left);
+        const int rightOrder = order(right);
         return leftOrder < rightOrder;
     });
     for (const RenderBatch& batch : batches) {
@@ -348,6 +360,10 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
             if (batch.fire) {
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+                glDepthMask(GL_FALSE);
+            } else if (batch.water || batch.lava) {
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                 glDepthMask(GL_FALSE);
             } else if (batch.smoke) {
                 glEnable(GL_BLEND);

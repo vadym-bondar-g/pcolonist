@@ -428,7 +428,7 @@ void Application::createWorld() {
         return MeshFactory::cube({0.75F, 0.12F, 0.1F});
     });
     const auto waterMesh = resources_.load<Mesh>("builtin/water", [] {
-        return MeshFactory::gridPlane(640.0F, 224, {0.02F, 0.24F, 0.42F});
+        return MeshFactory::gridPlane(1920.0F, 288, {0.02F, 0.24F, 0.42F});
     });
     const auto lavaMesh = resources_.load<Mesh>("builtin/lava", [] {
         return MeshFactory::lavaLake(1.0F, 1.0F, 128, 5, {1.0F, 0.12F, 0.005F});
@@ -458,9 +458,9 @@ void Application::createWorld() {
     }
 
     const Entity water = registry_.create();
-    registry_.emplace<Transform>(water, Transform{{0.0F, -0.45F, 0.0F}});
+    registry_.emplace<Transform>(water, Transform{{0.0F, 0.08F, 0.0F}});
     registry_.emplace<MeshRenderer>(water, waterMesh);
-    registry_.emplace<WaterSurface>(water, WaterSurface{{320.0F, 320.0F}});
+    registry_.emplace<WaterSurface>(water, WaterSurface{{960.0F, 960.0F}});
 
     const Entity internalWater = registry_.create();
     registry_.emplace<Transform>(internalWater);
