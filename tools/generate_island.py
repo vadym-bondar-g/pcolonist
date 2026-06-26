@@ -1238,7 +1238,7 @@ def write_chunked_terrain_meshes(
     lod_index: int,
     vertices: list[tuple[float, float, float, float, float, float]],
     faces: list[tuple[int, ...]],
-    chunk_size: float = 64.0,
+    chunk_size: float = 128.0,
 ) -> list[Path]:
     TERRAIN_CHUNK_DIR.mkdir(parents=True, exist_ok=True)
     if lod_index == 0:

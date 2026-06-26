@@ -18,7 +18,7 @@ class Registry;
 class ChunkManager {
 public:
     struct Config {
-        float chunkSize = 64.0F;
+        float chunkSize = 128.0F;
         int loadRadius = 3;
         int unloadRadius = 4;
         int lod0Radius = 1;

@@ -264,7 +264,7 @@ Every frame executes ordered tasks:
 - Vegetation placement uses local elevation, slope, moisture and distance to
   water, keeping steep dry ridges exposed and concentrating forest and
   understory in sheltered wet valleys.
-- Terrain rendering is split into seamless 64-unit chunks. The complete
+- Terrain rendering is split into seamless 128-unit chunks. The complete
   collider remains resident, while chunk GPU meshes are uploaded lazily as
   they enter the camera's streaming radius.
 - Terrain uses seamless triplanar earth, sand and basalt textures blended by
