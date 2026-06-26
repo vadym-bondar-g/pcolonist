@@ -10,7 +10,7 @@ import html
 import base64
 import struct
 import zlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cache
 from pathlib import Path
 from typing import Sequence
@@ -22,7 +22,10 @@ from island_generator.runtime import OutputLayout
 
 DEFAULT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SEED = 1847
-DEFAULT_GRID = 321
+WORLD_SCALE = 3.0
+HORIZONTAL_SCALE = WORLD_SCALE
+VERTICAL_SCALE = 1.35
+DEFAULT_GRID = 481
 ROOT = DEFAULT_ROOT
 MAP_PATH = ROOT / "assets" / "maps" / "demo_map.obj"
 MAP_LOD_PATHS = (
@@ -56,7 +59,7 @@ SCENE_PATH = ROOT / "assets" / "scripts" / "models.scene"
 GAMEPLAY_GOALS_PATH = ROOT / "assets" / "scripts" / "gameplay_goals.json"
 SEED = DEFAULT_SEED
 GRID = DEFAULT_GRID
-SPACING = 2.0
+SPACING = 4.0
 LOD_STEPS = (2, 4)
 WALKABILITY_GRID = 161
 DEBUG_MAP_GRID = 81
@@ -315,7 +318,163 @@ class IslandModelConfig:
     )
 
 
-CONFIG = IslandModelConfig()
+def scale_xz(point: tuple[float, float]) -> tuple[float, float]:
+    return point[0] * HORIZONTAL_SCALE, point[1] * HORIZONTAL_SCALE
+
+
+def scale_distance(value: float) -> float:
+    return value * HORIZONTAL_SCALE
+
+
+def scale_height(value: float) -> float:
+    return value * VERTICAL_SCALE
+
+
+def scale_optional_height(value: float | None) -> float | None:
+    return None if value is None else scale_height(value)
+
+
+def scale_tributary(tributary: TributaryConfig) -> TributaryConfig:
+    return replace(
+        tributary,
+        source=scale_xz(tributary.source),
+        width_start=scale_distance(tributary.width_start),
+        width_end=scale_distance(tributary.width_end),
+        source_cut=scale_distance(tributary.source_cut),
+    )
+
+
+def scale_water(config: WaterConfig) -> WaterConfig:
+    return replace(
+        config,
+        lake_center=scale_xz(config.lake_center),
+        river_source=scale_xz(config.river_source),
+        harbor_center=scale_xz(config.harbor_center),
+        lake_level=scale_height(config.lake_level),
+        lake_radius_x=scale_distance(config.lake_radius_x),
+        lake_radius_z=scale_distance(config.lake_radius_z),
+        lake_basin_radius_x=scale_distance(config.lake_basin_radius_x),
+        lake_basin_radius_z=scale_distance(config.lake_basin_radius_z),
+        lake_bed_center=scale_height(config.lake_bed_center),
+        lake_bed_edge=scale_height(config.lake_bed_edge),
+        river_width_start=scale_distance(config.river_width_start),
+        river_width_end=scale_distance(config.river_width_end),
+        river_bank_width=scale_distance(config.river_bank_width),
+        river_source_cut=scale_distance(config.river_source_cut),
+        river_outlet_level=scale_height(config.river_outlet_level),
+        floodplain_width=scale_distance(config.floodplain_width),
+        wet_bank_width=scale_distance(config.wet_bank_width),
+        waterfall_drop=scale_height(config.waterfall_drop),
+        tributaries=tuple(scale_tributary(tributary) for tributary in config.tributaries),
+    )
+
+
+def scale_volcano(config: VolcanoConfig) -> VolcanoConfig:
+    return replace(
+        config,
+        center=scale_xz(config.center),
+        cone_radius=scale_distance(config.cone_radius),
+        cone_height=scale_height(config.cone_height),
+        crater_radius=scale_distance(config.crater_radius),
+        crater_depth=scale_height(config.crater_depth),
+        rim_radius=scale_distance(config.rim_radius),
+        rim_sharpness=scale_distance(config.rim_sharpness),
+        rim_height=scale_height(config.rim_height),
+        gully_depth=scale_height(config.gully_depth),
+    )
+
+
+def scale_grotto(config: GrottoConfig) -> GrottoConfig:
+    return replace(
+        config,
+        position=scale_xz(config.position),
+        chamber_radius=scale_distance(config.chamber_radius),
+        mouth_width=scale_distance(config.mouth_width),
+        floor_height=scale_optional_height(config.floor_height),
+    )
+
+
+def scale_shore_feature(config: ShoreFeatureConfig) -> ShoreFeatureConfig:
+    return replace(
+        config,
+        center=scale_xz(config.center),
+        radius_x=scale_distance(config.radius_x),
+        radius_z=scale_distance(config.radius_z),
+    )
+
+
+def scale_rock_spire(config: RockSpireConfig) -> RockSpireConfig:
+    return replace(
+        config,
+        position=scale_xz(config.position),
+        radius=scale_distance(config.radius),
+        height=scale_height(config.height),
+    )
+
+
+def scale_biome(config: BiomeConfig) -> BiomeConfig:
+    return replace(
+        config,
+        min_height=scale_height(config.min_height),
+        max_height=scale_height(config.max_height),
+    )
+
+
+def decoration_count_factor(name: str) -> float:
+    return {
+        "forest": 3.0,
+        "understory": 3.5,
+        "coastal_rocks": 3.0,
+        "palms": 2.5,
+        "mushrooms": 2.0,
+    }.get(name, HORIZONTAL_SCALE)
+
+
+def scale_decoration_rule(config: DecorationRuleConfig) -> DecorationRuleConfig:
+    return replace(
+        config,
+        count=round(config.count * decoration_count_factor(config.name)),
+        min_height=scale_height(config.min_height),
+        max_height=scale_height(config.max_height),
+        avoid_path_width=scale_distance(config.avoid_path_width),
+        avoid_grotto_radius=scale_distance(config.avoid_grotto_radius),
+    )
+
+
+def scale_radius_tuple(value: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
+    return (
+        value[0] * HORIZONTAL_SCALE,
+        value[1] * HORIZONTAL_SCALE,
+        value[2] * HORIZONTAL_SCALE,
+        value[3] * HORIZONTAL_SCALE,
+    )
+
+
+def scale_config(config: IslandModelConfig) -> IslandModelConfig:
+    return replace(
+        config,
+        terrain=replace(
+            config.terrain,
+            island_radius_x=scale_distance(config.terrain.island_radius_x),
+            island_radius_z=scale_distance(config.terrain.island_radius_z),
+            floor_height=scale_height(config.terrain.floor_height),
+            terrace_step=scale_height(config.terrain.terrace_step),
+        ),
+        water=scale_water(config.water),
+        volcano=scale_volcano(config.volcano),
+        grottos=tuple(scale_grotto(grotto) for grotto in config.grottos),
+        granite_house=scale_xz(config.granite_house),
+        shoreline_features=tuple(scale_shore_feature(feature) for feature in config.shoreline_features),
+        reef_fields=tuple(scale_radius_tuple(field) for field in config.reef_fields),
+        islets=tuple(scale_radius_tuple(islet) for islet in config.islets),
+        biomes=tuple(scale_biome(biome) for biome in config.biomes),
+        rock_spires=tuple(scale_rock_spire(spire) for spire in config.rock_spires),
+        decoration_rules=tuple(scale_decoration_rule(rule) for rule in config.decoration_rules),
+    )
+
+
+BASE_CONFIG = IslandModelConfig()
+CONFIG = scale_config(BASE_CONFIG)
 # Tune the island model here first. The generator below reads these grouped
 # parameters instead of scattering landmark, water and volcano values inline.
 TERRAIN = CONFIG.terrain
