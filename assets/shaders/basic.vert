@@ -22,20 +22,20 @@ uniform float smoke;
 uniform float time;
 
 float waveHeight(vec2 worldXZ) {
-    return sin(dot(vec2(0.940376, 0.340136), worldXZ) * 0.16 + time * 1.05) * 0.34
-        + sin(dot(vec2(-0.28, 0.96), worldXZ) * 0.28 + time * 0.72) * 0.18
-        + sin(dot(vec2(0.707107, -0.707107), worldXZ) * 0.53 + time * 1.42) * 0.085
-        + sin(dot(vec2(-0.819232, -0.573462), worldXZ) * 0.88 + time * 1.86) * 0.040
-        + sin(dot(vec2(0.196116, -0.980581), worldXZ) * 1.32 + time * 2.24) * 0.025;
+    return sin(dot(vec2(0.940376, 0.340136), worldXZ) * 0.18 + time * 1.05) * 0.16
+        + sin(dot(vec2(-0.28, 0.96), worldXZ) * 0.31 + time * 0.72) * 0.09
+        + sin(dot(vec2(0.707107, -0.707107), worldXZ) * 0.57 + time * 1.42) * 0.045
+        + sin(dot(vec2(-0.819232, -0.573462), worldXZ) * 0.93 + time * 1.86) * 0.022
+        + sin(dot(vec2(0.196116, -0.980581), worldXZ) * 1.41 + time * 2.24) * 0.012;
 }
 
 vec3 waveNormal(vec2 worldXZ) {
     vec2 gradient =
-        vec2(0.940376, 0.340136) * cos(dot(vec2(0.940376, 0.340136), worldXZ) * 0.16 + time * 1.05) * 0.34 * 0.16
-        + vec2(-0.28, 0.96) * cos(dot(vec2(-0.28, 0.96), worldXZ) * 0.28 + time * 0.72) * 0.18 * 0.28
-        + vec2(0.707107, -0.707107) * cos(dot(vec2(0.707107, -0.707107), worldXZ) * 0.53 + time * 1.42) * 0.085 * 0.53
-        + vec2(-0.819232, -0.573462) * cos(dot(vec2(-0.819232, -0.573462), worldXZ) * 0.88 + time * 1.86) * 0.040 * 0.88
-        + vec2(0.196116, -0.980581) * cos(dot(vec2(0.196116, -0.980581), worldXZ) * 1.32 + time * 2.24) * 0.025 * 1.32;
+        vec2(0.940376, 0.340136) * cos(dot(vec2(0.940376, 0.340136), worldXZ) * 0.18 + time * 1.05) * 0.16 * 0.18
+        + vec2(-0.28, 0.96) * cos(dot(vec2(-0.28, 0.96), worldXZ) * 0.31 + time * 0.72) * 0.09 * 0.31
+        + vec2(0.707107, -0.707107) * cos(dot(vec2(0.707107, -0.707107), worldXZ) * 0.57 + time * 1.42) * 0.045 * 0.57
+        + vec2(-0.819232, -0.573462) * cos(dot(vec2(-0.819232, -0.573462), worldXZ) * 0.93 + time * 1.86) * 0.022 * 0.93
+        + vec2(0.196116, -0.980581) * cos(dot(vec2(0.196116, -0.980581), worldXZ) * 1.41 + time * 2.24) * 0.012 * 1.41;
     return normalize(vec3(-gradient.x, 1.0, -gradient.y));
 }
 

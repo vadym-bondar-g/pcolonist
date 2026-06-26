@@ -42,6 +42,9 @@ uniform vec3 fireLightColors[4];
 uniform float fireLightIntensities[4];
 uniform float fireLightFalloffs[4];
 
+const float oceanWaterLevel = 0.08;
+const vec2 scaledIslandShore = vec2(396.0, 336.0);
+
 float hash(vec3 position) {
     return fract(sin(dot(position, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
 }
@@ -390,21 +393,22 @@ void main() {
 
     if (water > 0.5) {
         float shimmer = sin(worldPosition.x * 0.18 + time * 0.7) * 0.026 + sin(worldPosition.z * 0.33 - time * 0.55) * 0.018;
-        float crest = smoothstep(0.12, 0.29, worldPosition.y + 0.45);
-        float islandRadius = length(vec2(worldPosition.x / 132.0, worldPosition.z / 112.0));
-        float shoreBand = exp(-pow((islandRadius - 0.82) * 18.0, 2.0));
-        float shoreBreak = smoothstep(0.35, 0.78, valueNoise(worldPosition.xz * 0.42 + vec2(time * 0.18, 0.0)));
-        float distanceFade = smoothstep(12.0, 150.0, length(cameraPosition.xz - worldPosition.xz));
-        float shallow = smoothstep(0.98, 0.72, islandRadius);
-        float turbidity = valueNoise(worldPosition.xz * 0.06 + vec2(time * 0.015, -time * 0.01));
+        float crest = smoothstep(0.09, 0.24, worldPosition.y - oceanWaterLevel);
+        float islandRadius = length(worldPosition.xz / scaledIslandShore);
+        float shoreBand = exp(-pow((islandRadius - 0.86) * 20.0, 2.0));
+        float outerBreak = exp(-pow((islandRadius - 1.03) * 14.0, 2.0));
+        float shoreBreak = smoothstep(0.35, 0.78, valueNoise(worldPosition.xz * 0.16 + vec2(time * 0.18, 0.0)));
+        float distanceFade = smoothstep(36.0, 450.0, length(cameraPosition.xz - worldPosition.xz));
+        float shallow = smoothstep(1.08, 0.70, islandRadius);
+        float turbidity = valueNoise(worldPosition.xz * 0.045 + vec2(time * 0.015, -time * 0.01));
         vec3 deepWater = vec3(0.004, 0.050, 0.115);
         vec3 surfaceWater = vec3(0.018, 0.135 + shimmer, 0.245);
         vec3 shallowWater = vec3(0.105, 0.275, 0.245);
         vec3 sandyBottom = vec3(0.34, 0.30, 0.18);
         vec3 waterColor = mix(surfaceWater, shallowWater, shallow * 0.48);
-        waterColor = mix(waterColor, sandyBottom, shallow * shoreBand * 0.28 * daylight);
+        waterColor = mix(waterColor, sandyBottom, shallow * shoreBand * 0.34 * daylight);
         waterColor = mix(waterColor, deepWater, distanceFade * 0.68);
-        waterColor = mix(waterColor, vec3(0.075, 0.125, 0.105), turbidity * shoreBand * 0.16);
+        waterColor = mix(waterColor, vec3(0.075, 0.125, 0.105), turbidity * shoreBand * 0.20);
         float fresnel = 0.025 + 0.52 * pow(1.0 - max(dot(normal, viewDirection), 0.0), 4.6);
         vec3 reflectedLight = mix(sunColor, moonColor, nightFactor);
         vec3 reflection = mix(fogColor, reflectedLight, 0.08 + daylight * 0.11);
@@ -415,8 +419,11 @@ void main() {
             + reflectedLight * mix(moonSpecular, specular, daylight) * 0.72;
         color += vec3(0.12, 0.34, 0.26) * caustic * daylight * 0.75;
         float foamAmount = crest * (0.04 + valueNoise(worldPosition.xz * 4.0 + time * 0.06) * 0.08)
-            + shoreBand * shoreBreak * (0.18 + cloudiness * 0.08);
+            + shoreBand * shoreBreak * (0.20 + cloudiness * 0.08)
+            + outerBreak * shoreBreak * 0.08;
         color = mix(color, foam, clamp(foamAmount, 0.0, 0.42));
+        alpha = mix(0.88, 0.58, shallow * shoreBand);
+        alpha = mix(alpha, 0.96, distanceFade * 0.45);
     }
 
     vec3 cameraToFragment = worldPosition - cameraPosition;
@@ -425,7 +432,7 @@ void main() {
     float heightFog = exp(-max(worldPosition.y + 2.0, 0.0) * 0.035);
     float horizonFog = smoothstep(95.0, 620.0, horizontalDistance);
     float weatherFog = 1.0 - exp(-fogDensity * horizontalDistance);
-    float seaMist = exp(-pow((worldPosition.y + 0.45) * 0.62, 2.0))
+    float seaMist = exp(-pow((worldPosition.y - oceanWaterLevel) * 0.62, 2.0))
         * smoothstep(22.0, 210.0, horizontalDistance)
         * (0.08 + cloudiness * 0.18);
     float valleyMist = exp(-max(worldPosition.y - 1.2, 0.0) * 0.18)
