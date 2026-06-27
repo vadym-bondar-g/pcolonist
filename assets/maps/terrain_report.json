@@ -1,28 +1,28 @@
 {
   "biomes": {
     "beach": {
-      "ratio": 0.4451,
-      "samples": 478
+      "ratio": 0.6138,
+      "samples": 666
     },
     "coastal_jungle": {
-      "ratio": 0.0047,
-      "samples": 5
+      "ratio": 0.0,
+      "samples": 0
     },
     "highland": {
-      "ratio": 0.1061,
-      "samples": 114
+      "ratio": 0.0175,
+      "samples": 19
     },
     "temperate_forest": {
-      "ratio": 0.2635,
-      "samples": 283
+      "ratio": 0.224,
+      "samples": 243
     },
     "volcanic": {
-      "ratio": 0.067,
-      "samples": 72
+      "ratio": 0.0608,
+      "samples": 66
     },
     "wetland": {
-      "ratio": 0.1136,
-      "samples": 122
+      "ratio": 0.0839,
+      "samples": 91
     }
   },
   "decoration_rules": {
@@ -32,10 +32,10 @@
         "highland",
         "volcanic"
       ],
-      "count": 260,
+      "count": 780,
       "height": [
-        -8.0,
-        3.2
+        -10.8,
+        4.32
       ],
       "max_slope": 10.0,
       "min_moisture": 0.0,
@@ -50,10 +50,10 @@
         "temperate_forest",
         "wetland"
       ],
-      "count": 520,
+      "count": 1560,
       "height": [
-        0.1,
-        15.0
+        0.135,
+        20.25
       ],
       "max_slope": 0.82,
       "min_moisture": 0.18,
@@ -66,10 +66,10 @@
       "allowed_biomes": [
         "wetland"
       ],
-      "count": 140,
+      "count": 280,
       "height": [
-        -0.3,
-        4.2
+        -0.405,
+        5.670000000000001
       ],
       "max_slope": 0.45,
       "min_moisture": 0.68,
@@ -84,10 +84,10 @@
         "coastal_jungle",
         "wetland"
       ],
-      "count": 190,
+      "count": 475,
       "height": [
-        -0.45,
-        2.4
+        -0.6075,
+        3.24
       ],
       "max_slope": 0.45,
       "min_moisture": 0.34,
@@ -103,10 +103,10 @@
         "temperate_forest",
         "highland"
       ],
-      "count": 620,
+      "count": 2170,
       "height": [
-        -0.2,
-        12.0
+        -0.27,
+        16.200000000000003
       ],
       "max_slope": 0.72,
       "min_moisture": 0.25,
@@ -119,13 +119,13 @@
   "generated_by": "tools/generate_island.py",
   "grid": {
     "debug_samples_per_side": 81,
-    "spacing": 2.0,
-    "terrain_vertices_per_side": 321
+    "spacing": 4.0,
+    "terrain_vertices_per_side": 481
   },
   "height": {
-    "average": 3.713,
-    "max": 35.358,
-    "min": -0.249
+    "average": 3.024,
+    "max": 64.595,
+    "min": -0.25
   },
   "outputs": {
     "biome_map": "assets/maps/biomes.ppm",
@@ -144,32 +144,32 @@
   },
   "seed": 1847,
   "slope": {
-    "average": 0.274,
-    "max": 4.235,
-    "steep_sample_ratio": 0.0959
+    "average": 0.153,
+    "max": 3.285,
+    "steep_sample_ratio": 0.0249
   },
   "walkability": {
-    "average": 0.872,
-    "good_sample_ratio": 0.8687
+    "average": 0.953,
+    "good_sample_ratio": 0.9539
   },
   "water": {
     "harbor_center": {
-      "x": 104.0,
-      "z": 25.0
+      "x": 312.0,
+      "z": 75.0
     },
     "lake_center": {
-      "x": 31.0,
-      "z": -24.0
+      "x": 93.0,
+      "z": -72.0
     },
-    "river_points": 23,
+    "river_points": 49,
     "river_source": {
-      "x": 39.0,
-      "z": -20.0
+      "x": 117.0,
+      "z": -60.0
     },
     "tributary_points": [
       29,
-      11,
-      16
+      29,
+      29
     ]
   }
 }

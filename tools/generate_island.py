@@ -56,7 +56,9 @@ TERRAIN_REPORT_PATH = ROOT / "assets" / "maps" / "terrain_report.json"
 QUALITY_REPORT_PATH = ROOT / "assets" / "maps" / "generation_quality.json"
 DEBUG_PREVIEW_PATH = ROOT / "assets" / "maps" / "debug_preview.html"
 SCENE_PATH = ROOT / "assets" / "scripts" / "models.scene"
+SCENE_CHUNK_DIR = ROOT / "assets" / "scripts" / "chunks"
 GAMEPLAY_GOALS_PATH = ROOT / "assets" / "scripts" / "gameplay_goals.json"
+WORLD_CONFIG_PATH = ROOT / "assets" / "maps" / "world_config.json"
 SEED = DEFAULT_SEED
 GRID = DEFAULT_GRID
 SPACING = 4.0
@@ -70,7 +72,8 @@ def configure_output_root(output_root: Path) -> None:
     global MAP_PATH, MAP_LOD_PATHS, SPLIT_MAP_PATHS, TERRAIN_CHUNK_DIR, INTERNAL_WATER_PATH
     global LANDMARKS_PATH, WALKABILITY_PATH, HEIGHTMAP_PATH, BIOME_MAP_PATH
     global SLOPE_MAP_PATH, MOISTURE_MAP_PATH, MATERIAL_MASK_PATHS
-    global TERRAIN_REPORT_PATH, QUALITY_REPORT_PATH, DEBUG_PREVIEW_PATH, SCENE_PATH, GAMEPLAY_GOALS_PATH
+    global TERRAIN_REPORT_PATH, QUALITY_REPORT_PATH, DEBUG_PREVIEW_PATH, SCENE_PATH, SCENE_CHUNK_DIR
+    global GAMEPLAY_GOALS_PATH, WORLD_CONFIG_PATH
 
     layout = OutputLayout.from_root(output_root)
     ROOT = layout.root
@@ -90,7 +93,9 @@ def configure_output_root(output_root: Path) -> None:
     QUALITY_REPORT_PATH = layout.quality_report_path
     DEBUG_PREVIEW_PATH = layout.debug_preview_path
     SCENE_PATH = layout.scene_path
+    SCENE_CHUNK_DIR = layout.scene_chunk_dir
     GAMEPLAY_GOALS_PATH = layout.gameplay_goals_path
+    WORLD_CONFIG_PATH = layout.world_config_path
 
 
 def configure_runtime(options: RuntimeOptions) -> None:
@@ -2186,6 +2191,73 @@ def generate_landmarks() -> None:
     LANDMARKS_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def generate_world_config() -> None:
+    crater_level = terrain_height(VOLCANO.center[0], VOLCANO.center[1])
+    payload = {
+        "generated_by": "tools/generate_island.py",
+        "seed": SEED,
+        "landmarks": {
+            "arrival_camp": "arrival_camp",
+            "craft_house": "granite_house",
+            "grant_lake": "grant_lake",
+            "mercy_river_mouth": "mercy_river_mouth",
+            "natural_harbor": "natural_harbor",
+            "standing_stones": "standing_stones",
+            "watchtower": "watchtower",
+            "debug_teleports": [
+                "granite_house",
+                "natural_harbor",
+                "grant_lake",
+                "mercy_river_source",
+                "hidden_grotto_1",
+                "hidden_grotto_2",
+                "hidden_grotto_3",
+            ],
+        },
+        "water": {
+            "ocean": {
+                "position": {"x": 0.0, "y": 0.08, "z": 0.0},
+                "half_extents": {"x": 960.0, "z": 960.0},
+                "affects_physics": True,
+                "kind": "ocean",
+                "flow_direction": {"x": 0.0, "z": 0.0},
+                "foam_strength": 1.0,
+            },
+            "internal": {
+                "mesh": "maps/internal_water.obj",
+                "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "half_extents": {"x": 0.0, "z": 0.0},
+                "affects_physics": False,
+                "kind": "inland",
+                "flow_direction": {"x": 0.78, "z": -0.32},
+                "foam_strength": 0.55,
+            },
+        },
+        "lava": {
+            "crater_lake": {
+                "mesh": "builtin/lava",
+                "position": {"x": 0.4, "y": round(crater_level - 4.1, 2), "z": -0.2},
+                "rotation": {"x": 0.0, "y": 0.16, "z": 0.0},
+                "scale": {"x": 13.9, "y": 1.0, "z": 11.6},
+                "fire_light": {"color": {"x": 1.0, "y": 0.16, "z": 0.025}, "intensity": 4.8, "falloff": 0.055},
+            },
+            "inner_current": {
+                "mesh": "builtin/lava_tongue",
+                "position": {"x": -3.7, "y": round(crater_level - 4.03, 2), "z": 3.6},
+                "rotation": {"x": 0.0, "y": 0.72, "z": 0.0},
+                "scale": {"x": 8.4, "y": 1.0, "z": 2.7},
+            },
+            "overflow": {
+                "mesh": "builtin/lava_tongue",
+                "position": {"x": 2.8, "y": round(crater_level - 4.22, 2), "z": 10.8},
+                "rotation": {"x": 0.0, "y": 1.48, "z": 0.0},
+                "scale": {"x": 7.8, "y": 1.0, "z": 1.95},
+            },
+        },
+    }
+    WORLD_CONFIG_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def spawn(
     lines: list[str],
     model: str,
@@ -2218,6 +2290,46 @@ def spawn_collider(
         f"spawn_collider {position[0]:.2f} {position[1]:.2f} {position[2]:.2f} "
         f"{half[0]:.2f} {half[1]:.2f} {half[2]:.2f}"
     )
+
+
+def scene_command_position(line: str) -> tuple[float, float] | None:
+    tokens = line.split()
+    if not tokens:
+        return None
+    if tokens[0] in {"spawn_model", "spawn_decor"} and len(tokens) >= 5:
+        return float(tokens[2]), float(tokens[4])
+    if tokens[0] == "spawn_collider" and len(tokens) >= 4:
+        return float(tokens[1]), float(tokens[3])
+    return None
+
+
+def write_scene_chunks(lines: list[str]) -> None:
+    if SCENE_CHUNK_DIR.exists():
+        for path in SCENE_CHUNK_DIR.glob("scene_*.scene"):
+            path.unlink()
+    SCENE_CHUNK_DIR.mkdir(parents=True, exist_ok=True)
+
+    model_lines = [line for line in lines if line.startswith("model ")]
+    chunks: dict[tuple[int, int], list[str]] = {}
+    for line in lines:
+        position = scene_command_position(line)
+        if position is None:
+            continue
+        x, z = position
+        key = (math.floor(x / 128.0), math.floor(z / 128.0))
+        chunks.setdefault(key, []).append(line)
+
+    for (chunk_x, chunk_z), commands in sorted(chunks.items()):
+        payload = [
+            "# Generated by tools/generate_island.py. Do not edit by hand.",
+            "# Chunked environment scene; loaded by WorldStreamer.",
+            "",
+            *model_lines,
+            "",
+            *commands,
+            "",
+        ]
+        (SCENE_CHUNK_DIR / f"scene_{chunk_x}_{chunk_z}.scene").write_text("\n".join(payload), encoding="utf-8")
 
 
 def generate_scene() -> None:
@@ -2480,6 +2592,7 @@ def generate_scene() -> None:
         record_placement("mushrooms", True)
 
     SCENE_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_scene_chunks(lines)
 
 
 def generate_gameplay_goals() -> None:
@@ -2919,6 +3032,7 @@ def map_output_paths() -> list[Path]:
         *sorted(TERRAIN_CHUNK_DIR.glob("*.obj")),
         INTERNAL_WATER_PATH,
         LANDMARKS_PATH,
+        WORLD_CONFIG_PATH,
     ]
 
 
@@ -2940,6 +3054,7 @@ def generate_map_outputs() -> list[Path]:
     generate_lod_maps()
     generate_internal_water()
     generate_landmarks()
+    generate_world_config()
     return map_output_paths()
 
 
@@ -2952,7 +3067,7 @@ def generate_debug_outputs() -> list[Path]:
 def generate_scene_outputs() -> list[Path]:
     generate_scene()
     generate_gameplay_goals()
-    return [SCENE_PATH, GAMEPLAY_GOALS_PATH]
+    return [SCENE_PATH, *sorted(SCENE_CHUNK_DIR.glob("*.scene")), GAMEPLAY_GOALS_PATH]
 
 
 def run_generation(only: str) -> list[Path]:

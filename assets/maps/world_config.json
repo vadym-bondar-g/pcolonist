@@ -1,0 +1,126 @@
+{
+  "generated_by": "tools/generate_island.py",
+  "landmarks": {
+    "arrival_camp": "arrival_camp",
+    "craft_house": "granite_house",
+    "debug_teleports": [
+      "granite_house",
+      "natural_harbor",
+      "grant_lake",
+      "mercy_river_source",
+      "hidden_grotto_1",
+      "hidden_grotto_2",
+      "hidden_grotto_3"
+    ],
+    "grant_lake": "grant_lake",
+    "mercy_river_mouth": "mercy_river_mouth",
+    "natural_harbor": "natural_harbor",
+    "standing_stones": "standing_stones",
+    "watchtower": "watchtower"
+  },
+  "lava": {
+    "crater_lake": {
+      "fire_light": {
+        "color": {
+          "x": 1.0,
+          "y": 0.16,
+          "z": 0.025
+        },
+        "falloff": 0.055,
+        "intensity": 4.8
+      },
+      "mesh": "builtin/lava",
+      "position": {
+        "x": 0.4,
+        "y": 13.28,
+        "z": -0.2
+      },
+      "rotation": {
+        "x": 0.0,
+        "y": 0.16,
+        "z": 0.0
+      },
+      "scale": {
+        "x": 13.9,
+        "y": 1.0,
+        "z": 11.6
+      }
+    },
+    "inner_current": {
+      "mesh": "builtin/lava_tongue",
+      "position": {
+        "x": -3.7,
+        "y": 13.35,
+        "z": 3.6
+      },
+      "rotation": {
+        "x": 0.0,
+        "y": 0.72,
+        "z": 0.0
+      },
+      "scale": {
+        "x": 8.4,
+        "y": 1.0,
+        "z": 2.7
+      }
+    },
+    "overflow": {
+      "mesh": "builtin/lava_tongue",
+      "position": {
+        "x": 2.8,
+        "y": 13.16,
+        "z": 10.8
+      },
+      "rotation": {
+        "x": 0.0,
+        "y": 1.48,
+        "z": 0.0
+      },
+      "scale": {
+        "x": 7.8,
+        "y": 1.0,
+        "z": 1.95
+      }
+    }
+  },
+  "seed": 1847,
+  "water": {
+    "internal": {
+      "affects_physics": false,
+      "flow_direction": {
+        "x": 0.78,
+        "z": -0.32
+      },
+      "foam_strength": 0.55,
+      "half_extents": {
+        "x": 0.0,
+        "z": 0.0
+      },
+      "kind": "inland",
+      "mesh": "maps/internal_water.obj",
+      "position": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+      }
+    },
+    "ocean": {
+      "affects_physics": true,
+      "flow_direction": {
+        "x": 0.0,
+        "z": 0.0
+      },
+      "foam_strength": 1.0,
+      "half_extents": {
+        "x": 960.0,
+        "z": 960.0
+      },
+      "kind": "ocean",
+      "position": {
+        "x": 0.0,
+        "y": 0.08,
+        "z": 0.0
+      }
+    }
+  }
+}

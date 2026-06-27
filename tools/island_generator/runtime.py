@@ -25,7 +25,9 @@ class OutputLayout:
     quality_report_path: Path
     debug_preview_path: Path
     scene_path: Path
+    scene_chunk_dir: Path
     gameplay_goals_path: Path
+    world_config_path: Path
 
     @classmethod
     def from_root(cls, root: Path) -> "OutputLayout":
@@ -65,7 +67,9 @@ class OutputLayout:
             quality_report_path=maps_dir / "generation_quality.json",
             debug_preview_path=maps_dir / "debug_preview.html",
             scene_path=scripts_dir / "models.scene",
+            scene_chunk_dir=scripts_dir / "chunks",
             gameplay_goals_path=scripts_dir / "gameplay_goals.json",
+            world_config_path=maps_dir / "world_config.json",
         )
 
     def map_outputs(self) -> list[Path]:
@@ -76,6 +80,7 @@ class OutputLayout:
             *sorted(self.terrain_chunk_dir.glob("*.obj")),
             self.internal_water_path,
             self.landmarks_path,
+            self.world_config_path,
         ]
 
     def debug_outputs(self) -> list[Path]:
