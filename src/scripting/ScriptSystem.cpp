@@ -11,6 +11,7 @@
 #include <sstream>
 #include <future>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -30,15 +31,23 @@ std::vector<Entity> ScriptSystem::execute(
     JobSystem& jobs) {
     struct ModelEntry {
         std::string path;
-        std::future<Mesh> pending;
+        std::optional<std::future<Mesh>> pending;
         std::shared_ptr<Mesh> loaded;
     };
 
     std::istringstream input(assets.readText(script));
     std::unordered_map<std::string, ModelEntry> models;
-    const auto resolveModel = [&resources](ModelEntry& model) {
+    const auto resolveModel = [&assets, &jobs, &resources](ModelEntry& model) {
         if (!model.loaded) {
-            Mesh mesh = model.pending.get();
+            model.loaded = resources.find<Mesh>(model.path);
+        }
+        if (!model.loaded && !model.pending) {
+            model.pending = jobs.submit([&assets, path = model.path] {
+                return MeshLoader::load(assets, path);
+            });
+        }
+        if (!model.loaded) {
+            Mesh mesh = model.pending->get();
             model.loaded = resources.load<Mesh>(model.path, [mesh = std::move(mesh)]() mutable {
                 return std::move(mesh);
             });
@@ -113,9 +122,7 @@ std::vector<Entity> ScriptSystem::execute(
             if (models.contains(id)) {
                 throw std::runtime_error("Script model id is already declared: " + id);
             }
-            models.emplace(id, ModelEntry{path, jobs.submit([&assets, path] {
-                return MeshLoader::load(assets, path);
-            }), {}});
+            models.emplace(id, ModelEntry{path, std::nullopt, {}});
             continue;
         }
 
@@ -170,10 +177,6 @@ std::vector<Entity> ScriptSystem::execute(
         throw std::runtime_error("Unknown script command: " + command);
     }
 
-    for (auto& [id, model] : models) {
-        static_cast<void>(id);
-        resolveModel(model);
-    }
     return spawned;
 }
 

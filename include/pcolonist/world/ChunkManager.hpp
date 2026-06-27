@@ -23,8 +23,8 @@ class ChunkManager {
 public:
     struct Config {
         float chunkSize = 128.0F;
-        int loadRadius = 3;
-        int unloadRadius = 4;
+        int loadRadius = 2;
+        int unloadRadius = 3;
         int lod0Radius = 1;
         int lod1Radius = 2;
     };

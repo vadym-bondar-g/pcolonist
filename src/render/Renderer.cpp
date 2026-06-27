@@ -30,8 +30,8 @@ namespace {
 constexpr int shadowSize = 2048;
 constexpr std::array<float, 2> shadowRanges = {48.0F, 190.0F};
 constexpr float cameraFarPlane = 760.0F;
-constexpr float terrainStreamingDistance = 520.0F;
-constexpr float objectDrawDistance = 420.0F;
+constexpr float terrainStreamingDistance = 340.0F;
+constexpr float objectDrawDistance = 260.0F;
 constexpr int maxFireLights = 4;
 
 glm::mat4 modelMatrix(const pcolonist::Transform& transform) {
