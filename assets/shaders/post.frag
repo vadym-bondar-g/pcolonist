@@ -10,6 +10,7 @@ uniform float exposure;
 uniform float daylight;
 uniform float time;
 uniform float cloudiness;
+uniform float stormStrength;
 uniform int bloomEnabled;
 uniform int underwater;
 
@@ -91,6 +92,27 @@ float lightningFlash() {
         exp(-pow((phase - 0.08) * 90.0, 2.0))
         + exp(-pow((phase - 0.14) * 120.0, 2.0)) * 0.65
     );
+}
+
+float rainLayer(vec2 fragCoord, float scale, float speed, float slant, float threshold) {
+    vec2 position = fragCoord / max(resolution.y, 1.0);
+    position.x += position.y * slant;
+    position.y += time * speed;
+    vec2 grid = position * scale;
+    vec2 cell = floor(grid);
+    vec2 local = fract(grid);
+    float seed = stableHash(cell);
+    float isVisible = step(threshold, seed);
+    float drop = fract(local.y + seed);
+    float thinLine = smoothstep(0.055, 0.0, abs(local.x - 0.5));
+    float tail = smoothstep(0.0, 0.08, drop) * (1.0 - smoothstep(0.08, 0.46, drop));
+    return isVisible * thinLine * tail;
+}
+
+float rainStreaks(vec2 fragCoord) {
+    float nearRain = rainLayer(fragCoord, 58.0, 2.6, 0.42, 0.54);
+    float farRain = rainLayer(fragCoord + vec2(37.0, 19.0), 88.0, 3.4, 0.36, 0.72);
+    return clamp(nearRain * 0.82 + farRain * 0.48, 0.0, 1.0);
 }
 
 float screenSpaceOcclusion(vec2 uv, vec2 texel) {
@@ -181,6 +203,12 @@ void main() {
         float particles = step(0.992, smoothNoise(gl_FragCoord.xy * 0.09 + vec2(0.0, time * 0.7)));
         color += vec3(0.15, 0.28, 0.25) * particles * 0.18;
     }
+    float rainStrength = smoothstep(0.45, 0.95, stormStrength) * (underwater != 0 ? 0.22 : 1.0);
+    float rain = rainStreaks(gl_FragCoord.xy) * rainStrength;
+    float rainVeil = rainStrength * (0.025 + 0.025 * smoothNoise(gl_FragCoord.xy * 0.018 + vec2(time * 0.05, -time * 0.42)));
+    color = mix(color, vec3(0.35, 0.42, 0.5), rainVeil);
+    color = mix(color, vec3(0.62, 0.7, 0.82), rain * 0.28);
+    color += vec3(0.22, 0.3, 0.4) * rain * 0.16;
     color += vec3(0.54, 0.62, 0.9) * lightningFlash() * 0.18;
     float vignette = smoothstep(0.95, 0.25, length(uv - 0.5));
     color *= mix(0.78, 1.0, vignette);

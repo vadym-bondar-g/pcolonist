@@ -91,6 +91,7 @@ void Renderer::postProcess(const WeatherSystem& weather, bool underwater) {
     shader.setFloat("exposure", 1.08F + weather.daylight() * 0.12F + weather.cloudiness() * 0.055F);
     shader.setFloat("daylight", weather.daylight());
     shader.setFloat("cloudiness", weather.cloudiness());
+    shader.setFloat("stormStrength", weather.stormStrength());
     shader.setFloat("time", weather.time());
     shader.setVec3("resolution", {static_cast<float>(width_), static_cast<float>(height_), 0.0F});
     glActiveTexture(GL_TEXTURE0);
