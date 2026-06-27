@@ -12,8 +12,12 @@
 namespace pcolonist {
 
 class AssetManager;
+class AssetSystem;
 class JobSystem;
+class PhysicsSystem;
 class Registry;
+class ResourceManager;
+class ScriptSystem;
 
 class ChunkManager {
 public:
@@ -28,8 +32,24 @@ public:
     ChunkManager();
     explicit ChunkManager(Config config);
 
-    void loadInitial(glm::vec3 playerPosition, Registry& registry, AssetManager& assets);
-    void update(glm::vec3 playerPosition, Registry& registry, AssetManager& assets, JobSystem& jobs);
+    void loadInitial(
+        glm::vec3 playerPosition,
+        Registry& registry,
+        AssetManager& assets,
+        const AssetSystem& assetSystem,
+        PhysicsSystem& physics,
+        ResourceManager& resources,
+        ScriptSystem& scripts,
+        JobSystem& jobs);
+    void update(
+        glm::vec3 playerPosition,
+        Registry& registry,
+        AssetManager& assets,
+        const AssetSystem& assetSystem,
+        PhysicsSystem& physics,
+        ResourceManager& resources,
+        ScriptSystem& scripts,
+        JobSystem& jobs);
     void unloadAll(Registry& registry);
 
     [[nodiscard]] ChunkKey chunkFor(glm::vec3 position) const;
@@ -46,9 +66,22 @@ private:
     [[nodiscard]] TerrainTile terrainTile(ChunkId id) const;
     [[nodiscard]] bool shouldKeep(ChunkId id, ChunkKey center) const;
     void requestMissingChunks(ChunkKey center, AssetManager& assets, JobSystem& jobs);
-    void integrateReadyChunks(Registry& registry);
+    void integrateReadyChunks(
+        Registry& registry,
+        const AssetSystem& assetSystem,
+        PhysicsSystem& physics,
+        ResourceManager& resources,
+        ScriptSystem& scripts,
+        JobSystem& jobs);
     void unloadDistantChunks(ChunkKey center, Registry& registry);
-    void spawnChunk(Chunk chunk, Registry& registry);
+    void spawnChunk(
+        Chunk chunk,
+        Registry& registry,
+        const AssetSystem& assetSystem,
+        PhysicsSystem& physics,
+        ResourceManager& resources,
+        ScriptSystem& scripts,
+        JobSystem& jobs);
 
     Config config_;
     std::unordered_map<ChunkId, Chunk, ChunkIdHash> active_;

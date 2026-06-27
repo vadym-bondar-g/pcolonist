@@ -21,7 +21,7 @@ bool ScriptSystem::frameCounterVisible() const {
     return frameCounterVisible_;
 }
 
-void ScriptSystem::execute(
+std::vector<Entity> ScriptSystem::execute(
     const AssetSystem& assets,
     const std::filesystem::path& script,
     Registry& registry,
@@ -47,6 +47,7 @@ void ScriptSystem::execute(
     };
 
     std::string line;
+    std::vector<Entity> spawned;
     while (std::getline(input, line)) {
         std::istringstream row(line);
         std::string command;
@@ -84,6 +85,7 @@ void ScriptSystem::execute(
             registry.emplace<Transform>(entity, transform);
             registry.emplace<RigidBody>(entity, body);
             registry.emplace<BoxCollider>(entity);
+            spawned.push_back(entity);
             continue;
         }
 
@@ -98,6 +100,7 @@ void ScriptSystem::execute(
             const Entity entity = registry.create();
             registry.emplace<Transform>(entity, transform);
             registry.emplace<BoxCollider>(entity, collider);
+            spawned.push_back(entity);
             continue;
         }
 
@@ -140,6 +143,7 @@ void ScriptSystem::execute(
             if (id == "tree" || id == "oak") {
                 registry.emplace<ResourceNode>(entity);
             }
+            spawned.push_back(entity);
             continue;
         }
 
@@ -159,6 +163,7 @@ void ScriptSystem::execute(
             const Entity entity = registry.create();
             registry.emplace<Transform>(entity, transform);
             registry.emplace<MeshRenderer>(entity, resolveModel(iterator->second));
+            spawned.push_back(entity);
             continue;
         }
 
@@ -169,6 +174,7 @@ void ScriptSystem::execute(
         static_cast<void>(id);
         resolveModel(model);
     }
+    return spawned;
 }
 
 } // namespace pcolonist

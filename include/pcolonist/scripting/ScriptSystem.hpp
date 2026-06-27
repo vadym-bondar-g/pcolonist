@@ -1,7 +1,10 @@
 #pragma once
 
+#include "pcolonist/ecs/Registry.hpp"
+
 #include <filesystem>
 #include <string_view>
+#include <vector>
 
 namespace pcolonist {
 
@@ -15,7 +18,7 @@ class ScriptSystem {
 public:
     [[nodiscard]] bool frameCounterVisible() const;
 
-    void execute(
+    std::vector<Entity> execute(
         const AssetSystem& assets,
         const std::filesystem::path& script,
         Registry& registry,

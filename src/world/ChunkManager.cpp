@@ -1,8 +1,10 @@
 #include "pcolonist/world/ChunkManager.hpp"
 
+#include "pcolonist/assets/AssetSystem.hpp"
 #include "pcolonist/ecs/Components.hpp"
 #include "pcolonist/ecs/Registry.hpp"
 #include "pcolonist/physics/PhysicsSystem.hpp"
+#include "pcolonist/scripting/ScriptSystem.hpp"
 #include "pcolonist/world/AssetManager.hpp"
 
 #include <glm/geometric.hpp>
@@ -10,6 +12,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
 #include <stdexcept>
 
 namespace {
@@ -23,6 +26,10 @@ bool ready(std::future<std::shared_ptr<pcolonist::Mesh>>& future) {
     return future.wait_for(0ms) == std::future_status::ready;
 }
 
+std::filesystem::path sceneChunkPath(pcolonist::ChunkKey key) {
+    return "scripts/chunks/scene_" + std::to_string(key.x) + "_" + std::to_string(key.z) + ".scene";
+}
+
 } // namespace
 
 namespace pcolonist {
@@ -33,7 +40,15 @@ ChunkManager::ChunkManager()
 ChunkManager::ChunkManager(Config config)
     : config_(config) {}
 
-void ChunkManager::loadInitial(glm::vec3 playerPosition, Registry& registry, AssetManager& assets) {
+void ChunkManager::loadInitial(
+    glm::vec3 playerPosition,
+    Registry& registry,
+    AssetManager& assets,
+    const AssetSystem& assetSystem,
+    PhysicsSystem& physics,
+    ResourceManager& resources,
+    ScriptSystem& scripts,
+    JobSystem& jobs) {
     const ChunkKey center = chunkFor(playerPosition);
     for (int z = center.z - config_.loadRadius; z <= center.z + config_.loadRadius; ++z) {
         for (int x = center.x - config_.loadRadius; x <= center.x + config_.loadRadius; ++x) {
@@ -44,7 +59,7 @@ void ChunkManager::loadInitial(glm::vec3 playerPosition, Registry& registry, Ass
             TerrainTile tile = terrainTile(id);
             try {
                 Chunk chunk{tile, assets.loadMesh(tile.meshPath), {}};
-                spawnChunk(std::move(chunk), registry);
+                spawnChunk(std::move(chunk), registry, assetSystem, physics, resources, scripts, jobs);
             } catch (const std::exception&) {
                 missing_.insert(id);
             }
@@ -52,10 +67,18 @@ void ChunkManager::loadInitial(glm::vec3 playerPosition, Registry& registry, Ass
     }
 }
 
-void ChunkManager::update(glm::vec3 playerPosition, Registry& registry, AssetManager& assets, JobSystem& jobs) {
+void ChunkManager::update(
+    glm::vec3 playerPosition,
+    Registry& registry,
+    AssetManager& assets,
+    const AssetSystem& assetSystem,
+    PhysicsSystem& physics,
+    ResourceManager& resources,
+    ScriptSystem& scripts,
+    JobSystem& jobs) {
     const ChunkKey center = chunkFor(playerPosition);
     unloadDistantChunks(center, registry);
-    integrateReadyChunks(registry);
+    integrateReadyChunks(registry, assetSystem, physics, resources, scripts, jobs);
     requestMissingChunks(center, assets, jobs);
     assets.clearExpired();
 }
@@ -129,7 +152,13 @@ void ChunkManager::requestMissingChunks(ChunkKey center, AssetManager& assets, J
     }
 }
 
-void ChunkManager::integrateReadyChunks(Registry& registry) {
+void ChunkManager::integrateReadyChunks(
+    Registry& registry,
+    const AssetSystem& assetSystem,
+    PhysicsSystem& physics,
+    ResourceManager& resources,
+    ScriptSystem& scripts,
+    JobSystem& jobs) {
     for (auto iterator = pending_.begin(); iterator != pending_.end();) {
         if (!ready(iterator->second.mesh)) {
             ++iterator;
@@ -138,7 +167,7 @@ void ChunkManager::integrateReadyChunks(Registry& registry) {
 
         try {
             Chunk chunk{iterator->second.terrain, iterator->second.mesh.get(), {}};
-            spawnChunk(std::move(chunk), registry);
+            spawnChunk(std::move(chunk), registry, assetSystem, physics, resources, scripts, jobs);
         } catch (const std::exception&) {
             missing_.insert(iterator->first);
         }
@@ -159,7 +188,14 @@ void ChunkManager::unloadDistantChunks(ChunkKey center, Registry& registry) {
     }
 }
 
-void ChunkManager::spawnChunk(Chunk chunk, Registry& registry) {
+void ChunkManager::spawnChunk(
+    Chunk chunk,
+    Registry& registry,
+    const AssetSystem& assetSystem,
+    PhysicsSystem& physics,
+    ResourceManager& resources,
+    ScriptSystem& scripts,
+    JobSystem& jobs) {
     if (!chunk.terrainMesh || chunk.terrainMesh->vertices.empty() || chunk.terrainMesh->indices.empty()) {
         throw std::runtime_error("Cannot spawn empty terrain chunk");
     }
@@ -171,6 +207,13 @@ void ChunkManager::spawnChunk(Chunk chunk, Registry& registry) {
     registry.emplace<TerrainChunk>(terrain, chunk.terrain.center, chunk.terrain.size * 0.78F);
     registry.emplace<TerrainCollider>(terrain, *chunk.terrainMesh, transform);
     chunk.entities.push_back(terrain);
+
+    const std::filesystem::path scenePath = sceneChunkPath(chunk.terrain.id.key);
+    if (std::filesystem::exists(assetSystem.resolve(scenePath))) {
+        std::vector<Entity> sceneEntities = scripts.execute(assetSystem, scenePath, registry, physics, resources, jobs);
+        chunk.entities.insert(chunk.entities.end(), sceneEntities.begin(), sceneEntities.end());
+        physics.rebuildStaticIndex(registry);
+    }
     active_.emplace(chunk.terrain.id, std::move(chunk));
 }
 

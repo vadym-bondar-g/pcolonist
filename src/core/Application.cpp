@@ -17,12 +17,14 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cmath>
 #include <filesystem>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <utility>
@@ -31,15 +33,26 @@
 namespace {
 
 constexpr float maximumDeltaTime = 0.1F;
-const glm::vec3 arrivalCamp{-32.0F, 3.0F, 77.0F};
-const glm::vec3 grantLake{31.0F, 4.0F, -24.0F};
-const glm::vec3 mercyRiverMouth{104.0F, 1.0F, 25.0F};
-const glm::vec3 naturalHarbor{91.0F, 1.0F, 14.5F};
-const glm::vec3 graniteHouse{-104.0F, 7.0F, -10.0F};
-const glm::vec3 standingStones{-82.0F, 2.0F, 38.0F};
-const glm::vec3 watchtower{91.0F, 2.0F, 18.0F};
-const glm::vec3 craterLavaCenter{0.4F, 13.24F, -0.2F};
-const glm::vec3 craterLavaOverflow{2.8F, 13.12F, 10.8F};
+
+struct WaterDefinition {
+    glm::vec3 position{0.0F};
+    glm::vec2 halfExtents{0.0F};
+    bool affectsPhysics = true;
+    pcolonist::WaterKind kind = pcolonist::WaterKind::Ocean;
+    glm::vec2 flowDirection{0.0F};
+    float foamStrength = 1.0F;
+};
+
+struct LavaDefinition {
+    std::string mesh;
+    glm::vec3 position{0.0F};
+    glm::vec3 rotation{0.0F};
+    glm::vec3 scale{1.0F};
+    bool hasFireLight = false;
+    glm::vec3 fireColor{1.0F, 0.16F, 0.025F};
+    float fireIntensity = 1.0F;
+    float fireFalloff = 0.72F;
+};
 
 pcolonist::KeyAction toKeyAction(int action) {
     if (action == GLFW_PRESS) {
@@ -81,6 +94,208 @@ std::optional<float> rayBoxDistance(
         }
     }
     return near <= maximumDistance ? std::optional<float>{near} : std::nullopt;
+}
+
+std::size_t matchingBrace(std::string_view text, std::size_t open) {
+    int depth = 0;
+    for (std::size_t index = open; index < text.size(); ++index) {
+        if (text[index] == '{') {
+            ++depth;
+        } else if (text[index] == '}') {
+            --depth;
+            if (depth == 0) {
+                return index;
+            }
+        }
+    }
+    return std::string_view::npos;
+}
+
+std::pair<std::size_t, std::size_t> objectRange(std::string_view text, std::string_view key, std::size_t start = 0) {
+    const std::string quoted = "\"" + std::string(key) + "\"";
+    const std::size_t keyPosition = text.find(quoted, start);
+    if (keyPosition == std::string_view::npos) {
+        return {std::string_view::npos, std::string_view::npos};
+    }
+    const std::size_t open = text.find('{', keyPosition + quoted.size());
+    if (open == std::string_view::npos) {
+        return {std::string_view::npos, std::string_view::npos};
+    }
+    return {open, matchingBrace(text, open)};
+}
+
+float numberField(std::string_view text, std::string_view key, std::size_t start, std::size_t end, float fallback = 0.0F) {
+    const std::string quoted = "\"" + std::string(key) + "\"";
+    const std::size_t keyPosition = text.find(quoted, start);
+    if (keyPosition == std::string_view::npos || keyPosition > end) {
+        return fallback;
+    }
+    const std::size_t colon = text.find(':', keyPosition + quoted.size());
+    if (colon == std::string_view::npos || colon > end) {
+        return fallback;
+    }
+    const std::size_t first = text.find_first_of("-0123456789", colon + 1);
+    if (first == std::string_view::npos || first > end) {
+        return fallback;
+    }
+    const std::size_t last = text.find_first_not_of("-0123456789.eE+", first);
+    float value = fallback;
+    const char* begin = text.data() + first;
+    const char* finish = text.data() + std::min(last, end + 1);
+    std::from_chars(begin, finish, value);
+    return value;
+}
+
+bool boolField(std::string_view text, std::string_view key, std::size_t start, std::size_t end, bool fallback) {
+    const std::string quoted = "\"" + std::string(key) + "\"";
+    const std::size_t keyPosition = text.find(quoted, start);
+    if (keyPosition == std::string_view::npos || keyPosition > end) {
+        return fallback;
+    }
+    const std::size_t colon = text.find(':', keyPosition + quoted.size());
+    if (colon == std::string_view::npos || colon > end) {
+        return fallback;
+    }
+    const std::size_t first = text.find_first_not_of(" \t\r\n", colon + 1);
+    if (first == std::string_view::npos || first > end) {
+        return fallback;
+    }
+    return text.substr(first, 4) == "true" ? true : text.substr(first, 5) == "false" ? false : fallback;
+}
+
+std::string stringField(std::string_view text, std::string_view key, std::size_t start, std::size_t end) {
+    const std::string quoted = "\"" + std::string(key) + "\"";
+    const std::size_t keyPosition = text.find(quoted, start);
+    if (keyPosition == std::string_view::npos || keyPosition > end) {
+        return {};
+    }
+    const std::size_t colon = text.find(':', keyPosition + quoted.size());
+    const std::size_t open = text.find('"', colon + 1);
+    if (colon == std::string_view::npos || open == std::string_view::npos || open > end) {
+        return {};
+    }
+    const std::size_t close = text.find('"', open + 1);
+    if (close == std::string_view::npos || close > end) {
+        return {};
+    }
+    return std::string{text.substr(open + 1, close - open - 1)};
+}
+
+glm::vec3 vec3Field(std::string_view text, std::string_view key, std::size_t start, std::size_t end, glm::vec3 fallback = {}) {
+    const auto [open, close] = objectRange(text, key, start);
+    if (open == std::string_view::npos || close > end) {
+        return fallback;
+    }
+    return {
+        numberField(text, "x", open, close, fallback.x),
+        numberField(text, "y", open, close, fallback.y),
+        numberField(text, "z", open, close, fallback.z),
+    };
+}
+
+glm::vec2 vec2Field(std::string_view text, std::string_view key, std::size_t start, std::size_t end, glm::vec2 fallback = {}) {
+    const auto [open, close] = objectRange(text, key, start);
+    if (open == std::string_view::npos || close > end) {
+        return fallback;
+    }
+    return {
+        numberField(text, "x", open, close, fallback.x),
+        numberField(text, "z", open, close, fallback.y),
+    };
+}
+
+pcolonist::WaterKind waterKind(std::string_view text, std::size_t start, std::size_t end) {
+    return stringField(text, "kind", start, end) == "inland" ? pcolonist::WaterKind::Inland : pcolonist::WaterKind::Ocean;
+}
+
+std::unordered_map<std::string, glm::vec3> parseLandmarks(std::string_view text) {
+    std::unordered_map<std::string, glm::vec3> landmarks;
+    std::size_t cursor = 0;
+    while (true) {
+        const std::size_t nameKey = text.find("\"name\"", cursor);
+        if (nameKey == std::string_view::npos) {
+            break;
+        }
+        const std::size_t entryEnd = text.find("\n    }", nameKey);
+        const std::string name = stringField(text, "name", nameKey, entryEnd == std::string_view::npos ? text.size() - 1 : entryEnd);
+        const glm::vec3 position = vec3Field(
+            text,
+            "position",
+            nameKey,
+            entryEnd == std::string_view::npos ? text.size() - 1 : entryEnd);
+        if (!name.empty()) {
+            landmarks.emplace(name, position);
+        }
+        cursor = nameKey + 6;
+    }
+    return landmarks;
+}
+
+std::vector<std::string> parseStringArray(std::string_view text, std::string_view key) {
+    std::vector<std::string> values;
+    const std::string quoted = "\"" + std::string(key) + "\"";
+    const std::size_t keyPosition = text.find(quoted);
+    if (keyPosition == std::string_view::npos) {
+        return values;
+    }
+    const std::size_t open = text.find('[', keyPosition + quoted.size());
+    const std::size_t close = text.find(']', open + 1);
+    if (open == std::string_view::npos || close == std::string_view::npos) {
+        return values;
+    }
+    std::size_t cursor = open + 1;
+    while (cursor < close) {
+        const std::size_t valueOpen = text.find('"', cursor);
+        if (valueOpen == std::string_view::npos || valueOpen > close) {
+            break;
+        }
+        const std::size_t valueClose = text.find('"', valueOpen + 1);
+        if (valueClose == std::string_view::npos || valueClose > close) {
+            break;
+        }
+        values.emplace_back(text.substr(valueOpen + 1, valueClose - valueOpen - 1));
+        cursor = valueClose + 1;
+    }
+    return values;
+}
+
+WaterDefinition parseWaterDefinition(std::string_view text, std::string_view key) {
+    const auto [open, close] = objectRange(text, key);
+    if (open == std::string_view::npos) {
+        throw std::runtime_error("Missing water config: " + std::string(key));
+    }
+    glm::vec2 flow = vec2Field(text, "flow_direction", open, close, {0.0F, 0.0F});
+    if (glm::length(flow) > 0.001F) {
+        flow = glm::normalize(flow);
+    }
+    return {
+        vec3Field(text, "position", open, close),
+        vec2Field(text, "half_extents", open, close),
+        boolField(text, "affects_physics", open, close, true),
+        waterKind(text, open, close),
+        flow,
+        numberField(text, "foam_strength", open, close, 1.0F),
+    };
+}
+
+LavaDefinition parseLavaDefinition(std::string_view text, std::string_view key) {
+    const auto [open, close] = objectRange(text, key);
+    if (open == std::string_view::npos) {
+        throw std::runtime_error("Missing lava config: " + std::string(key));
+    }
+    LavaDefinition definition;
+    definition.mesh = stringField(text, "mesh", open, close);
+    definition.position = vec3Field(text, "position", open, close);
+    definition.rotation = vec3Field(text, "rotation", open, close);
+    definition.scale = vec3Field(text, "scale", open, close, {1.0F, 1.0F, 1.0F});
+    const auto [fireOpen, fireClose] = objectRange(text, "fire_light", open);
+    definition.hasFireLight = fireOpen != std::string_view::npos && fireClose <= close;
+    if (definition.hasFireLight) {
+        definition.fireColor = vec3Field(text, "color", fireOpen, fireClose, definition.fireColor);
+        definition.fireIntensity = numberField(text, "intensity", fireOpen, fireClose, definition.fireIntensity);
+        definition.fireFalloff = numberField(text, "falloff", fireOpen, fireClose, definition.fireFalloff);
+    }
+    return definition;
 }
 
 } // namespace
@@ -147,6 +362,7 @@ void Application::initialize() {
     ui_.setLanguage(config_.language);
     survival_.loadLocations(assets_);
     discovery_.loadLocations(assets_);
+    loadWorldMetadata();
     loadMap();
     createWorld();
     initializeSystems();
@@ -298,7 +514,7 @@ void Application::buildPipeline() {
         if (worldStreamer_ == nullptr || menuOpen_) {
             return;
         }
-        worldStreamer_->update(playerPosition(), registry_, jobs_);
+        worldStreamer_->update(playerPosition(), registry_, assets_, physics_, resources_, scripts_, jobs_);
         renderer_->releaseUnusedMeshes(registry_);
     });
     pipeline_.add(FrameStage::Update, "update enemies", [this](FrameContext& context) {
@@ -374,6 +590,15 @@ void Application::buildPipeline() {
     });
 }
 
+void Application::loadWorldMetadata() {
+    landmarks_ = parseLandmarks(assets_.readText("maps/landmarks.json"));
+    debugTeleports_.clear();
+    const std::string config = assets_.readText("maps/world_config.json");
+    for (const std::string& name : parseStringArray(config, "debug_teleports")) {
+        debugTeleports_.push_back(landmark(name));
+    }
+}
+
 void Application::resetWorldState() {
     registry_ = Registry{};
     worldStreamer_.reset();
@@ -381,7 +606,9 @@ void Application::resetWorldState() {
     loadMap();
     createWorld();
     scripts_.execute(assets_, "scripts/startup.script", registry_, physics_, resources_, jobs_);
-    scripts_.execute(assets_, "scripts/models.scene", registry_, physics_, resources_, jobs_);
+    if (worldStreamer_ == nullptr) {
+        scripts_.execute(assets_, "scripts/models.scene", registry_, physics_, resources_, jobs_);
+    }
     ui_.setFrameCounterVisible(scripts_.frameCounterVisible());
     physics_.rebuildStaticIndex(registry_);
 }
@@ -406,7 +633,7 @@ void Application::loadMap() {
 
     if (chunkAssetsAvailable) {
         worldStreamer_ = std::make_unique<WorldStreamer>(assetManager_);
-        worldStreamer_->loadInitial(arrivalCamp, registry_);
+        worldStreamer_->loadInitial(landmark("arrival_camp"), registry_, assets_, physics_, resources_, scripts_, jobs_);
         return;
     }
 
@@ -439,6 +666,14 @@ void Application::createWorld() {
     const auto internalWaterMesh = resources_.load<Mesh>("maps/internal_water.obj", [this] {
         return MeshLoader::load(assets_, "maps/internal_water.obj");
     });
+    const std::string worldConfig = assets_.readText("maps/world_config.json");
+    const WaterDefinition oceanWater = parseWaterDefinition(worldConfig, "ocean");
+    const WaterDefinition internalWaterDefinition = parseWaterDefinition(worldConfig, "internal");
+    const std::array lavaDefinitions = {
+        parseLavaDefinition(worldConfig, "crater_lake"),
+        parseLavaDefinition(worldConfig, "inner_current"),
+        parseLavaDefinition(worldConfig, "overflow"),
+    };
 
     const std::array<Transform, 8> obstacles = {
         Transform{{-8.0F, 3.0F, -90.0F}, {}, {2.0F, 6.0F, 2.0F}},
@@ -458,36 +693,44 @@ void Application::createWorld() {
     }
 
     const Entity water = registry_.create();
-    registry_.emplace<Transform>(water, Transform{{0.0F, 0.08F, 0.0F}});
+    registry_.emplace<Transform>(water, Transform{oceanWater.position});
     registry_.emplace<MeshRenderer>(water, waterMesh);
-    registry_.emplace<WaterSurface>(water, WaterSurface{{960.0F, 960.0F}});
+    registry_.emplace<WaterSurface>(
+        water,
+        WaterSurface{
+            oceanWater.halfExtents,
+            oceanWater.affectsPhysics,
+            oceanWater.kind,
+            oceanWater.flowDirection,
+            oceanWater.foamStrength});
 
     const Entity internalWater = registry_.create();
-    registry_.emplace<Transform>(internalWater);
+    registry_.emplace<Transform>(internalWater, Transform{internalWaterDefinition.position});
     registry_.emplace<MeshRenderer>(internalWater, internalWaterMesh);
     registry_.emplace<WaterSurface>(
         internalWater,
-        WaterSurface{{0.0F, 0.0F}, false, WaterKind::Inland, glm::normalize(glm::vec2{0.78F, -0.32F}), 0.55F});
+        WaterSurface{
+            internalWaterDefinition.halfExtents,
+            internalWaterDefinition.affectsPhysics,
+            internalWaterDefinition.kind,
+            internalWaterDefinition.flowDirection,
+            internalWaterDefinition.foamStrength});
 
-    const Entity craterLake = registry_.create();
-    registry_.emplace<Transform>(craterLake, Transform{craterLavaCenter, {0.0F, 0.16F, 0.0F}, {13.9F, 1.0F, 11.6F}});
-    registry_.emplace<MeshRenderer>(craterLake, lavaMesh);
-    registry_.emplace<LavaSurface>(craterLake);
-    registry_.emplace<FireLight>(craterLake, FireLight{{1.0F, 0.16F, 0.025F}, 4.8F, 0.055F});
-
-    const Entity innerCurrent = registry_.create();
-    registry_.emplace<Transform>(innerCurrent, Transform{{-3.7F, 13.31F, 3.6F}, {0.0F, 0.72F, 0.0F}, {8.4F, 1.0F, 2.7F}});
-    registry_.emplace<MeshRenderer>(innerCurrent, lavaTongueMesh);
-    registry_.emplace<LavaSurface>(innerCurrent);
-
-    const Entity overflow = registry_.create();
-    registry_.emplace<Transform>(overflow, Transform{craterLavaOverflow, {0.0F, 1.48F, 0.0F}, {7.8F, 1.0F, 1.95F}});
-    registry_.emplace<MeshRenderer>(overflow, lavaTongueMesh);
-    registry_.emplace<LavaSurface>(overflow);
+    for (const LavaDefinition& definition : lavaDefinitions) {
+        const Entity lava = registry_.create();
+        registry_.emplace<Transform>(lava, Transform{definition.position, definition.rotation, definition.scale});
+        registry_.emplace<MeshRenderer>(lava, definition.mesh == "builtin/lava" ? lavaMesh : lavaTongueMesh);
+        registry_.emplace<LavaSurface>(lava);
+        if (definition.hasFireLight) {
+            registry_.emplace<FireLight>(
+                lava,
+                FireLight{definition.fireColor, definition.fireIntensity, definition.fireFalloff});
+        }
+    }
 
     createCampfireFire({-26.48F, 0.86F, 75.48F}, 0.52F);
 
-    player_.create(registry_, arrivalCamp);
+    player_.create(registry_, landmark("arrival_camp"));
     Enemy::create(registry_, {-14.0F, 1.0F, -22.0F}, enemyMesh);
     Enemy::create(registry_, {45.0F, 3.0F, -45.0F}, enemyMesh);
     Enemy::create(registry_, {-60.0F, 4.0F, 55.0F}, enemyMesh);
@@ -558,7 +801,9 @@ Entity Application::createSmokeLayer(
 
 void Application::initializeSystems() {
     scripts_.execute(assets_, "scripts/startup.script", registry_, physics_, resources_, jobs_);
-    scripts_.execute(assets_, "scripts/models.scene", registry_, physics_, resources_, jobs_);
+    if (worldStreamer_ == nullptr) {
+        scripts_.execute(assets_, "scripts/models.scene", registry_, physics_, resources_, jobs_);
+    }
     ui_.setFrameCounterVisible(scripts_.frameCounterVisible());
     physics_.rebuildStaticIndex(registry_);
     physicsTime_ = weather_.time();
@@ -624,22 +869,15 @@ void Application::handleUiAction(UiAction action) {
         ui_.setLanguage(nextLanguage(ui_.language()));
         break;
     case UiAction::RespawnPlayer:
-        teleportPlayer({-25.0F, 2.0F, 75.0F});
+        teleportPlayer(landmark("arrival_camp"));
         break;
     case UiAction::TeleportVolcano:
         teleportPlayer({0.0F, 34.0F, 18.0F});
         break;
     case UiAction::TeleportNextLandmark: {
-        constexpr std::array landmarks = {
-            glm::vec3{-104.0F, 11.0F, -2.0F},
-            glm::vec3{91.0F, 3.0F, 14.5F},
-            glm::vec3{31.0F, 10.0F, -24.0F},
-            glm::vec3{56.0F, 4.0F, -11.0F},
-            glm::vec3{-72.0F, 4.0F, -61.0F},
-            glm::vec3{65.0F, 2.0F, 63.0F},
-            glm::vec3{-91.0F, 3.0F, 60.0F},
-        };
-        teleportPlayer(landmarks[nextLandmark_ % landmarks.size()]);
+        if (!debugTeleports_.empty()) {
+            teleportPlayer(debugTeleports_[nextLandmark_ % debugTeleports_.size()]);
+        }
         ++nextLandmark_;
         break;
     }
@@ -678,7 +916,7 @@ void Application::startNewGame() {
     nextLandmark_ = 0;
     physicsTime_ = weather_.time();
     craftMessage_ = crafting_.nextHint(inventory_, nearCraftStation());
-    teleportPlayer(arrivalCamp);
+    teleportPlayer(landmark("arrival_camp"));
     gameStarted_ = true;
     menuOpen_ = false;
     inventoryOpen_ = false;
@@ -851,6 +1089,14 @@ void Application::teleportPlayer(glm::vec3 position) {
     player_.syncCamera(registry_, camera_);
 }
 
+glm::vec3 Application::landmark(std::string_view name) const {
+    const auto iterator = landmarks_.find(std::string{name});
+    if (iterator == landmarks_.end()) {
+        throw std::runtime_error("Missing generated landmark: " + std::string{name});
+    }
+    return iterator->second;
+}
+
 void Application::stopPlayerMotion() {
     input_.clearMovementKeys();
     if (!registry_.alive(player_.entity())) {
@@ -915,19 +1161,19 @@ void Application::useContextAction() {
     const auto near = [&position](glm::vec3 point, float radius) {
         return glm::length(glm::vec2{position.x - point.x, position.z - point.z}) <= radius;
     };
-    if (near(arrivalCamp, 14.0F) && !fireLit_ && inventory_.wood() > 0 && inventory_.stone() > 0) {
+    if (near(landmark("arrival_camp"), 14.0F) && !fireLit_ && inventory_.wood() > 0 && inventory_.stone() > 0) {
         if (inventory_.spendWood(1) && inventory_.spendStone(1)) {
             fireLit_ = true;
             craftMessage_ = crafting_.nextHint(inventory_, nearCraftStation());
         }
         return;
     }
-    if (near(grantLake, 24.0F) || near(mercyRiverMouth, 24.0F)) {
+    if (near(landmark("grant_lake"), 24.0F) || near(landmark("mercy_river_mouth"), 24.0F)) {
         inventory_.addWater(1);
         survival_.drinkCleanWater(1);
         return;
     }
-    if (near(arrivalCamp, 12.0F) && fireLit_) {
+    if (near(landmark("arrival_camp"), 12.0F) && fireLit_) {
         survival_.restNearFire(18.0F);
         return;
     }
@@ -951,7 +1197,7 @@ void Application::useContextAction() {
         survival_.drinkCleanWater(1);
         return;
     }
-    if (near(naturalHarbor, 42.0F) || glm::length(glm::vec2{position.x, position.z}) < 56.0F) {
+    if (near(landmark("natural_harbor"), 42.0F) || glm::length(glm::vec2{position.x, position.z}) < 56.0F) {
         inventory_.addStone(inventory_.selectedTool() == Tool::Pickaxe ? 3 : 1);
         if (inventory_.selectedTool() == Tool::Pickaxe) {
             inventory_.addMetal(1);
@@ -970,9 +1216,9 @@ bool Application::nearCraftStation() const {
     const auto near = [&position](glm::vec3 point, float radius) {
         return glm::length(glm::vec2{position.x - point.x, position.z - point.z}) <= radius;
     };
-    return (fireLit_ && near(arrivalCamp, 16.0F))
-        || near(graniteHouse, 24.0F)
-        || near(watchtower, 20.0F);
+    return (fireLit_ && near(landmark("arrival_camp"), 16.0F))
+        || near(landmark("granite_house"), 24.0F)
+        || near(landmark("watchtower"), 20.0F);
 }
 
 ObjectiveHudState Application::objectiveHudState() const {
@@ -981,11 +1227,11 @@ ObjectiveHudState Application::objectiveHudState() const {
         return glm::length(glm::vec2{position.x - point.x, position.z - point.z}) <= radius;
     };
     std::string_view hint = "E: НЕТ ДЕЙСТВИЯ";
-    if (near(arrivalCamp, 14.0F) && !fireLit_) {
+    if (near(landmark("arrival_camp"), 14.0F) && !fireLit_) {
         hint = inventory_.wood() > 0 && inventory_.stone() > 0 ? "E: КОСТЕР" : "НУЖНЫ ДЕРЕВО/КАМЕНЬ";
-    } else if (near(grantLake, 24.0F) || near(mercyRiverMouth, 24.0F)) {
+    } else if (near(landmark("grant_lake"), 24.0F) || near(landmark("mercy_river_mouth"), 24.0F)) {
         hint = "E: ПИТЬ / НАБРАТЬ ВОДУ";
-    } else if (near(arrivalCamp, 12.0F) && fireLit_) {
+    } else if (near(landmark("arrival_camp"), 12.0F) && fireLit_) {
         hint = "E: ОТДОХНУТЬ У КОСТРА";
     } else if (survival_.canForageFood()) {
         hint = "E: СОБРАТЬ ЕДУ";
@@ -995,7 +1241,7 @@ ObjectiveHudState Application::objectiveHudState() const {
         hint = discovery_.status().lastMessage;
     } else if (inventory_.water() > 0 && survival_.status().thirst < 86.0F) {
         hint = "E: ВЫПИТЬ ВОДУ";
-    } else if (near(naturalHarbor, 42.0F) || glm::length(glm::vec2{position.x, position.z}) < 56.0F) {
+    } else if (near(landmark("natural_harbor"), 42.0F) || glm::length(glm::vec2{position.x, position.z}) < 56.0F) {
         hint = "E: ДОБЫТЬ КАМЕНЬ";
     }
     const SurvivalStatus& survival = survival_.status();
@@ -1006,8 +1252,8 @@ ObjectiveHudState Application::objectiveHudState() const {
         inventory_.stone() > 0,
         inventory_.water() > 0,
         fireLit_,
-        near(graniteHouse, 22.0F),
-        near(standingStones, 20.0F) || near(watchtower, 18.0F),
+        near(landmark("granite_house"), 22.0F),
+        near(landmark("standing_stones"), 20.0F) || near(landmark("watchtower"), 18.0F),
         hint,
         survival.health,
         survival.thirst,

@@ -29,6 +29,9 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
 
 struct GLFWwindow;
 
@@ -53,6 +56,7 @@ public:
 private:
     void registerEventHandlers();
     void buildPipeline();
+    void loadWorldMetadata();
     void resetWorldState();
     void loadMap();
     void createWorld();
@@ -83,6 +87,7 @@ private:
     void toggleDebugPanel();
     void toggleFullscreen();
     void teleportPlayer(glm::vec3 position);
+    [[nodiscard]] glm::vec3 landmark(std::string_view name) const;
     void stopPlayerMotion();
     void useSelectedTool();
     void useContextAction();
@@ -124,6 +129,8 @@ private:
     UiSystem ui_;
     FrameArena frameArena_;
     std::string sceneSnapshot_;
+    std::unordered_map<std::string, glm::vec3> landmarks_;
+    std::vector<glm::vec3> debugTeleports_;
     std::unique_ptr<Renderer> renderer_;
     std::unique_ptr<WorldStreamer> worldStreamer_;
     bool firstMouseEvent_ = true;
