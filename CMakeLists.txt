@@ -101,6 +101,7 @@ add_executable(pcolonist
     src/render/MeshFactory.cpp
     src/render/PngLoader.cpp
     src/render/Renderer.cpp
+    src/render/RendererTargets.cpp
     src/render/Shader.cpp
     src/render/ShaderLibrary.cpp
     src/render/Skybox.cpp
