@@ -22,6 +22,7 @@
 #include "pcolonist/platform/Input.hpp"
 #include "pcolonist/render/Camera.hpp"
 #include "pcolonist/scripting/ScriptSystem.hpp"
+#include "pcolonist/ui/DebugUi.hpp"
 #include "pcolonist/ui/UiSystem.hpp"
 #include "pcolonist/world/AssetManager.hpp"
 #include "pcolonist/world/WeatherSystem.hpp"
@@ -85,6 +86,7 @@ private:
     void toggleMenu();
     void toggleInventory();
     void toggleDebugPanel();
+    void toggleDebugOverlay();
     void toggleFullscreen();
     void teleportPlayer(glm::vec3 position);
     [[nodiscard]] glm::vec3 landmark(std::string_view name) const;
@@ -95,6 +97,7 @@ private:
     bool nearCraftStation() const;
     glm::vec3 playerPosition() const;
     ObjectiveHudState objectiveHudState() const;
+    DebugUiStats debugUiStats(float deltaTime, double totalTime);
     void updateCursorMode();
 
     static void keyCallback(GLFWwindow* window, int key, int scanCode, int action, int modifiers);
@@ -126,6 +129,7 @@ private:
     AnimationSystem animations_;
     AudioSystem audio_;
     ScriptSystem scripts_;
+    DebugUi debugUi_;
     UiSystem ui_;
     FrameArena frameArena_;
     std::string sceneSnapshot_;

@@ -29,6 +29,23 @@ public:
         int lod1Radius = 2;
     };
 
+    struct RuntimeStats {
+        ChunkKey center{};
+        float chunkSize = 0.0F;
+        int loadRadius = 0;
+        int unloadRadius = 0;
+        int lod0Radius = 0;
+        int lod1Radius = 0;
+        std::size_t activeChunks = 0;
+        std::size_t pendingChunks = 0;
+        std::size_t missingChunks = 0;
+        std::size_t lod0Chunks = 0;
+        std::size_t lod1Chunks = 0;
+        std::size_t lod2Chunks = 0;
+        std::size_t terrainEntities = 0;
+        std::size_t sceneEntities = 0;
+    };
+
     ChunkManager();
     explicit ChunkManager(Config config);
 
@@ -55,6 +72,7 @@ public:
     [[nodiscard]] ChunkKey chunkFor(glm::vec3 position) const;
     [[nodiscard]] std::size_t activeChunkCount() const;
     [[nodiscard]] std::size_t pendingChunkCount() const;
+    [[nodiscard]] RuntimeStats stats(glm::vec3 playerPosition) const;
 
 private:
     struct PendingChunk {
@@ -73,7 +91,7 @@ private:
         ResourceManager& resources,
         ScriptSystem& scripts,
         JobSystem& jobs);
-    void unloadDistantChunks(ChunkKey center, Registry& registry);
+    bool unloadDistantChunks(ChunkKey center, Registry& registry);
     void spawnChunk(
         Chunk chunk,
         Registry& registry,

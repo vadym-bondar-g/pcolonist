@@ -18,6 +18,18 @@ class Registry;
 class WeatherSystem;
 enum class GraphicsQuality;
 
+struct RendererDebugOptions {
+    float terrainDrawDistance = 340.0F;
+    float objectDrawDistance = 260.0F;
+    bool showTerrain = true;
+    bool showObjects = true;
+    bool showResources = true;
+    bool showWater = true;
+    bool showLava = true;
+    bool showFire = true;
+    bool wireframe = false;
+};
+
 class Renderer {
 public:
     Renderer();
@@ -34,11 +46,13 @@ public:
     void setBloomEnabled(bool enabled);
     void setGraphicsQuality(GraphicsQuality quality);
     void setSkyQuality(SkyQuality quality);
+    void setDebugOptions(RendererDebugOptions options);
     void cycleSkyQuality();
     [[nodiscard]] bool shadowsEnabled() const;
     [[nodiscard]] bool bloomEnabled() const;
     [[nodiscard]] SkyQuality skyQuality() const;
     [[nodiscard]] const char* skyQualityName() const;
+    [[nodiscard]] const RendererDebugOptions& debugOptions() const;
 
 private:
     struct GpuMesh {
@@ -76,6 +90,7 @@ private:
     bool bloomEnabled_ = true;
     int sceneQuality_ = 2;
     SkyQuality skyQuality_ = SkyQuality::Medium;
+    RendererDebugOptions debugOptions_;
 };
 
 } // namespace pcolonist

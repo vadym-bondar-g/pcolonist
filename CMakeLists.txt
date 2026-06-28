@@ -74,6 +74,25 @@ if(PCOLONIST_ENABLE_FREETYPE_UI)
     find_package(Freetype REQUIRED)
 endif()
 
+option(PCOLONIST_ENABLE_IMGUI_DEBUG "Enable Dear ImGui debug overlay when external/imgui is available" ON)
+set(PCOLONIST_HAS_IMGUI_DEBUG OFF)
+if(PCOLONIST_ENABLE_IMGUI_DEBUG AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui.cpp")
+    set(PCOLONIST_HAS_IMGUI_DEBUG ON)
+    add_library(imgui STATIC
+        external/imgui/imgui.cpp
+        external/imgui/imgui_draw.cpp
+        external/imgui/imgui_tables.cpp
+        external/imgui/imgui_widgets.cpp
+        external/imgui/backends/imgui_impl_glfw.cpp
+        external/imgui/backends/imgui_impl_opengl3.cpp
+    )
+    target_include_directories(imgui PUBLIC
+        external/imgui
+        external/imgui/backends
+    )
+    target_link_libraries(imgui PUBLIC glfw)
+endif()
+
 add_executable(pcolonist
     main.cpp
     src/animation/AnimationSystem.cpp
@@ -108,6 +127,7 @@ add_executable(pcolonist
     src/scripting/ScriptSystem.cpp
     src/serialization/SaveGameSerializer.cpp
     src/serialization/SceneSerializer.cpp
+    src/ui/DebugUi.cpp
     src/ui/MainMenu.cpp
     src/ui/PauseMenu.cpp
     src/ui/UiSystem.cpp
@@ -124,6 +144,10 @@ target_link_libraries(pcolonist PRIVATE glfw glad_gl_core_33 glm::glm PNG::PNG T
 if(PCOLONIST_ENABLE_FREETYPE_UI)
     target_link_libraries(pcolonist PRIVATE Freetype::Freetype)
     target_compile_definitions(pcolonist PRIVATE PCOLONIST_ENABLE_FREETYPE_UI=1)
+endif()
+if(PCOLONIST_HAS_IMGUI_DEBUG)
+    target_link_libraries(pcolonist PRIVATE imgui)
+    target_compile_definitions(pcolonist PRIVATE PCOLONIST_ENABLE_IMGUI_DEBUG=1)
 endif()
 target_compile_features(pcolonist PRIVATE cxx_std_20)
 set_target_properties(pcolonist PROPERTIES CXX_EXTENSIONS OFF)

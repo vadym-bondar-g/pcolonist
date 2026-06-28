@@ -45,4 +45,8 @@ std::size_t WorldStreamer::pendingChunkCount() const {
     return chunks_.pendingChunkCount();
 }
 
+ChunkManager::RuntimeStats WorldStreamer::stats(glm::vec3 playerPosition) const {
+    return chunks_.stats(playerPosition);
+}
+
 } // namespace pcolonist

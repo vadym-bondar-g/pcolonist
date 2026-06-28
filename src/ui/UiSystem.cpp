@@ -27,16 +27,16 @@ namespace {
 
 using Glyph = std::array<unsigned char, 7>;
 
-constexpr glm::vec4 panel{0.012F, 0.016F, 0.021F, 0.78F};
-constexpr glm::vec4 panelRaised{0.026F, 0.034F, 0.043F, 0.88F};
-constexpr glm::vec4 panelHover{0.060F, 0.086F, 0.100F, 0.96F};
-constexpr glm::vec4 border{0.36F, 0.48F, 0.54F, 0.46F};
-constexpr glm::vec4 textPrimary{0.90F, 0.93F, 0.94F, 1.0F};
-constexpr glm::vec4 textMuted{0.52F, 0.58F, 0.61F, 1.0F};
-constexpr glm::vec4 cyan{0.24F, 0.82F, 0.90F, 1.0F};
-constexpr glm::vec4 green{0.38F, 0.78F, 0.58F, 1.0F};
-constexpr glm::vec4 amber{0.88F, 0.66F, 0.34F, 1.0F};
-constexpr glm::vec4 danger{0.90F, 0.26F, 0.22F, 1.0F};
+constexpr glm::vec4 panel{0.110F, 0.078F, 0.040F, 0.80F};
+constexpr glm::vec4 panelRaised{0.155F, 0.105F, 0.052F, 0.88F};
+constexpr glm::vec4 panelHover{0.205F, 0.145F, 0.070F, 0.96F};
+constexpr glm::vec4 border{0.72F, 0.54F, 0.28F, 0.52F};
+constexpr glm::vec4 textPrimary{0.96F, 0.88F, 0.70F, 1.0F};
+constexpr glm::vec4 textMuted{0.70F, 0.62F, 0.48F, 1.0F};
+constexpr glm::vec4 waterBlue{0.36F, 0.58F, 0.62F, 1.0F};
+constexpr glm::vec4 green{0.38F, 0.62F, 0.32F, 1.0F};
+constexpr glm::vec4 amber{0.92F, 0.64F, 0.24F, 1.0F};
+constexpr glm::vec4 danger{0.86F, 0.30F, 0.22F, 1.0F};
 
 pcolonist::UiAction toUiAction(pcolonist::PauseMenuAction action) {
     switch (action) {
@@ -244,16 +244,16 @@ void UiSystem::render(
         rectangle(x + 3.0F, y + 5.0F, width, height, {0.0F, 0.0F, 0.0F, 0.26F}, radius);
         rectangle(x, y, width, height, alpha(border, 0.72F), radius);
         rectangle(x + 1.0F, y + 1.0F, width - 2.0F, height - 2.0F, panel, std::max(0.0F, radius - 1.0F));
-        rectangle(x + 1.0F, y + 1.0F, width - 2.0F, 1.0F, {0.70F, 0.94F, 0.98F, 0.12F}, 0.0F);
+        rectangle(x + 1.0F, y + 1.0F, width - 2.0F, 1.0F, {0.92F, 0.64F, 0.32F, 0.14F}, 0.0F);
     };
     const auto statusPill = [this](float x, float y, float width, std::string_view label, const glm::vec4& accent) {
-        rectangle(x, y, width, 26.0F, {0.030F, 0.042F, 0.052F, 0.78F}, 8.0F);
-        rectangle(x + 1.0F, y + 1.0F, width - 2.0F, 1.0F, {0.70F, 0.94F, 0.98F, 0.10F}, 0.0F);
+        rectangle(x, y, width, 26.0F, {0.135F, 0.095F, 0.050F, 0.82F}, 8.0F);
+        rectangle(x + 1.0F, y + 1.0F, width - 2.0F, 1.0F, {0.92F, 0.64F, 0.32F, 0.12F}, 0.0F);
         rectangle(x + 12.0F, y + 10.0F, 6.0F, 6.0F, accent, 3.0F);
         text(x + 28.0F, y + 7.0F, label, 1.28F, textPrimary);
     };
     const auto questRow = [this, alpha](float x, float y, float width, std::string_view number, std::string_view label, bool done, bool active) {
-        const glm::vec4 accent = done ? green : (active ? cyan : textMuted);
+        const glm::vec4 accent = done ? green : (active ? waterBlue : textMuted);
         rectangle(x, y, width, 36.0F, active ? panelRaised : glm::vec4{0.014F, 0.020F, 0.026F, 0.58F}, 7.0F);
         rectangle(x + 1.0F, y + 1.0F, active ? width - 2.0F : 5.0F, 2.0F, alpha(accent, active ? 0.85F : 0.50F), 1.0F);
         rectangle(x + 14.0F, y + 11.0F, 6.0F, 14.0F, accent, 3.0F);
@@ -262,7 +262,7 @@ void UiSystem::render(
     };
     const auto survivalBar = [this](float x, float y, float width, std::string_view label, float value, const glm::vec4& accent) {
         const float clamped = std::clamp(value, 0.0F, 100.0F);
-        rectangle(x, y, width, 18.0F, {0.046F, 0.052F, 0.058F, 0.82F}, 5.0F);
+        rectangle(x, y, width, 18.0F, {0.075F, 0.056F, 0.034F, 0.84F}, 5.0F);
         rectangle(x, y, width * (clamped / 100.0F), 18.0F, accent, 5.0F);
         rectangle(x, y, width, 1.0F, {1.0F, 1.0F, 1.0F, 0.10F}, 0.0F);
         text(x + 8.0F, y + 4.0F, label, 1.02F, textPrimary);
@@ -278,12 +278,12 @@ void UiSystem::render(
     const int minutes = totalMinutes % 60;
     std::ostringstream clock;
     clock << std::setfill('0') << std::setw(2) << hours << ':' << std::setw(2) << minutes;
-    rectangle(timePanelX + 18.0F, margin + 17.0F, 3.0F, 22.0F, weather.daylight() > 0.2F ? amber : cyan, 1.0F);
+    rectangle(timePanelX + 18.0F, margin + 17.0F, 3.0F, 22.0F, weather.daylight() > 0.2F ? amber : waterBlue, 1.0F);
     text(timePanelX + 34.0F, margin + 18.0F, clock.str(), 2.45F, textPrimary);
     const std::string dayLabel = std::string(tr(language, UiText::Day)) + " " + std::to_string(weather.dayNumber());
-    statusPill(timePanelX + 126.0F, margin + 15.0F, 104.0F, dayLabel, weather.daylight() > 0.2F ? amber : cyan);
+    statusPill(timePanelX + 126.0F, margin + 15.0F, 104.0F, dayLabel, weather.daylight() > 0.2F ? amber : waterBlue);
     if (!compact) {
-        statusPill(timePanelX + 242.0F, margin + 15.0F, 150.0F, weather.weatherName(), cyan);
+        statusPill(timePanelX + 242.0F, margin + 15.0F, 150.0F, weather.weatherName(), waterBlue);
     }
 
     const float questWidth = compact ? 282.0F : 326.0F;
@@ -309,11 +309,11 @@ void UiSystem::render(
     card(survivalX, survivalY, statusWidth, 224.0F, 10.0F);
     rectangle(survivalX + 1.0F, survivalY + 1.0F, 3.0F, 222.0F, objectives.sick ? amber : green, 2.0F);
     text(survivalX + 18.0F, survivalY + 16.0F, tr(language, UiText::Status), 1.35F, textPrimary);
-    text(survivalX + 18.0F, survivalY + 40.0F, objectives.survivalBiome, 1.02F, cyan);
+    text(survivalX + 18.0F, survivalY + 40.0F, objectives.survivalBiome, 1.02F, waterBlue);
     text(survivalX + 18.0F, survivalY + 58.0F, objectives.survivalLocation, 0.90F, textMuted);
     const glm::vec4 healthColor = objectives.health < 35.0F ? danger : green;
     survivalBar(survivalX + 18.0F, survivalY + 82.0F, statusWidth - 36.0F, "HP", objectives.health, healthColor);
-    survivalBar(survivalX + 18.0F, survivalY + 106.0F, statusWidth - 36.0F, "H2O", objectives.thirst, cyan);
+    survivalBar(survivalX + 18.0F, survivalY + 106.0F, statusWidth - 36.0F, "H2O", objectives.thirst, waterBlue);
     survivalBar(survivalX + 18.0F, survivalY + 130.0F, statusWidth - 36.0F, tr(language, UiText::Food), objectives.hunger, amber);
     survivalBar(survivalX + 18.0F, survivalY + 154.0F, statusWidth - 36.0F, tr(language, UiText::Rest), 100.0F - objectives.fatigue, {0.62F, 0.68F, 0.78F, 1.0F});
     const std::string temperature = "TEMP " + std::to_string(static_cast<int>(std::round(objectives.bodyTemperature))) + "C";
@@ -323,7 +323,7 @@ void UiSystem::render(
     if (!compact) {
         const float discoveryY = survivalY + 236.0F;
         card(survivalX, discoveryY, statusWidth, 112.0F, 10.0F);
-        rectangle(survivalX + 1.0F, discoveryY + 1.0F, 3.0F, 110.0F, objectives.discoveryBlocked ? amber : cyan, 2.0F);
+        rectangle(survivalX + 1.0F, discoveryY + 1.0F, 3.0F, 110.0F, objectives.discoveryBlocked ? amber : waterBlue, 2.0F);
         text(survivalX + 18.0F, discoveryY + 14.0F, tr(language, UiText::Discovery), 1.24F, textPrimary);
         const std::string poiProgress = std::string(tr(language, UiText::Poi)) + " " + std::to_string(objectives.discoveredLocations)
             + "/" + std::to_string(objectives.totalLocations);
@@ -331,7 +331,7 @@ void UiSystem::render(
             + "/" + std::to_string(objectives.totalStoryClues);
         const std::string secretProgress = std::string(tr(language, UiText::Secrets)) + " " + std::to_string(objectives.secretsFound)
             + "/" + std::to_string(objectives.totalSecrets);
-        text(survivalX + 18.0F, discoveryY + 42.0F, poiProgress, 1.02F, cyan);
+        text(survivalX + 18.0F, discoveryY + 42.0F, poiProgress, 1.02F, waterBlue);
         text(survivalX + 104.0F, discoveryY + 42.0F, clueProgress, 1.02F, textMuted);
         text(survivalX + 18.0F, discoveryY + 64.0F, secretProgress, 1.02F, objectives.discoveryBlocked ? amber : green);
         text(survivalX + 18.0F, discoveryY + 86.0F, objectives.discoveryMessage, 0.80F, textPrimary);
@@ -339,11 +339,11 @@ void UiSystem::render(
 
     const float centerX = static_cast<float>(width_) * 0.5F;
     const float centerY = static_cast<float>(height_) * 0.5F;
-    rectangle(centerX - 1.0F, centerY - 16.0F, 2.0F, 8.0F, {0.86F, 0.96F, 1.0F, 0.70F}, 1.0F);
-    rectangle(centerX - 1.0F, centerY + 8.0F, 2.0F, 8.0F, {0.86F, 0.96F, 1.0F, 0.70F}, 1.0F);
-    rectangle(centerX - 16.0F, centerY - 1.0F, 8.0F, 2.0F, {0.86F, 0.96F, 1.0F, 0.70F}, 1.0F);
-    rectangle(centerX + 8.0F, centerY - 1.0F, 8.0F, 2.0F, {0.86F, 0.96F, 1.0F, 0.70F}, 1.0F);
-    rectangle(centerX - 2.0F, centerY - 2.0F, 4.0F, 4.0F, {0.24F, 0.82F, 0.90F, 0.78F}, 2.0F);
+    rectangle(centerX - 1.0F, centerY - 16.0F, 2.0F, 8.0F, {0.96F, 0.82F, 0.54F, 0.70F}, 1.0F);
+    rectangle(centerX - 1.0F, centerY + 8.0F, 2.0F, 8.0F, {0.96F, 0.82F, 0.54F, 0.70F}, 1.0F);
+    rectangle(centerX - 16.0F, centerY - 1.0F, 8.0F, 2.0F, {0.96F, 0.82F, 0.54F, 0.70F}, 1.0F);
+    rectangle(centerX + 8.0F, centerY - 1.0F, 8.0F, 2.0F, {0.96F, 0.82F, 0.54F, 0.70F}, 1.0F);
+    rectangle(centerX - 2.0F, centerY - 2.0F, 4.0F, 4.0F, {0.92F, 0.64F, 0.24F, 0.78F}, 2.0F);
 
     const float slotSize = compact ? 52.0F : 62.0F;
     const float slotGap = compact ? 6.0F : 8.0F;
@@ -356,10 +356,10 @@ void UiSystem::render(
         const float x = hotbarX + static_cast<float>(slot) * (slotSize + slotGap);
         const bool selected = inventory.selectedSlot() == slot;
         rectangle(x + 3.0F, hotbarY + 5.0F, slotSize, slotSize, {0.0F, 0.0F, 0.0F, 0.34F}, 8.0F);
-        rectangle(x, hotbarY, slotSize, slotSize, selected ? cyan : border, 8.0F);
-        rectangle(x + 2.0F, hotbarY + 2.0F, slotSize - 4.0F, slotSize - 4.0F, selected ? glm::vec4{0.038F, 0.068F, 0.078F, 0.94F} : panelRaised, 7.0F);
-        rectangle(x + 2.0F, hotbarY + 2.0F, selected ? slotSize - 4.0F : 7.0F, 2.0F, selected ? cyan : alpha(border, 0.55F), 1.0F);
-        text(x + 8.0F, hotbarY + 7.0F, std::to_string(slot + 1), compact ? 1.20F : 1.35F, selected ? cyan : textMuted);
+        rectangle(x, hotbarY, slotSize, slotSize, selected ? waterBlue : border, 8.0F);
+        rectangle(x + 2.0F, hotbarY + 2.0F, slotSize - 4.0F, slotSize - 4.0F, selected ? glm::vec4{0.180F, 0.120F, 0.055F, 0.94F} : panelRaised, 7.0F);
+        rectangle(x + 2.0F, hotbarY + 2.0F, selected ? slotSize - 4.0F : 7.0F, 2.0F, selected ? waterBlue : alpha(border, 0.55F), 1.0F);
+        text(x + 8.0F, hotbarY + 7.0F, std::to_string(slot + 1), compact ? 1.20F : 1.35F, selected ? waterBlue : textMuted);
         if (!inventory.toolName(slot).empty()) {
             text(x + 13.0F, hotbarY + slotSize - 24.0F, inventory.toolName(slot), compact ? 1.15F : 1.35F, textPrimary);
         }
@@ -369,7 +369,7 @@ void UiSystem::render(
     const bool fullscreenHovered = !cursorCaptured && contains(pointerX_, pointerY_, fullscreenX, 18.0F, 54.0F, 44.0F);
     card(fullscreenX, 18.0F, 54.0F, 44.0F, 8.0F);
     if (fullscreenHovered || fullscreen) {
-        rectangle(fullscreenX + 1.0F, 19.0F, 52.0F, 42.0F, fullscreen ? glm::vec4{0.045F, 0.22F, 0.26F, 0.82F} : panelHover, 7.0F);
+        rectangle(fullscreenX + 1.0F, 19.0F, 52.0F, 42.0F, fullscreen ? glm::vec4{0.185F, 0.135F, 0.060F, 0.86F} : panelHover, 7.0F);
     }
     rectangle(fullscreenX + 15.0F, 31.0F, 24.0F, 2.0F, textPrimary);
     rectangle(fullscreenX + 15.0F, 47.0F, 24.0F, 2.0F, textPrimary);
@@ -390,37 +390,37 @@ void UiSystem::render(
         const float minimapY = static_cast<float>(height_) - minimapSize - slotSize - margin - 46.0F;
         card(minimapX, minimapY, minimapSize, minimapSize, 10.0F);
         text(minimapX + 16.0F, minimapY + 13.0F, tr(language, UiText::LocalMap), 1.18F, textPrimary);
-        rectangle(minimapX + 16.0F, minimapY + 36.0F, 134.0F, 112.0F, {0.014F, 0.065F, 0.078F, 0.92F}, 7.0F);
-        rectangle(minimapX + 38.0F, minimapY + 54.0F, 84.0F, 70.0F, {0.10F, 0.25F, 0.15F, 0.94F}, 6.0F);
-        rectangle(minimapX + 55.0F, minimapY + 46.0F, 46.0F, 22.0F, {0.16F, 0.31F, 0.18F, 0.96F}, 6.0F);
-        rectangle(minimapX + 77.0F, minimapY + 69.0F, 24.0F, 24.0F, {0.20F, 0.16F, 0.15F, 0.98F}, 6.0F);
-        rectangle(minimapX + 103.0F, minimapY + 86.0F, 24.0F, 20.0F, {0.04F, 0.22F, 0.30F, 0.98F}, 6.0F);
+        rectangle(minimapX + 16.0F, minimapY + 36.0F, 134.0F, 112.0F, {0.135F, 0.100F, 0.052F, 0.92F}, 7.0F);
+        rectangle(minimapX + 38.0F, minimapY + 54.0F, 84.0F, 70.0F, {0.13F, 0.27F, 0.14F, 0.94F}, 6.0F);
+        rectangle(minimapX + 55.0F, minimapY + 46.0F, 46.0F, 22.0F, {0.22F, 0.36F, 0.17F, 0.96F}, 6.0F);
+        rectangle(minimapX + 77.0F, minimapY + 69.0F, 24.0F, 24.0F, {0.24F, 0.17F, 0.10F, 0.98F}, 6.0F);
+        rectangle(minimapX + 103.0F, minimapY + 86.0F, 24.0F, 20.0F, {0.05F, 0.23F, 0.27F, 0.98F}, 6.0F);
         const float markerX = minimapX + 16.0F + std::clamp((objectives.playerPosition.x + 132.0F) / 264.0F, 0.0F, 1.0F) * 134.0F;
         const float markerY = minimapY + 36.0F + std::clamp((objectives.playerPosition.z + 112.0F) / 224.0F, 0.0F, 1.0F) * 112.0F;
-        rectangle(markerX - 6.0F, markerY - 6.0F, 12.0F, 12.0F, {0.24F, 0.82F, 0.90F, 0.36F}, 6.0F);
-        rectangle(markerX - 3.0F, markerY - 3.0F, 6.0F, 6.0F, cyan, 3.0F);
+        rectangle(markerX - 6.0F, markerY - 6.0F, 12.0F, 12.0F, {0.36F, 0.58F, 0.62F, 0.36F}, 6.0F);
+        rectangle(markerX - 3.0F, markerY - 3.0F, 6.0F, 6.0F, waterBlue, 3.0F);
     }
 
     if (!cursorCaptured) {
         card(margin, margin, 206.0F, 40.0F, 8.0F);
-        rectangle(margin + 13.0F, margin + 14.0F, 3.0F, 12.0F, cyan, 1.0F);
+        rectangle(margin + 13.0F, margin + 14.0F, 3.0F, 12.0F, waterBlue, 1.0F);
         text(margin + 32.0F, margin + 12.0F, tr(language, UiText::CaptureCursor), 1.18F, textPrimary);
     }
 
     if (inventoryOpen) {
-        rectangle(0.0F, 0.0F, static_cast<float>(width_), static_cast<float>(height_), {0.005F, 0.009F, 0.016F, 0.58F});
+        rectangle(0.0F, 0.0F, static_cast<float>(width_), static_cast<float>(height_), {0.020F, 0.016F, 0.010F, 0.62F});
         const float invWidth = std::min(660.0F, static_cast<float>(width_) - 48.0F);
         const float invHeight = std::min(456.0F, static_cast<float>(height_) - 72.0F);
         const float left = centerX - invWidth * 0.5F;
         const float top = centerY - invHeight * 0.5F;
         rectangle(left + 8.0F, top + 10.0F, invWidth, invHeight, {0.0F, 0.0F, 0.0F, 0.38F}, 14.0F);
         rectangle(left, top, invWidth, invHeight, alpha(border, 0.84F), 14.0F);
-        rectangle(left + 1.0F, top + 1.0F, invWidth - 2.0F, invHeight - 2.0F, {0.014F, 0.020F, 0.027F, 0.88F}, 13.0F);
-        rectangle(left + 1.0F, top + 1.0F, 5.0F, invHeight - 2.0F, cyan, 3.0F);
+        rectangle(left + 1.0F, top + 1.0F, invWidth - 2.0F, invHeight - 2.0F, {0.105F, 0.075F, 0.040F, 0.90F}, 13.0F);
+        rectangle(left + 1.0F, top + 1.0F, 5.0F, invHeight - 2.0F, waterBlue, 3.0F);
         text(left + 32.0F, top + 28.0F, tr(language, UiText::Inventory), 2.28F, textPrimary);
         text(left + invWidth - 150.0F, top + 34.0F, tr(language, UiText::CloseTab), 1.10F, textMuted);
         rectangle(left + 32.0F, top + 78.0F, invWidth - 64.0F, 1.0F, alpha(border, 0.75F), 0.0F);
-        text(left + 34.0F, top + 104.0F, tr(language, UiText::Resources), 1.28F, cyan);
+        text(left + 34.0F, top + 104.0F, tr(language, UiText::Resources), 1.28F, waterBlue);
 
         const auto resourceCell = [this](float x, float y, float width, std::string_view label, int amount, const glm::vec4& accent) {
             rectangle(x, y, width, 48.0F, panelRaised, 8.0F);
@@ -433,24 +433,24 @@ void UiSystem::render(
         const float cellWidth = (invWidth - 76.0F - cellGap) * 0.5F;
         resourceCell(left + 34.0F, top + 132.0F, cellWidth, tr(language, UiText::Wood), inventory.wood(), amber);
         resourceCell(left + 46.0F + cellWidth, top + 132.0F, cellWidth, tr(language, UiText::Stone), inventory.stone(), textMuted);
-        resourceCell(left + 34.0F, top + 190.0F, cellWidth, tr(language, UiText::Water), inventory.water(), cyan);
+        resourceCell(left + 34.0F, top + 190.0F, cellWidth, tr(language, UiText::Water), inventory.water(), waterBlue);
         resourceCell(left + 46.0F + cellWidth, top + 190.0F, cellWidth, tr(language, UiText::Fiber), inventory.fiber(), green);
         resourceCell(left + 34.0F, top + 248.0F, cellWidth, tr(language, UiText::Metal), inventory.metal(), {0.62F, 0.68F, 0.78F, 1.0F});
         rectangle(left + 46.0F + cellWidth, top + 248.0F, cellWidth, 48.0F, panelRaised, 8.0F);
         text(left + 64.0F + cellWidth, top + 260.0F, objectives.craftingHint, 1.00F, textMuted);
         text(left + 64.0F + cellWidth, top + 280.0F, objectives.discoveryClue, 0.82F, textMuted);
 
-        text(left + 34.0F, top + 322.0F, tr(language, UiText::Tools), 1.28F, cyan);
+        text(left + 34.0F, top + 322.0F, tr(language, UiText::Tools), 1.28F, waterBlue);
         const float toolGap = 10.0F;
         const float toolSize = std::min(88.0F, (invWidth - 68.0F - toolGap * static_cast<float>(Inventory::hotbarSize - 1))
             / static_cast<float>(Inventory::hotbarSize));
         for (std::size_t slot = 0; slot < Inventory::hotbarSize; ++slot) {
             const float x = left + 34.0F + static_cast<float>(slot) * (toolSize + toolGap);
             const bool selected = inventory.selectedSlot() == slot;
-            rectangle(x, top + 346.0F, toolSize, toolSize, selected ? cyan : alpha(border, 0.78F), 9.0F);
-            rectangle(x + 2.0F, top + 348.0F, toolSize - 4.0F, toolSize - 4.0F, selected ? glm::vec4{0.038F, 0.068F, 0.078F, 0.94F} : panelRaised, 8.0F);
-            rectangle(x + 9.0F, top + 358.0F, 6.0F, 14.0F, selected ? cyan : textMuted, 3.0F);
-            text(x + 22.0F, top + 356.0F, std::to_string(slot + 1), 1.22F, selected ? cyan : textMuted);
+            rectangle(x, top + 346.0F, toolSize, toolSize, selected ? waterBlue : alpha(border, 0.78F), 9.0F);
+            rectangle(x + 2.0F, top + 348.0F, toolSize - 4.0F, toolSize - 4.0F, selected ? glm::vec4{0.180F, 0.120F, 0.055F, 0.94F} : panelRaised, 8.0F);
+            rectangle(x + 9.0F, top + 358.0F, 6.0F, 14.0F, selected ? waterBlue : textMuted, 3.0F);
+            text(x + 22.0F, top + 356.0F, std::to_string(slot + 1), 1.22F, selected ? waterBlue : textMuted);
             if (!inventory.toolName(slot).empty()) {
                 text(x + 16.0F, top + 346.0F + toolSize - 30.0F, inventory.toolName(slot), 1.12F, textPrimary);
             }
@@ -463,10 +463,10 @@ void UiSystem::render(
         rectangle(layout.left + 5.0F, layout.top + 6.0F, layout.width, layout.height, {0, 0, 0, 0.42F}, 2.0F);
         rectangle(layout.left, layout.top, layout.width, layout.height, border, 2.0F);
         rectangle(layout.left + 1.0F, layout.top + 1.0F, layout.width - 2.0F, layout.height - 2.0F, panel, 1.0F);
-        rectangle(layout.left + 1.0F, layout.top + 1.0F, 4.0F, layout.height - 2.0F, cyan);
+        rectangle(layout.left + 1.0F, layout.top + 1.0F, 4.0F, layout.height - 2.0F, waterBlue);
         text(layout.left + 32.0F, layout.top + 28.0F, "DEV PANEL", 3.0F, textPrimary);
         text(layout.left + 430.0F, layout.top + 34.0F, "TILDE CLOSE", 1.5F, textMuted);
-        text(layout.left + 32.0F, layout.top + 68.0F, "WORLD AND RENDER TESTING", 1.5F, cyan);
+        text(layout.left + 32.0F, layout.top + 68.0F, "WORLD AND RENDER TESTING", 1.5F, waterBlue);
         rectangle(layout.left + 32.0F, layout.top + 94.0F, layout.width - 64.0F, 1.0F, border);
 
         const auto debugButton = [this, &layout](
@@ -488,15 +488,15 @@ void UiSystem::render(
             }
         };
 
-        debugButton(0, 0, "RESPAWN", "ARRIVAL CAMP", cyan);
-        debugButton(1, 0, "VOLCANO", "TELEPORT", cyan);
-        debugButton(0, 1, "NEXT LANDMARK", "TELEPORT", cyan);
-        debugButton(1, 1, "WEATHER", weather.weatherName(), cyan);
-        debugButton(0, 2, "SET NOON", "DAY LIGHT", cyan);
-        debugButton(1, 2, "SET NIGHT", "MOON LIGHT", cyan);
-        debugButton(0, 3, "SHADOWS", shadows ? "ON" : "OFF", cyan);
-        debugButton(1, 3, "BLOOM", bloom ? "ON" : "OFF", cyan);
-        debugButton(0, 4, "SKY QUALITY", skyQuality, cyan);
+        debugButton(0, 0, "RESPAWN", "ARRIVAL CAMP", waterBlue);
+        debugButton(1, 0, "VOLCANO", "TELEPORT", waterBlue);
+        debugButton(0, 1, "NEXT LANDMARK", "TELEPORT", waterBlue);
+        debugButton(1, 1, "WEATHER", weather.weatherName(), waterBlue);
+        debugButton(0, 2, "SET NOON", "DAY LIGHT", waterBlue);
+        debugButton(1, 2, "SET NIGHT", "MOON LIGHT", waterBlue);
+        debugButton(0, 3, "SHADOWS", shadows ? "ON" : "OFF", waterBlue);
+        debugButton(1, 3, "BLOOM", bloom ? "ON" : "OFF", waterBlue);
+        debugButton(0, 4, "SKY QUALITY", skyQuality, waterBlue);
     }
 
     pauseMenuActive_ = menuOpen && gameStarted;

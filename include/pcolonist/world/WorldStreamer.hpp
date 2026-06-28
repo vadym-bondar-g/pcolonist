@@ -39,6 +39,7 @@ public:
 
     [[nodiscard]] std::size_t activeChunkCount() const;
     [[nodiscard]] std::size_t pendingChunkCount() const;
+    [[nodiscard]] ChunkManager::RuntimeStats stats(glm::vec3 playerPosition) const;
 
 private:
     AssetManager& assets_;

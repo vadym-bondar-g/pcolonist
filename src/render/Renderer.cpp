@@ -30,8 +30,6 @@ namespace {
 constexpr int shadowSize = 2048;
 constexpr std::array<float, 2> shadowRanges = {48.0F, 190.0F};
 constexpr float cameraFarPlane = 760.0F;
-constexpr float terrainStreamingDistance = 340.0F;
-constexpr float objectDrawDistance = 260.0F;
 constexpr int maxFireLights = 4;
 
 glm::mat4 modelMatrix(const pcolonist::Transform& transform) {
@@ -161,13 +159,14 @@ std::vector<RenderBatch> collectBatches(
     std::unordered_map<const pcolonist::Mesh*, float>& meshRadii,
     float terrainDistance,
     float objectDistance,
-    float minimumShadowRadius) {
+    float minimumShadowRadius,
+    const pcolonist::RendererDebugOptions& debugOptions) {
     std::vector<RenderBatch> batches;
     std::unordered_map<BatchKey, std::size_t, BatchKeyHash> batchIndices;
     const glm::vec3& cameraPosition = camera.position();
     const Frustum frustum = cameraFrustum(camera, aspectRatio);
     registry.each<pcolonist::Transform, pcolonist::MeshRenderer>(
-        [&batches, &batchIndices, &registry, cameraPosition, &frustum, shadows, &meshRadii, terrainDistance, objectDistance, minimumShadowRadius](
+        [&batches, &batchIndices, &registry, cameraPosition, &frustum, shadows, &meshRadii, terrainDistance, objectDistance, minimumShadowRadius, &debugOptions](
             pcolonist::Entity entity,
             const pcolonist::Transform& transform,
             const pcolonist::MeshRenderer& renderer) {
@@ -183,6 +182,14 @@ std::vector<RenderBatch> collectBatches(
             const bool lava = registry.has<pcolonist::LavaSurface>(entity);
             const bool fire = registry.has<pcolonist::FireSurface>(entity);
             const bool smoke = registry.has<pcolonist::SmokeSurface>(entity);
+            if ((!debugOptions.showTerrain && terrain)
+                || (!debugOptions.showWater && water)
+                || (!debugOptions.showLava && lava)
+                || (!debugOptions.showFire && (fire || smoke))
+                || (!debugOptions.showResources && registry.has<pcolonist::ResourceNode>(entity))
+                || (!debugOptions.showObjects && !terrain && !water && !lava && !fire && !smoke)) {
+                return;
+            }
             int waterKind = 0;
             glm::vec2 waterFlowDirection{0.0F};
             float waterFoamStrength = 1.0F;
@@ -374,9 +381,10 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
         aspectRatio,
         false,
         meshRadii_,
-        terrainStreamingDistance,
-        objectDrawDistance,
-        0.0F);
+        debugOptions_.terrainDrawDistance,
+        debugOptions_.objectDrawDistance,
+        0.0F,
+        debugOptions_);
     std::stable_sort(batches.begin(), batches.end(), [](const RenderBatch& left, const RenderBatch& right) {
         const auto order = [](const RenderBatch& batch) {
             if (batch.smoke) {
@@ -394,6 +402,9 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
         const int rightOrder = order(right);
         return leftOrder < rightOrder;
     });
+    if (debugOptions_.wireframe) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    }
     for (const RenderBatch& batch : batches) {
             const GpuMesh& gpuMesh = upload(*batch.mesh);
             shader.setFloat("water", batch.water ? 1.0F : 0.0F);
@@ -465,6 +476,9 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
     }
     glDisable(GL_BLEND);
     glDepthMask(GL_TRUE);
+    if (debugOptions_.wireframe) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    }
 
     bool underwater = false;
     registry.each<Transform, WaterSurface>(
@@ -539,6 +553,12 @@ void Renderer::setSkyQuality(SkyQuality quality) {
     skyQuality_ = quality;
 }
 
+void Renderer::setDebugOptions(RendererDebugOptions options) {
+    options.terrainDrawDistance = std::clamp(options.terrainDrawDistance, 64.0F, 760.0F);
+    options.objectDrawDistance = std::clamp(options.objectDrawDistance, 32.0F, 520.0F);
+    debugOptions_ = options;
+}
+
 void Renderer::cycleSkyQuality() {
     switch (skyQuality_) {
     case SkyQuality::Off:
@@ -582,6 +602,10 @@ const char* Renderer::skyQualityName() const {
     return "UNKNOWN";
 }
 
+const RendererDebugOptions& Renderer::debugOptions() const {
+    return debugOptions_;
+}
+
 void Renderer::renderShadowMap(const Camera& camera, Registry& registry, const WeatherSystem& weather) {
     const glm::vec3 lightDirection = weather.daylight() > 0.05F ? weather.sunDirection() : weather.moonDirection();
     const glm::vec3 center = camera.position();
@@ -621,7 +645,8 @@ void Renderer::renderShadowMap(const Camera& camera, Registry& registry, const W
             meshRadii_,
             terrainShadowDistance,
             objectShadowDistance,
-            minimumShadowRadius);
+            minimumShadowRadius,
+            debugOptions_);
         glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffers_[cascade]);
         glClear(GL_DEPTH_BUFFER_BIT);
         shader.setMat4("lightSpaceMatrix", lightSpaceMatrices_[cascade]);

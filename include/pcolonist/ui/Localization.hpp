@@ -149,15 +149,15 @@ enum class UiText {
 
     switch (text) {
     case UiText::GameTitle: return "PCOLONIST";
-    case UiText::GameSubtitle: return choose("MYSTERIOUS ISLAND PROTOCOL", "ПРОТОКОЛ ТАИНСТВЕННОГО ОСТРОВА", "PROTOKOL TAJEMNICZEJ WYSPY");
-    case UiText::Copyright: return choose("COPYRIGHT 2026 PCOLONIST EXPEDITION SYSTEMS", "COPYRIGHT 2026 ЭКСПЕДИЦИОННЫЕ СИСТЕМЫ PCOLONIST", "COPYRIGHT 2026 SYSTEMY EKSPEDYCYJNE PCOLONIST");
-    case UiText::Profile: return choose("PROFILE: CASTAWAY-01", "ПРОФИЛЬ: ВЫЖИВШИЙ-01", "PROFIL: ROZBITEK-01");
-    case UiText::SignalLost: return choose("SIGNAL LOST / OCEANIC GRID UNKNOWN", "СИГНАЛ ПОТЕРЯН / ОКЕАНИЧЕСКАЯ СЕТЬ НЕИЗВЕСТНА", "SYGNAL UTRACONY / SIEC OCEANICZNA NIEZNANA");
-    case UiText::StoryLinePrimary: return choose("DARK WATER. ANCIENT MACHINES.", "ТЕМНАЯ ВОДА. ДРЕВНИЕ МАШИНЫ.", "CIEMNA WODA. STARE MASZYNY.");
-    case UiText::StoryLineSecondary: return choose("SURVIVE THE ISLAND BEFORE IT WAKES.", "ВЫЖИВИ НА ОСТРОВЕ, ПОКА ОН НЕ ПРОСНУЛСЯ.", "PRZETRWAJ WYSPĘ, ZANIM SIĘ OBUDZI.");
-    case UiText::SessionActive: return choose("SESSION ACTIVE", "СЕССИЯ АКТИВНА", "SESJA AKTYWNA");
-    case UiText::AwaitingDeployment: return choose("AWAITING DEPLOYMENT", "ОЖИДАНИЕ ВЫСАДКИ", "OCZEKIWANIE NA START");
-    case UiText::Command: return choose("COMMAND", "КОМАНДА", "DOWODZENIE");
+    case UiText::GameSubtitle: return choose("JOURNAL OF THE LOST ISLAND", "ДНЕВНИК ЗАТЕРЯННОГО ОСТРОВА", "DZIENNIK ZAGUBIONEJ WYSPY");
+    case UiText::Copyright: return choose("PCOLONIST 2026 / ISLAND SURVIVAL ADVENTURE", "PCOLONIST 2026 / ОСТРОВНОЕ ВЫЖИВАНИЕ", "PCOLONIST 2026 / PRZYGODA O PRZETRWANIU");
+    case UiText::Profile: return choose("TRAVELER: CASTAWAY-01", "ПУТНИК: ВЫЖИВШИЙ-01", "WĘDROWIEC: ROZBITEK-01");
+    case UiText::SignalLost: return choose("THE TIDE HAS TAKEN THE WAY HOME", "ПРИЛИВ СКРЫЛ ПУТЬ ДОМОЙ", "PRZYPŁYW ZABRAŁ DROGĘ DO DOMU");
+    case UiText::StoryLinePrimary: return choose("AN OLD ISLAND. A QUIET CAMP.", "ДРЕВНИЙ ОСТРОВ. ТИХИЙ ЛАГЕРЬ.", "STARA WYSPA. CICHY OBÓZ.");
+    case UiText::StoryLineSecondary: return choose("FIND WATER, FIRE, AND THE WAY BACK.", "НАЙДИ ВОДУ, ОГОНЬ И ПУТЬ НАЗАД.", "ZNAJDŹ WODĘ, OGIEŃ I DROGĘ POWROTNĄ.");
+    case UiText::SessionActive: return choose("CAMP IS SET", "ЛАГЕРЬ РАЗБИТ", "OBÓZ GOTOWY");
+    case UiText::AwaitingDeployment: return choose("READY TO MAKE LANDFALL", "ГОТОВ К ВЫСАДКЕ", "GOTOWY DO LĄDOWANIA");
+    case UiText::Command: return choose("JOURNAL", "ДНЕВНИК", "DZIENNIK");
     case UiText::Continue: return choose("CONTINUE", "ПРОДОЛЖИТЬ", "KONTYNUUJ");
     case UiText::NewGame: return choose("NEW GAME", "НОВАЯ ИГРА", "NOWA GRA");
     case UiText::LoadGame: return choose("LOAD GAME", "ЗАГРУЗИТЬ", "WCZYTAJ GRĘ");
@@ -187,11 +187,11 @@ enum class UiText {
     case UiText::Language: return choose("LANGUAGE", "ЯЗЫК", "JĘZYK");
     case UiText::On: return choose("ON", "ВКЛ", "WŁ.");
     case UiText::Off: return choose("OFF", "ВЫКЛ", "WYŁ.");
-    case UiText::ModLoaderOffline: return choose("MOD LOADER OFFLINE", "ЗАГРУЗЧИК МОДОВ ОТКЛЮЧЕН", "LOADER MODÓW OFFLINE");
-    case UiText::ReservedForMods: return choose("RESERVED FOR LOCAL CONTENT PACKS", "ЗАРЕЗЕРВИРОВАНО ДЛЯ ЛОКАЛЬНЫХ ПАКЕТОВ", "MIEJSCE NA LOKALNE PAKIETY");
-    case UiText::NoDependencies: return choose("NO EXTERNAL DEPENDENCIES LOADED", "ВНЕШНИЕ ЗАВИСИМОСТИ НЕ ЗАГРУЖЕНЫ", "BRAK ZEWNĘTRZNYCH ZALEŻNOŚCI");
+    case UiText::ModLoaderOffline: return choose("LOCAL MOD SATCHEL IS EMPTY", "СУМКА МОДОВ ПУСТА", "SAKWA MODÓW JEST PUSTA");
+    case UiText::ReservedForMods: return choose("RESERVED FOR MAPS, CAMPS, AND CONTENT PACKS", "МЕСТО ДЛЯ КАРТ, ЛАГЕРЕЙ И ПАКЕТОВ", "MIEJSCE NA MAPY, OBOZY I PAKIETY");
+    case UiText::NoDependencies: return choose("NO EXTRA PACKS LOADED", "ДОПОЛНИТЕЛЬНЫЕ ПАКЕТЫ НЕ ЗАГРУЖЕНЫ", "BRAK DODATKOWYCH PAKIETÓW");
     case UiText::Paused: return choose("PAUSED", "ПАУЗА", "PAUZA");
-    case UiText::WorldStateHeld: return choose("SYSTEM SUSPENDED / WORLD STATE HELD", "СИСТЕМА ОСТАНОВЛЕНА / СОСТОЯНИЕ МИРА УДЕРЖАНО", "SYSTEM WSTRZYMANY / STAN ŚWIATA ZACHOWANY");
+    case UiText::WorldStateHeld: return choose("THE ISLAND WAITS WHILE THE JOURNAL IS OPEN", "ОСТРОВ ЖДЕТ, ПОКА ОТКРЫТ ДНЕВНИК", "WYSPA CZEKA, GDY DZIENNIK JEST OTWARTY");
     case UiText::ResumeGame: return choose("RESUME GAME", "ВЕРНУТЬСЯ В ИГРУ", "WRÓĆ DO GRY");
     case UiText::Controls: return choose("CONTROLS", "УПРАВЛЕНИЕ", "STEROWANIE");
     case UiText::Achievements: return choose("ACHIEVEMENTS", "ДОСТИЖЕНИЯ", "OSIĄGNIĘCIA");
@@ -204,7 +204,7 @@ enum class UiText {
     case UiText::Time: return choose("TIME", "ВРЕМЯ", "CZAS");
     case UiText::Location: return choose("LOCATION", "ЛОКАЦИЯ", "LOKACJA");
     case UiText::Unknown: return choose("UNKNOWN", "НЕИЗВЕСТНО", "NIEZNANE");
-    case UiText::FutureTabs: return choose("FUTURE TABS", "БУДУЩИЕ ВКЛАДКИ", "PRZYSZŁE ZAKŁADKI");
+    case UiText::FutureTabs: return choose("JOURNAL PAGES", "СТРАНИЦЫ ДНЕВНИКА", "STRONY DZIENNIKA");
     case UiText::FutureTabsLineOne: return choose("INVENTORY / CRAFTING / QUESTS", "ИНВЕНТАРЬ / КРАФТ / ЗАДАНИЯ", "EKWIPUNEK / CRAFTING / ZADANIA");
     case UiText::FutureTabsLineTwo: return choose("MAP / SKILLS", "КАРТА / НАВЫКИ", "MAPA / UMIEJĘTNOŚCI");
     case UiText::DisplayOptionsMainMenu: return choose("DISPLAY OPTIONS REMAIN AVAILABLE IN THE MAIN MENU.", "ПАРАМЕТРЫ ЭКРАНА ДОСТУПНЫ В ГЛАВНОМ МЕНЮ.", "OPCJE OBRAZU SĄ W MENU GŁÓWNYM.");

@@ -77,7 +77,10 @@ void ChunkManager::update(
     ScriptSystem& scripts,
     JobSystem& jobs) {
     const ChunkKey center = chunkFor(playerPosition);
-    unloadDistantChunks(center, registry);
+    const bool unloadedStaticColliders = unloadDistantChunks(center, registry);
+    if (unloadedStaticColliders) {
+        physics.rebuildStaticIndex(registry);
+    }
     integrateReadyChunks(registry, assetSystem, physics, resources, scripts, jobs);
     requestMissingChunks(center, assets, jobs);
     assets.clearExpired();
@@ -107,6 +110,35 @@ std::size_t ChunkManager::activeChunkCount() const {
 
 std::size_t ChunkManager::pendingChunkCount() const {
     return pending_.size();
+}
+
+ChunkManager::RuntimeStats ChunkManager::stats(glm::vec3 playerPosition) const {
+    RuntimeStats result;
+    result.center = chunkFor(playerPosition);
+    result.chunkSize = config_.chunkSize;
+    result.loadRadius = config_.loadRadius;
+    result.unloadRadius = config_.unloadRadius;
+    result.lod0Radius = config_.lod0Radius;
+    result.lod1Radius = config_.lod1Radius;
+    result.activeChunks = active_.size();
+    result.pendingChunks = pending_.size();
+    result.missingChunks = missing_.size();
+    for (const auto& [id, chunk] : active_) {
+        switch (id.lod) {
+        case 0:
+            ++result.lod0Chunks;
+            break;
+        case 1:
+            ++result.lod1Chunks;
+            break;
+        default:
+            ++result.lod2Chunks;
+            break;
+        }
+        result.terrainEntities += chunk.terrainMesh ? 1U : 0U;
+        result.sceneEntities += chunk.entities.size() > 0U ? chunk.entities.size() - 1U : 0U;
+    }
+    return result;
 }
 
 ChunkId ChunkManager::desiredId(ChunkKey key, ChunkKey center) const {
@@ -175,17 +207,20 @@ void ChunkManager::integrateReadyChunks(
     }
 }
 
-void ChunkManager::unloadDistantChunks(ChunkKey center, Registry& registry) {
+bool ChunkManager::unloadDistantChunks(ChunkKey center, Registry& registry) {
+    bool unloadedStaticColliders = false;
     for (auto iterator = active_.begin(); iterator != active_.end();) {
         if (shouldKeep(iterator->first, center)) {
             ++iterator;
             continue;
         }
         for (Entity entity : iterator->second.entities) {
+            unloadedStaticColliders = unloadedStaticColliders || registry.has<BoxCollider>(entity);
             registry.destroy(entity);
         }
         iterator = active_.erase(iterator);
     }
+    return unloadedStaticColliders;
 }
 
 void ChunkManager::spawnChunk(

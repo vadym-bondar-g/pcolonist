@@ -7,16 +7,16 @@
 
 namespace {
 
-constexpr glm::vec4 backgroundDeep{0.006F, 0.010F, 0.018F, 1.0F};
-constexpr glm::vec4 backgroundCold{0.020F, 0.045F, 0.070F, 1.0F};
-constexpr glm::vec4 backgroundRift{0.085F, 0.025F, 0.070F, 0.72F};
-constexpr glm::vec4 panelGlass{0.020F, 0.035F, 0.050F, 0.74F};
-constexpr glm::vec4 panelStroke{0.40F, 0.70F, 0.78F, 0.32F};
-constexpr glm::vec4 textPrimary{0.93F, 0.98F, 0.97F, 1.0F};
-constexpr glm::vec4 textMuted{0.56F, 0.67F, 0.68F, 0.86F};
-constexpr glm::vec4 accentCyan{0.28F, 0.90F, 0.96F, 1.0F};
-constexpr glm::vec4 accentGold{0.93F, 0.66F, 0.28F, 1.0F};
-constexpr glm::vec4 accentDanger{0.94F, 0.25F, 0.22F, 1.0F};
+constexpr glm::vec4 backgroundDeep{0.030F, 0.033F, 0.024F, 1.0F};
+constexpr glm::vec4 backgroundSky{0.070F, 0.125F, 0.125F, 1.0F};
+constexpr glm::vec4 backgroundCanopy{0.060F, 0.120F, 0.075F, 0.88F};
+constexpr glm::vec4 parchment{0.180F, 0.130F, 0.070F, 0.80F};
+constexpr glm::vec4 panelStroke{0.72F, 0.54F, 0.28F, 0.52F};
+constexpr glm::vec4 textPrimary{0.96F, 0.88F, 0.70F, 1.0F};
+constexpr glm::vec4 textMuted{0.70F, 0.62F, 0.48F, 0.88F};
+constexpr glm::vec4 accentLeaf{0.36F, 0.62F, 0.32F, 1.0F};
+constexpr glm::vec4 accentGold{0.92F, 0.64F, 0.24F, 1.0F};
+constexpr glm::vec4 accentDanger{0.86F, 0.30F, 0.22F, 1.0F};
 
 constexpr std::string_view buildVersion = "v0.1-dev";
 
@@ -73,15 +73,15 @@ void MainMenu::renderBackground(
     const float drift = std::sin(t * 0.10F) * 22.0F;
 
     rectangle(0.0F, 0.0F, width, height, backgroundDeep, 0.0F);
-    rectangle(0.0F, 0.0F, width, height * 0.58F, {0.018F, 0.040F, 0.067F, 0.96F}, 0.0F);
-    rectangle(0.0F, height * 0.20F, width, height * 0.48F, backgroundRift, 0.0F);
-    rectangle(0.0F, height * 0.58F, width, height * 0.42F, backgroundCold, 0.0F);
+    rectangle(0.0F, 0.0F, width, height * 0.60F, backgroundSky, 0.0F);
+    rectangle(0.0F, height * 0.25F, width, height * 0.42F, backgroundCanopy, 0.0F);
+    rectangle(0.0F, height * 0.56F, width, height * 0.44F, {0.090F, 0.070F, 0.040F, 1.0F}, 0.0F);
 
     const auto fogBand = [&](float y, float alpha, float speed, float bandWidth) {
         const float x = wrap(t * speed, width + bandWidth) - bandWidth * 0.62F;
-        rectangle(x, y, bandWidth, 26.0F, {0.65F, 0.86F, 0.94F, alpha}, 13.0F);
-        rectangle(x + bandWidth * 0.28F, y - 18.0F, bandWidth * 0.78F, 44.0F, {0.58F, 0.76F, 0.86F, alpha * 0.66F}, 22.0F);
-        rectangle(x + bandWidth * 0.82F, y + 8.0F, bandWidth * 0.64F, 22.0F, {0.75F, 0.52F, 0.92F, alpha * 0.42F}, 11.0F);
+        rectangle(x, y, bandWidth, 26.0F, {0.72F, 0.64F, 0.46F, alpha}, 13.0F);
+        rectangle(x + bandWidth * 0.28F, y - 18.0F, bandWidth * 0.78F, 44.0F, {0.48F, 0.62F, 0.42F, alpha * 0.58F}, 22.0F);
+        rectangle(x + bandWidth * 0.82F, y + 8.0F, bandWidth * 0.64F, 22.0F, {0.82F, 0.54F, 0.24F, alpha * 0.32F}, 11.0F);
     };
     fogBand(height * 0.22F, 0.12F, 7.0F, 340.0F);
     fogBand(height * 0.42F, 0.085F, 4.2F, 430.0F);
@@ -93,13 +93,13 @@ void MainMenu::renderBackground(
         const float y = wrap(seed * 53.0F + std::sin(t * 0.2F + seed) * 18.0F, height);
         const float size = 1.0F + std::fmod(seed, 4.0F);
         const float alpha = (0.08F + std::fmod(seed, 6.0F) * 0.018F) * intro;
-        rectangle(x, y, size, size, {0.45F, 0.95F, 1.0F, alpha}, size * 0.5F);
+        rectangle(x, y, size, size, {0.92F, 0.62F, 0.26F, alpha}, size * 0.5F);
     }
 
-    rectangle(width * 0.52F + drift, height * 0.15F, width * 0.17F, height * 0.36F, {0.030F, 0.035F, 0.045F, 0.74F}, 8.0F);
-    rectangle(width * 0.55F + drift, height * 0.13F, width * 0.075F, height * 0.12F, {0.18F, 0.06F, 0.13F, 0.82F}, 12.0F);
-    rectangle(width * 0.17F - drift * 0.3F, height * 0.55F, width * 0.42F, height * 0.14F, {0.018F, 0.070F, 0.055F, 0.88F}, 64.0F);
-    rectangle(width * 0.34F - drift * 0.16F, height * 0.47F, width * 0.18F, height * 0.10F, {0.030F, 0.088F, 0.066F, 0.90F}, 32.0F);
+    rectangle(width * 0.52F + drift, height * 0.18F, width * 0.15F, height * 0.34F, {0.050F, 0.070F, 0.042F, 0.76F}, 8.0F);
+    rectangle(width * 0.55F + drift, height * 0.13F, width * 0.075F, height * 0.12F, {0.12F, 0.11F, 0.065F, 0.84F}, 12.0F);
+    rectangle(width * 0.14F - drift * 0.3F, height * 0.56F, width * 0.46F, height * 0.16F, {0.030F, 0.110F, 0.062F, 0.90F}, 64.0F);
+    rectangle(width * 0.34F - drift * 0.16F, height * 0.47F, width * 0.18F, height * 0.10F, {0.045F, 0.140F, 0.072F, 0.92F}, 32.0F);
 
     rectangle(0.0F, 0.0F, width, height, {0.0F, 0.0F, 0.0F, 0.22F}, 0.0F);
     rectangle(0.0F, 0.0F, width * 0.26F, height, {0.0F, 0.0F, 0.0F, 0.42F}, 0.0F);
@@ -110,7 +110,7 @@ void MainMenu::renderBackground(
     const float scanAlpha = 0.035F * intro;
     for (int index = 0; index < 10; ++index) {
         const float y = frame.top + 20.0F + static_cast<float>(index) * 54.0F + std::sin(t + static_cast<float>(index)) * 3.0F;
-        rectangle(frame.left, y, frame.width, 1.0F, {0.30F, 0.80F, 0.88F, scanAlpha}, 0.0F);
+        rectangle(frame.left, y, frame.width, 1.0F, {0.85F, 0.62F, 0.32F, scanAlpha}, 0.0F);
     }
 
     text(frame.storyLeft, frame.top + frame.height - 114.0F, tr(state.language, UiText::SignalLost), 1.15F, withAlpha(textMuted, intro * 0.72F));
@@ -124,8 +124,8 @@ void MainMenu::renderBottomBar(
     const float width = static_cast<float>(state.width);
     const float height = static_cast<float>(state.height);
     constexpr float barHeight = 52.0F;
-    rectangle(0.0F, height - barHeight, width, barHeight, {0.010F, 0.016F, 0.022F, 0.82F * intro}, 0.0F);
-    rectangle(0.0F, height - barHeight, width, 1.0F, {0.48F, 0.92F, 0.96F, 0.22F * intro}, 0.0F);
+    rectangle(0.0F, height - barHeight, width, barHeight, {0.060F, 0.043F, 0.025F, 0.84F * intro}, 0.0F);
+    rectangle(0.0F, height - barHeight, width, 1.0F, {0.92F, 0.64F, 0.28F, 0.26F * intro}, 0.0F);
     text(28.0F, height - 32.0F, buildVersion, 1.15F, withAlpha(textMuted, intro));
     text(width * 0.5F - 175.0F, height - 32.0F, tr(state.language, UiText::Copyright), 1.05F, withAlpha(textMuted, intro * 0.82F));
     text(width - 260.0F, height - 32.0F, tr(state.language, UiText::Profile), 1.10F, withAlpha(textPrimary, intro * 0.90F));
@@ -143,17 +143,17 @@ void MainMenu::renderShell(
     rectangle(frame.storyLeft - 24.0F, frame.top + 82.0F, 86.0F, 2.0F, withAlpha(accentGold, intro), 0.0F);
     text(frame.storyLeft + titleSlide, frame.top + 112.0F, tr(state.language, UiText::GameTitle), 5.2F, withAlpha(textPrimary, intro));
     text(frame.storyLeft + 4.0F + titleSlide * 0.4F, frame.top + 176.0F, tr(state.language, UiText::GameSubtitle), 1.55F, withAlpha(accentGold, intro * 0.92F));
-    rectangle(frame.storyLeft, frame.top + 224.0F, std::clamp(frame.width * 0.36F, 310.0F, 430.0F), 1.0F, {0.72F, 0.96F, 1.0F, 0.18F * intro}, 0.0F);
+    rectangle(frame.storyLeft, frame.top + 224.0F, std::clamp(frame.width * 0.36F, 310.0F, 430.0F), 1.0F, {0.92F, 0.66F, 0.32F, 0.22F * intro}, 0.0F);
     text(frame.storyLeft + 2.0F, frame.top + 258.0F, tr(state.language, UiText::StoryLinePrimary), 1.38F, withAlpha(textPrimary, intro * 0.82F));
     text(frame.storyLeft + 2.0F, frame.top + 288.0F, tr(state.language, UiText::StoryLineSecondary), 1.38F, withAlpha(textMuted, intro * 0.82F));
-    rectangle(frame.storyLeft + 2.0F, frame.top + 342.0F, 12.0F, 12.0F, {0.28F, 0.90F, 0.96F, (0.40F + pulse * 0.30F) * intro}, 6.0F);
+    rectangle(frame.storyLeft + 2.0F, frame.top + 342.0F, 12.0F, 12.0F, {0.92F, 0.58F, 0.22F, (0.40F + pulse * 0.30F) * intro}, 6.0F);
     text(frame.storyLeft + 28.0F, frame.top + 340.0F, state.gameStarted ? tr(state.language, UiText::SessionActive) : tr(state.language, UiText::AwaitingDeployment), 1.18F, withAlpha(textMuted, intro));
 
     rectangle(frame.actionLeft - 20.0F, frame.top + 82.0F, frame.buttonWidth + 40.0F, frame.height - 138.0F, {0.0F, 0.0F, 0.0F, 0.30F * intro}, 10.0F);
     rectangle(frame.actionLeft - 30.0F, frame.top + 72.0F, frame.buttonWidth + 42.0F, frame.height - 140.0F, withAlpha(panelStroke, intro), 9.0F);
-    rectangle(frame.actionLeft - 28.0F, frame.top + 74.0F, frame.buttonWidth + 38.0F, frame.height - 144.0F, withAlpha(panelGlass, intro), 8.0F);
-    rectangle(frame.actionLeft - 8.0F, frame.top + 98.0F, frame.buttonWidth - 2.0F, 1.0F, {0.80F, 0.96F, 1.0F, 0.18F * intro}, 0.0F);
-    text(frame.actionLeft - 4.0F, frame.top + 118.0F, tr(state.language, UiText::Command), 1.24F, withAlpha(accentCyan, intro * 0.90F));
+    rectangle(frame.actionLeft - 28.0F, frame.top + 74.0F, frame.buttonWidth + 38.0F, frame.height - 144.0F, withAlpha(parchment, intro), 8.0F);
+    rectangle(frame.actionLeft - 8.0F, frame.top + 98.0F, frame.buttonWidth - 2.0F, 1.0F, {0.92F, 0.68F, 0.38F, 0.22F * intro}, 0.0F);
+    text(frame.actionLeft - 4.0F, frame.top + 118.0F, tr(state.language, UiText::Command), 1.24F, withAlpha(accentLeaf, intro * 0.90F));
 }
 
 void MainMenu::renderButton(
@@ -174,8 +174,8 @@ void MainMenu::renderButton(
     const float glow = 0.18F + hover * 0.34F;
 
     rectangle(x + 9.0F, button.y + 9.0F, frame.buttonWidth, buttonHeight, {0.0F, 0.0F, 0.0F, 0.30F * intro}, 6.0F);
-    rectangle(x, button.y, frame.buttonWidth, buttonHeight, {0.34F, 0.76F, 0.84F, glow * intro}, 6.0F);
-    rectangle(x + 1.0F, button.y + 1.0F, frame.buttonWidth - 2.0F, buttonHeight - 2.0F, {0.018F, 0.032F, 0.044F, (0.78F + hover * 0.10F) * intro}, 5.0F);
+    rectangle(x, button.y, frame.buttonWidth, buttonHeight, {0.76F, 0.52F, 0.24F, glow * intro}, 6.0F);
+    rectangle(x + 1.0F, button.y + 1.0F, frame.buttonWidth - 2.0F, buttonHeight - 2.0F, {0.105F, 0.075F, 0.040F, (0.82F + hover * 0.08F) * intro}, 5.0F);
     rectangle(x + 1.0F, button.y + 1.0F, hovered ? frame.buttonWidth - 2.0F : 7.0F, 2.0F, withAlpha(accent, intro), 1.0F);
     rectangle(x + 18.0F, button.y + 15.0F, 3.0F, 22.0F, withAlpha(accent, intro), 1.0F);
     text(x + 38.0F, button.y + 17.0F, button.label, 1.90F, labelColor);
@@ -188,11 +188,11 @@ std::array<MainMenu::ButtonSpec, 6> MainMenu::homeButtons(const MainMenuState& s
     const float first = frame.top + 158.0F;
     constexpr float step = 62.0F;
     return {
-        MainMenu::ButtonSpec{MainMenuAction::Continue, first + step * 0.0F, tr(state.language, UiText::Continue), state.gameStarted ? tr(state.language, UiText::Live) : state.saveAvailable ? tr(state.language, UiText::Save) : tr(state.language, UiText::None), accentCyan, !state.gameStarted && !state.saveAvailable, false},
+        MainMenu::ButtonSpec{MainMenuAction::Continue, first + step * 0.0F, tr(state.language, UiText::Continue), state.gameStarted ? tr(state.language, UiText::Live) : state.saveAvailable ? tr(state.language, UiText::Save) : tr(state.language, UiText::None), accentLeaf, !state.gameStarted && !state.saveAvailable, false},
         MainMenu::ButtonSpec{MainMenuAction::NewGame, first + step * 1.0F, tr(state.language, UiText::NewGame), tr(state.language, UiText::Start), accentGold, false, false},
-        MainMenu::ButtonSpec{MainMenuAction::OpenLoadGame, first + step * 2.0F, tr(state.language, UiText::LoadGame), state.saveAvailable ? tr(state.language, UiText::Ready) : tr(state.language, UiText::Empty), accentCyan, false, false},
-        MainMenu::ButtonSpec{MainMenuAction::OpenSettings, first + step * 3.0F, tr(state.language, UiText::Settings), "", accentCyan, false, false},
-        MainMenu::ButtonSpec{MainMenuAction::OpenMods, first + step * 4.0F, tr(state.language, UiText::Mods), tr(state.language, UiText::Local), accentCyan, false, false},
+        MainMenu::ButtonSpec{MainMenuAction::OpenLoadGame, first + step * 2.0F, tr(state.language, UiText::LoadGame), state.saveAvailable ? tr(state.language, UiText::Ready) : tr(state.language, UiText::Empty), accentLeaf, false, false},
+        MainMenu::ButtonSpec{MainMenuAction::OpenSettings, first + step * 3.0F, tr(state.language, UiText::Settings), "", accentLeaf, false, false},
+        MainMenu::ButtonSpec{MainMenuAction::OpenMods, first + step * 4.0F, tr(state.language, UiText::Mods), tr(state.language, UiText::Local), accentLeaf, false, false},
         MainMenu::ButtonSpec{MainMenuAction::Quit, first + step * 5.0F, tr(state.language, UiText::Exit), "", accentDanger, false, true},
     };
 }
@@ -209,11 +209,11 @@ void MainMenu::renderHome(const MainMenuState& state, const Rectangle& rectangle
 
 void MainMenu::renderLoadGame(const MainMenuState& state, const Rectangle& rectangle, const Text& text, const Layout& frame, float intro) const {
     text(frame.actionLeft - 4.0F, frame.top + 162.0F, tr(state.language, UiText::LoadGame), 2.25F, withAlpha(textPrimary, intro));
-    rectangle(frame.actionLeft, frame.top + 210.0F, frame.buttonWidth, 146.0F, {0.018F, 0.032F, 0.044F, 0.78F * intro}, 6.0F);
-    rectangle(frame.actionLeft + 18.0F, frame.top + 232.0F, 3.0F, 86.0F, withAlpha(state.saveAvailable ? accentCyan : textMuted, intro), 1.0F);
+    rectangle(frame.actionLeft, frame.top + 210.0F, frame.buttonWidth, 146.0F, {0.105F, 0.075F, 0.040F, 0.78F * intro}, 6.0F);
+    rectangle(frame.actionLeft + 18.0F, frame.top + 232.0F, 3.0F, 86.0F, withAlpha(state.saveAvailable ? accentLeaf : textMuted, intro), 1.0F);
     text(frame.actionLeft + 40.0F, frame.top + 238.0F, state.saveAvailable ? tr(state.language, UiText::SaveSlot) : tr(state.language, UiText::NoSaveData), 1.70F, withAlpha(textPrimary, intro));
     text(frame.actionLeft + 40.0F, frame.top + 278.0F, state.saveAvailable ? tr(state.language, UiText::RestoreSave) : tr(state.language, UiText::StartNewFirst), 1.05F, withAlpha(textMuted, intro));
-    renderButton(state, rectangle, text, frame, {MainMenuAction::LoadGame, frame.top + 386.0F, tr(state.language, UiText::LoadSelected), "", accentCyan, !state.saveAvailable, false}, intro);
+    renderButton(state, rectangle, text, frame, {MainMenuAction::LoadGame, frame.top + 386.0F, tr(state.language, UiText::LoadSelected), "", accentLeaf, !state.saveAvailable, false}, intro);
     renderButton(state, rectangle, text, frame, {MainMenuAction::Back, frame.top + 454.0F, tr(state.language, UiText::Back), "", accentGold, false, false}, intro);
 }
 
@@ -222,10 +222,10 @@ void MainMenu::renderSettings(const MainMenuState& state, const Rectangle& recta
     const auto optionButton = [&](int index, MainMenuAction action, std::string_view label, std::string_view value, bool active) {
         const float y = frame.top + 214.0F + static_cast<float>(index) * 48.0F;
         const bool hovered = contains(state.pointerX, state.pointerY, frame.actionLeft, y, frame.buttonWidth, 44.0F);
-        rectangle(frame.actionLeft, y, frame.buttonWidth, 44.0F, hovered ? glm::vec4{0.10F, 0.20F, 0.22F, 0.78F * intro} : glm::vec4{0.018F, 0.032F, 0.044F, 0.70F * intro}, 4.0F);
-        rectangle(frame.actionLeft, y, 4.0F, 44.0F, active ? withAlpha(accentCyan, intro) : withAlpha(textMuted, intro * 0.45F), 1.0F);
+        rectangle(frame.actionLeft, y, frame.buttonWidth, 44.0F, hovered ? glm::vec4{0.16F, 0.12F, 0.060F, 0.80F * intro} : glm::vec4{0.090F, 0.064F, 0.034F, 0.72F * intro}, 4.0F);
+        rectangle(frame.actionLeft, y, 4.0F, 44.0F, active ? withAlpha(accentLeaf, intro) : withAlpha(textMuted, intro * 0.45F), 1.0F);
         text(frame.actionLeft + 24.0F, y + 15.0F, label, 1.34F, withAlpha(textPrimary, intro * 0.90F));
-        text(frame.actionLeft + frame.buttonWidth - 116.0F, y + 15.0F, value, 1.28F, active ? withAlpha(accentCyan, intro) : withAlpha(textMuted, intro));
+        text(frame.actionLeft + frame.buttonWidth - 116.0F, y + 15.0F, value, 1.28F, active ? withAlpha(accentLeaf, intro) : withAlpha(textMuted, intro));
         static_cast<void>(action);
     };
     optionButton(0, MainMenuAction::ToggleFullscreen, tr(state.language, UiText::Fullscreen), state.fullscreen ? tr(state.language, UiText::On) : tr(state.language, UiText::Off), state.fullscreen);
@@ -239,7 +239,7 @@ void MainMenu::renderSettings(const MainMenuState& state, const Rectangle& recta
 
 void MainMenu::renderMods(const MainMenuState& state, const Rectangle& rectangle, const Text& text, const Layout& frame, float intro) const {
     text(frame.actionLeft - 4.0F, frame.top + 162.0F, tr(state.language, UiText::Mods), 2.25F, withAlpha(textPrimary, intro));
-    rectangle(frame.actionLeft, frame.top + 214.0F, frame.buttonWidth, 168.0F, {0.018F, 0.032F, 0.044F, 0.78F * intro}, 6.0F);
+    rectangle(frame.actionLeft, frame.top + 214.0F, frame.buttonWidth, 168.0F, {0.105F, 0.075F, 0.040F, 0.78F * intro}, 6.0F);
     rectangle(frame.actionLeft + 18.0F, frame.top + 238.0F, 3.0F, 98.0F, withAlpha(accentGold, intro), 1.0F);
     text(frame.actionLeft + 40.0F, frame.top + 244.0F, tr(state.language, UiText::ModLoaderOffline), 1.55F, withAlpha(textPrimary, intro));
     text(frame.actionLeft + 40.0F, frame.top + 284.0F, tr(state.language, UiText::ReservedForMods), 1.02F, withAlpha(textMuted, intro));

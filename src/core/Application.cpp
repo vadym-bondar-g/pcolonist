@@ -358,6 +358,7 @@ void Application::initialize() {
     renderer_->setGraphicsQuality(config_.graphicsQuality);
     renderer_->setSkyQuality(config_.skyQuality);
     frameLimiter_.setLimit(config_.frameLimit);
+    debugUi_.initialize(window_);
     ui_.initialize(config_.assetRoot);
     ui_.setLanguage(config_.language);
     survival_.loadLocations(assets_);
@@ -386,6 +387,7 @@ void Application::initialize() {
 
 void Application::shutdown() {
     initialized_ = false;
+    debugUi_.shutdown();
     ui_.shutdown();
     renderer_.reset();
     if (window_ != nullptr) {
@@ -445,12 +447,22 @@ void Application::registerEventHandlers() {
         if (event.key == GLFW_KEY_F11 && event.action == KeyAction::Press) {
             toggleFullscreen();
         }
+        if (event.key == GLFW_KEY_F3 && event.action == KeyAction::Press) {
+            toggleDebugOverlay();
+            return;
+        }
         if (event.key == GLFW_KEY_ESCAPE && event.action == KeyAction::Press) {
-            if (debugPanelOpen_) {
+            if (debugUi_.open()) {
+                debugUi_.close();
+                updateCursorMode();
+            } else if (debugPanelOpen_) {
                 toggleDebugPanel();
             } else {
                 toggleMenu();
             }
+            return;
+        }
+        if (debugUi_.open()) {
             return;
         }
         if (menuOpen_ && event.action == KeyAction::Press) {
@@ -460,16 +472,16 @@ void Application::registerEventHandlers() {
             }
             return;
         }
-        if (event.key == GLFW_KEY_TAB && event.action == KeyAction::Press && !menuOpen_ && !debugPanelOpen_) {
+        if (event.key == GLFW_KEY_TAB && event.action == KeyAction::Press && !menuOpen_ && !debugPanelOpen_ && !debugUi_.open()) {
             toggleInventory();
         }
         if (event.key == GLFW_KEY_GRAVE_ACCENT && event.action == KeyAction::Press) {
             toggleDebugPanel();
         }
-        if (event.key == GLFW_KEY_E && event.action == KeyAction::Press && !menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
+        if (event.key == GLFW_KEY_E && event.action == KeyAction::Press && !menuOpen_ && !inventoryOpen_ && !debugPanelOpen_ && !debugUi_.open()) {
             useContextAction();
         }
-        if (event.key == GLFW_KEY_C && event.action == KeyAction::Press && !menuOpen_ && !debugPanelOpen_) {
+        if (event.key == GLFW_KEY_C && event.action == KeyAction::Press && !menuOpen_ && !debugPanelOpen_ && !debugUi_.open()) {
             craftNextItem();
         }
         if (event.action == KeyAction::Press && event.key >= GLFW_KEY_1 && event.key <= GLFW_KEY_5) {
@@ -478,6 +490,9 @@ void Application::registerEventHandlers() {
     });
     events_.subscribe<MouseButtonEvent>([this](const MouseButtonEvent& event) {
         if (event.button != GLFW_MOUSE_BUTTON_LEFT || event.action != KeyAction::Press) {
+            return;
+        }
+        if (debugUi_.open()) {
             return;
         }
         if (debugPanelOpen_) {
@@ -506,7 +521,7 @@ void Application::buildPipeline() {
         }
     });
     pipeline_.add(FrameStage::Input, "update physical player", [this](FrameContext& context) {
-        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
+        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_ && !debugUi_.open()) {
             player_.update(registry_, input_, camera_, context.deltaTime);
         }
     });
@@ -518,12 +533,12 @@ void Application::buildPipeline() {
         renderer_->releaseUnusedMeshes(registry_);
     });
     pipeline_.add(FrameStage::Update, "update enemies", [this](FrameContext& context) {
-        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
+        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_ && !debugUi_.open()) {
             enemies_.update(registry_, player_.entity(), context.deltaTime);
         }
     });
     pipeline_.add(FrameStage::Update, "update physics", [this](FrameContext& context) {
-        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
+        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_ && !debugUi_.open()) {
             physicsTimestep_.advance(context.deltaTime, [this](float step) {
                 physicsTime_ += step;
                 physics_.setTime(physicsTime_);
@@ -533,7 +548,7 @@ void Application::buildPipeline() {
         }
     });
     pipeline_.add(FrameStage::Update, "update animations", [this](FrameContext& context) {
-        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
+        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_ && !debugUi_.open()) {
             animations_.update(registry_, context.deltaTime);
         }
     });
@@ -542,7 +557,7 @@ void Application::buildPipeline() {
             audio_.update(deltaTime);
         });
         auto weatherUpdate = jobs_.submit([this, deltaTime = context.deltaTime] {
-            if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
+            if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_ && !debugUi_.open()) {
                 weather_.update(deltaTime);
             }
         });
@@ -550,12 +565,12 @@ void Application::buildPipeline() {
         weatherUpdate.get();
     });
     pipeline_.add(FrameStage::Update, "update survival", [this](FrameContext& context) {
-        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
+        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_ && !debugUi_.open()) {
             survival_.update(playerPosition(), weather_, context.deltaTime);
         }
     });
     pipeline_.add(FrameStage::Update, "update discoveries", [this](FrameContext&) {
-        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_) {
+        if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_ && !debugUi_.open()) {
             discovery_.update(playerPosition(), inventory_);
         }
     });
@@ -564,6 +579,7 @@ void Application::buildPipeline() {
         if (menuOpen_ && !gameStarted_) {
             return;
         }
+        renderer_->setDebugOptions(debugUi_.rendererDebugOptions());
         renderer_->render(camera_, registry_, weather_);
     });
     pipeline_.add(FrameStage::Render, "render UI", [this](FrameContext& context) {
@@ -584,6 +600,7 @@ void Application::buildPipeline() {
             saveAvailable(),
             gameStarted_);
         ui_.updateTitle(window_, registry_, audio_, context.deltaTime, menuOpen_);
+        debugUi_.render(debugUiStats(context.deltaTime, context.totalTime));
     });
     pipeline_.add(FrameStage::Present, "present frame", [this](FrameContext&) {
         glfwSwapBuffers(window_);
@@ -728,13 +745,11 @@ void Application::createWorld() {
         }
     }
 
-    createCampfireFire({-26.48F, 0.86F, 75.48F}, 0.52F);
-
     player_.create(registry_, landmark("arrival_camp"));
-    Enemy::create(registry_, {-14.0F, 1.0F, -22.0F}, enemyMesh);
-    Enemy::create(registry_, {45.0F, 3.0F, -45.0F}, enemyMesh);
-    Enemy::create(registry_, {-60.0F, 4.0F, 55.0F}, enemyMesh);
-    Enemy::create(registry_, {-35.0F, 1.0F, 12.0F}, enemyMesh);
+    Enemy::create(registry_, {-42.0F, 1.0F, -66.0F}, enemyMesh);
+    Enemy::create(registry_, {135.0F, 3.0F, -135.0F}, enemyMesh);
+    Enemy::create(registry_, {-180.0F, 4.0F, 165.0F}, enemyMesh);
+    Enemy::create(registry_, {-105.0F, 1.0F, 36.0F}, enemyMesh);
 }
 
 Entity Application::createCampfireFire(glm::vec3 position, float size) {
@@ -921,6 +936,7 @@ void Application::startNewGame() {
     menuOpen_ = false;
     inventoryOpen_ = false;
     debugPanelOpen_ = false;
+    debugUi_.close();
     input_.setCursorCaptured(true);
     updateCursorMode();
 }
@@ -1027,6 +1043,7 @@ bool Application::loadGame() {
     menuOpen_ = false;
     inventoryOpen_ = false;
     debugPanelOpen_ = false;
+    debugUi_.close();
     input_.setCursorCaptured(true);
     updateCursorMode();
     return true;
@@ -1041,6 +1058,7 @@ void Application::returnToMainMenu() {
     menuOpen_ = true;
     inventoryOpen_ = false;
     debugPanelOpen_ = false;
+    debugUi_.close();
     stopPlayerMotion();
     input_.setCursorCaptured(false);
     ui_.resetMenuAnimation();
@@ -1052,10 +1070,11 @@ void Application::toggleMenu() {
     if (menuOpen_) {
         inventoryOpen_ = false;
         debugPanelOpen_ = false;
+        debugUi_.close();
         stopPlayerMotion();
         ui_.resetMenuAnimation();
     }
-    input_.setCursorCaptured(!menuOpen_ && !inventoryOpen_);
+    input_.setCursorCaptured(!menuOpen_ && !inventoryOpen_ && !debugUi_.open());
     updateCursorMode();
 }
 
@@ -1063,9 +1082,10 @@ void Application::toggleInventory() {
     inventoryOpen_ = !inventoryOpen_;
     if (inventoryOpen_) {
         debugPanelOpen_ = false;
+        debugUi_.close();
         stopPlayerMotion();
     }
-    input_.setCursorCaptured(!inventoryOpen_);
+    input_.setCursorCaptured(!inventoryOpen_ && !debugUi_.open());
     updateCursorMode();
 }
 
@@ -1074,9 +1094,22 @@ void Application::toggleDebugPanel() {
     if (debugPanelOpen_) {
         menuOpen_ = false;
         inventoryOpen_ = false;
+        debugUi_.close();
         stopPlayerMotion();
     }
     input_.setCursorCaptured(!debugPanelOpen_);
+    updateCursorMode();
+}
+
+void Application::toggleDebugOverlay() {
+    debugUi_.toggleOpen();
+    if (debugUi_.open()) {
+        menuOpen_ = false;
+        inventoryOpen_ = false;
+        debugPanelOpen_ = false;
+        stopPlayerMotion();
+    }
+    input_.setCursorCaptured(!debugUi_.open() && !menuOpen_ && !inventoryOpen_ && !debugPanelOpen_);
     updateCursorMode();
 }
 
@@ -1277,6 +1310,53 @@ ObjectiveHudState Application::objectiveHudState() const {
     };
 }
 
+DebugUiStats Application::debugUiStats(float deltaTime, double totalTime) {
+    DebugUiStats stats;
+    stats.deltaTime = deltaTime;
+    stats.totalTime = totalTime;
+    stats.frameLimit = frameLimiter_.limit();
+    stats.vsync = vsync_;
+    stats.shadows = renderer_ != nullptr && renderer_->shadowsEnabled();
+    stats.bloom = renderer_ != nullptr && renderer_->bloomEnabled();
+    stats.playerPosition = playerPosition();
+    if (worldStreamer_ != nullptr) {
+        stats.streaming = worldStreamer_->stats(stats.playerPosition);
+    }
+    stats.entities = registry_.size();
+    registry_.each<MeshRenderer>([&stats](Entity, const MeshRenderer&) {
+        ++stats.meshRenderers;
+    });
+    registry_.each<TerrainSurface>([&stats](Entity, const TerrainSurface&) {
+        ++stats.terrainSurfaces;
+    });
+    registry_.each<TerrainChunk>([&stats](Entity, const TerrainChunk&) {
+        ++stats.terrainChunks;
+    });
+    registry_.each<BoxCollider>([&stats](Entity, const BoxCollider& collider) {
+        if (collider.isStatic) {
+            ++stats.staticColliders;
+        } else {
+            ++stats.dynamicColliders;
+        }
+    });
+    registry_.each<ResourceNode>([&stats](Entity, const ResourceNode&) {
+        ++stats.resources;
+    });
+    registry_.each<WaterSurface>([&stats](Entity, const WaterSurface&) {
+        ++stats.waterSurfaces;
+    });
+    registry_.each<LavaSurface>([&stats](Entity, const LavaSurface&) {
+        ++stats.lavaSurfaces;
+    });
+    registry_.each<FireLight>([&stats](Entity, const FireLight&) {
+        ++stats.fireLights;
+    });
+    registry_.each<Animation>([&stats](Entity, const Animation&) {
+        ++stats.animated;
+    });
+    return stats;
+}
+
 void Application::toggleFullscreen() {
     if (!fullscreen_) {
         glfwGetWindowPos(window_, &windowedX_, &windowedY_);
@@ -1302,7 +1382,7 @@ void Application::toggleFullscreen() {
 }
 
 void Application::updateCursorMode() {
-    if (menuOpen_ || inventoryOpen_ || debugPanelOpen_) {
+    if (menuOpen_ || inventoryOpen_ || debugPanelOpen_ || debugUi_.open()) {
         input_.setCursorCaptured(false);
     }
     if (cursorCaptured_ == input_.cursorCaptured()) {
@@ -1313,18 +1393,21 @@ void Application::updateCursorMode() {
     glfwSetInputMode(window_, GLFW_CURSOR, cursorCaptured_ ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
 }
 
-void Application::keyCallback(GLFWwindow* window, int key, int, int action, int) {
+void Application::keyCallback(GLFWwindow* window, int key, int scanCode, int action, int modifiers) {
     auto* application = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    application->debugUi_.handleKey(window, key, scanCode, action, modifiers);
     application->events_.enqueue(KeyEvent{key, toKeyAction(action)});
 }
 
 void Application::mouseCallback(GLFWwindow* window, double xPosition, double yPosition) {
     auto* application = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    application->debugUi_.handleCursorPosition(window, xPosition, yPosition);
     application->events_.enqueue(MouseMovedEvent{xPosition, yPosition});
 }
 
-void Application::mouseButtonCallback(GLFWwindow* window, int button, int action, int) {
+void Application::mouseButtonCallback(GLFWwindow* window, int button, int action, int modifiers) {
     auto* application = static_cast<Application*>(glfwGetWindowUserPointer(window));
+    application->debugUi_.handleMouseButton(window, button, action, modifiers);
     double x = 0.0;
     double y = 0.0;
     glfwGetCursorPos(window, &x, &y);

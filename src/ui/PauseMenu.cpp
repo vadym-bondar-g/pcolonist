@@ -9,15 +9,15 @@
 
 namespace {
 
-constexpr glm::vec4 overlay{0.004F, 0.006F, 0.010F, 0.58F};
-constexpr glm::vec4 glass{0.026F, 0.034F, 0.046F, 0.72F};
-constexpr glm::vec4 glassStrong{0.036F, 0.048F, 0.064F, 0.86F};
-constexpr glm::vec4 stroke{0.42F, 0.74F, 0.82F, 0.28F};
-constexpr glm::vec4 textPrimary{0.94F, 0.98F, 0.96F, 1.0F};
-constexpr glm::vec4 textMuted{0.58F, 0.66F, 0.68F, 0.88F};
-constexpr glm::vec4 accent{0.30F, 0.88F, 0.96F, 1.0F};
-constexpr glm::vec4 accentWarm{0.95F, 0.68F, 0.28F, 1.0F};
-constexpr glm::vec4 danger{0.96F, 0.30F, 0.26F, 1.0F};
+constexpr glm::vec4 overlay{0.020F, 0.018F, 0.012F, 0.62F};
+constexpr glm::vec4 glass{0.120F, 0.085F, 0.045F, 0.76F};
+constexpr glm::vec4 glassStrong{0.155F, 0.105F, 0.052F, 0.88F};
+constexpr glm::vec4 stroke{0.72F, 0.54F, 0.28F, 0.42F};
+constexpr glm::vec4 textPrimary{0.96F, 0.88F, 0.70F, 1.0F};
+constexpr glm::vec4 textMuted{0.70F, 0.62F, 0.48F, 0.88F};
+constexpr glm::vec4 accent{0.38F, 0.62F, 0.32F, 1.0F};
+constexpr glm::vec4 accentWarm{0.94F, 0.64F, 0.24F, 1.0F};
+constexpr glm::vec4 danger{0.86F, 0.30F, 0.22F, 1.0F};
 
 constexpr float itemHeight = 52.0F;
 constexpr float itemGap = 8.0F;
@@ -101,7 +101,7 @@ void PauseMenu::renderBackdrop(const PauseMenuState& state, const Rectangle& rec
     for (int index = 0; index < 12; ++index) {
         const float y = height * 0.18F + static_cast<float>(index) * 34.0F;
         const float x = std::sin(state.time * 0.42F + static_cast<float>(index)) * 34.0F;
-        rectangle(x - 60.0F, y, width + 120.0F, 1.0F, {0.45F, 0.90F, 0.95F, 0.020F * fade}, 0.0F);
+        rectangle(x - 60.0F, y, width + 120.0F, 1.0F, {0.92F, 0.64F, 0.32F, 0.020F * fade}, 0.0F);
     }
 }
 
@@ -111,8 +111,8 @@ void PauseMenu::renderPanel(const PauseMenuState& state, const Rectangle& rectan
     rectangle(frame.left + 10.0F, frame.top + 14.0F + slide, frame.width, frame.height, {0.0F, 0.0F, 0.0F, 0.36F * fade}, 12.0F);
     rectangle(frame.left, frame.top + slide, frame.width, frame.height, alpha(stroke, fade), 12.0F);
     rectangle(frame.left + 1.0F, frame.top + 1.0F + slide, frame.width - 2.0F, frame.height - 2.0F, alpha(glass, fade), 11.0F);
-    rectangle(frame.left + 24.0F, frame.top + 26.0F + slide, frame.width - 48.0F, 1.0F, {0.80F, 0.96F, 1.0F, 0.18F * fade}, 0.0F);
-    rectangle(frame.left + 24.0F, frame.top + frame.height - 74.0F + slide, frame.width - 48.0F, 1.0F, {0.80F, 0.96F, 1.0F, 0.12F * fade}, 0.0F);
+    rectangle(frame.left + 24.0F, frame.top + 26.0F + slide, frame.width - 48.0F, 1.0F, {0.92F, 0.64F, 0.32F, 0.22F * fade}, 0.0F);
+    rectangle(frame.left + 24.0F, frame.top + frame.height - 74.0F + slide, frame.width - 48.0F, 1.0F, {0.92F, 0.64F, 0.32F, 0.14F * fade}, 0.0F);
     text(frame.left + 42.0F, frame.top + 52.0F + slide, tr(state.language, UiText::Paused), 4.0F, alpha(textPrimary, fade));
     text(frame.left + 46.0F, frame.top + 100.0F + slide, tr(state.language, UiText::WorldStateHeld), 1.18F, alpha(textMuted, fade));
 }
@@ -134,7 +134,7 @@ void PauseMenu::renderItem(
     const float x = frame.navLeft + active * 8.0F;
 
     rectangle(x + 8.0F, y + 8.0F, frame.navWidth, itemHeight, {0.0F, 0.0F, 0.0F, 0.24F * fade}, 8.0F);
-    rectangle(x, y, frame.navWidth, itemHeight, {0.36F, 0.76F, 0.86F, (0.12F + active * 0.30F) * fade}, 8.0F);
+    rectangle(x, y, frame.navWidth, itemHeight, {0.78F, 0.54F, 0.25F, (0.12F + active * 0.26F) * fade}, 8.0F);
     rectangle(x + 1.0F, y + 1.0F, frame.navWidth - 2.0F, itemHeight - 2.0F, alpha(active > 0.0F ? glassStrong : glass, fade), 7.0F);
     rectangle(x + 1.0F, y + 1.0F, active > 0.0F ? frame.navWidth - 2.0F : 6.0F, 2.0F, alpha(itemAccent, fade), 1.0F);
     rectangle(x + 18.0F, y + 15.0F, 3.0F, 22.0F, alpha(itemAccent, item.disabled ? fade * 0.38F : fade), 1.0F);
@@ -206,8 +206,8 @@ void PauseMenu::renderFooter(const PauseMenuState& state, const Rectangle& recta
     const float fade = state.fade;
     const float width = static_cast<float>(state.width);
     const float height = static_cast<float>(state.height);
-    rectangle(0.0F, height - 48.0F, width, 48.0F, {0.006F, 0.010F, 0.014F, 0.70F * fade}, 0.0F);
-    rectangle(0.0F, height - 48.0F, width, 1.0F, {0.65F, 0.92F, 0.96F, 0.18F * fade}, 0.0F);
+    rectangle(0.0F, height - 48.0F, width, 48.0F, {0.065F, 0.044F, 0.024F, 0.72F * fade}, 0.0F);
+    rectangle(0.0F, height - 48.0F, width, 1.0F, {0.92F, 0.64F, 0.32F, 0.20F * fade}, 0.0F);
     text(24.0F, height - 30.0F, state.version.empty() ? "v0.1-dev" : state.version, 1.06F, alpha(textMuted, fade));
     const std::string fps = "FPS " + std::to_string(state.fps);
     text(width * 0.5F - 34.0F, height - 30.0F, fps, 1.06F, alpha(textMuted, fade));
