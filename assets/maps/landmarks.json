@@ -6,44 +6,44 @@
       "category": "camp",
       "name": "arrival_camp",
       "position": {
-        "x": -32.0,
-        "y": 4.69,
-        "z": 77.0
+        "x": -96.0,
+        "y": 4.27,
+        "z": 231.0
       },
-      "radius": 10.0,
-      "walkability": 0.774
+      "radius": 30.0,
+      "walkability": 1.0
     },
     {
       "category": "shelter",
       "name": "granite_house",
       "position": {
         "x": -312.0,
-        "y": 3.17,
+        "y": 3.87,
         "z": -30.0
       },
-      "radius": 12.0,
+      "radius": 36.0,
       "walkability": 1.0
     },
     {
       "category": "harbor",
       "name": "natural_harbor",
       "position": {
-        "x": 91.0,
-        "y": 3.23,
-        "z": 14.5
+        "x": 273.0,
+        "y": 2.41,
+        "z": 43.5
       },
-      "radius": 18.0,
-      "walkability": 0.287
+      "radius": 54.0,
+      "walkability": 1.0
     },
     {
       "category": "water",
       "name": "grant_lake",
       "position": {
         "x": 93.0,
-        "y": 5.06,
+        "y": 5.48,
         "z": -72.0
       },
-      "radius": 18.0,
+      "radius": 54.0,
       "walkability": 0.973
     },
     {
@@ -51,10 +51,10 @@
       "name": "mercy_river_source",
       "position": {
         "x": 117.0,
-        "y": -1.58,
+        "y": -1.23,
         "z": -60.0
       },
-      "radius": 7.0,
+      "radius": 21.0,
       "walkability": 0.0
     },
     {
@@ -62,10 +62,10 @@
       "name": "mercy_river_mouth",
       "position": {
         "x": 283.32,
-        "y": -0.1,
+        "y": 0.25,
         "z": 28.31
       },
-      "radius": 9.0,
+      "radius": 27.0,
       "walkability": 0.0
     },
     {
@@ -73,10 +73,10 @@
       "name": "volcano_crater",
       "position": {
         "x": 0.0,
-        "y": 25.38,
+        "y": 28.18,
         "z": 0.0
       },
-      "radius": 20.0,
+      "radius": 60.0,
       "walkability": 0.08
     },
     {
@@ -84,32 +84,32 @@
       "name": "sunken_temple",
       "position": {
         "x": 0.0,
-        "y": 2.12,
-        "z": -84.0
+        "y": 4.46,
+        "z": -252.0
       },
-      "radius": 12.0,
+      "radius": 36.0,
       "walkability": 1.0
     },
     {
       "category": "ruin",
       "name": "watchtower",
       "position": {
-        "x": 91.0,
-        "y": 2.73,
-        "z": 18.0
+        "x": 273.0,
+        "y": 5.06,
+        "z": 54.0
       },
-      "radius": 10.0,
+      "radius": 30.0,
       "walkability": 1.0
     },
     {
       "category": "ruin",
       "name": "standing_stones",
       "position": {
-        "x": -82.0,
-        "y": 2.47,
-        "z": 38.0
+        "x": -246.0,
+        "y": 2.35,
+        "z": 114.0
       },
-      "radius": 12.0,
+      "radius": 36.0,
       "walkability": 1.0
     },
     {
@@ -117,7 +117,7 @@
       "name": "hidden_grotto_1",
       "position": {
         "x": -216.0,
-        "y": -0.64,
+        "y": -0.15,
         "z": -162.0
       },
       "radius": 25.5,
@@ -128,7 +128,7 @@
       "name": "hidden_grotto_2",
       "position": {
         "x": 195.0,
-        "y": 2.24,
+        "y": 2.73,
         "z": 210.0
       },
       "radius": 24.0,
@@ -139,7 +139,7 @@
       "name": "hidden_grotto_3",
       "position": {
         "x": -273.0,
-        "y": 2.34,
+        "y": 2.83,
         "z": 201.0
       },
       "radius": 22.5,
@@ -150,7 +150,7 @@
       "name": "hidden_grotto_4",
       "position": {
         "x": 414.0,
-        "y": 2.03,
+        "y": 2.52,
         "z": -252.0
       },
       "radius": 24.599999999999998,
@@ -161,7 +161,7 @@
       "name": "hidden_grotto_5",
       "position": {
         "x": -390.0,
-        "y": 2.45,
+        "y": 2.94,
         "z": 240.0
       },
       "radius": 26.400000000000002,
@@ -172,10 +172,10 @@
       "name": "mercy_falls_1",
       "position": {
         "x": 163.01,
-        "y": -2.38,
+        "y": -2.03,
         "z": -33.04
       },
-      "radius": 7.0,
+      "radius": 21.0,
       "walkability": 0.0
     },
     {
@@ -183,10 +183,10 @@
       "name": "mercy_falls_2",
       "position": {
         "x": 212.28,
-        "y": -1.97,
+        "y": -1.62,
         "z": -14.18
       },
-      "radius": 7.0,
+      "radius": 21.0,
       "walkability": 0.0
     },
     {
@@ -194,10 +194,10 @@
       "name": "tributary_source_1",
       "position": {
         "x": -39.0,
-        "y": 1.08,
+        "y": 1.43,
         "z": -144.0
       },
-      "radius": 6.0,
+      "radius": 18.0,
       "walkability": 0.866
     },
     {
@@ -205,10 +205,10 @@
       "name": "tributary_source_2",
       "position": {
         "x": 189.0,
-        "y": -1.9,
+        "y": -1.55,
         "z": -168.0
       },
-      "radius": 6.0,
+      "radius": 18.0,
       "walkability": 0.0
     },
     {
@@ -216,10 +216,10 @@
       "name": "tributary_source_3",
       "position": {
         "x": 378.0,
-        "y": -2.89,
+        "y": -2.54,
         "z": 276.0
       },
-      "radius": 6.0,
+      "radius": 18.0,
       "walkability": 0.0
     },
     {
@@ -227,7 +227,7 @@
       "name": "offshore_islet_1",
       "position": {
         "x": 417.0,
-        "y": 2.86,
+        "y": 3.28,
         "z": 183.0
       },
       "radius": 27.0,
@@ -238,7 +238,7 @@
       "name": "offshore_islet_2",
       "position": {
         "x": -408.0,
-        "y": 0.01,
+        "y": 0.43,
         "z": -234.0
       },
       "radius": 30.0,
@@ -249,7 +249,7 @@
       "name": "offshore_islet_3",
       "position": {
         "x": 576.0,
-        "y": -2.35,
+        "y": -1.93,
         "z": 252.0
       },
       "radius": 45.0,
@@ -260,7 +260,7 @@
       "name": "offshore_islet_4",
       "position": {
         "x": -594.0,
-        "y": -1.79,
+        "y": -1.37,
         "z": 162.0
       },
       "radius": 39.0,
@@ -271,7 +271,7 @@
       "name": "offshore_islet_5",
       "position": {
         "x": 528.0,
-        "y": -7.68,
+        "y": -7.26,
         "z": -384.0
       },
       "radius": 36.0,

@@ -18,7 +18,5 @@ model basalt_scree_medium models/basalt_scree_medium.obj
 model basalt_scree_large models/basalt_scree_large.obj
 model basalt_scree_shard models/basalt_scree_shard.obj
 
-spawn_model rock -5.3 1.32 -383.3 0.91 0.91 0.91 0.82 0.70 0.74 3.895
-spawn_model rock -123.4 0.76 -356.9 1.48 1.48 1.48 0.82 0.70 0.74 0.276
-spawn_model rock -40.4 1.57 -374.4 1.30 1.30 1.30 0.82 0.70 0.74 2.605
-spawn_model rock -64.9 1.22 -366.4 1.53 1.53 1.53 0.82 0.70 0.74 2.627
+spawn_model rock -50.3 0.91 -383.5 1.15 1.15 1.15 0.82 0.70 0.74 5.374
+spawn_model rock -93.0 0.72 -380.5 1.64 1.64 1.64 0.82 0.70 0.74 0.021

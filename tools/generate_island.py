@@ -427,11 +427,11 @@ def scale_biome(config: BiomeConfig) -> BiomeConfig:
 
 def decoration_count_factor(name: str) -> float:
     return {
-        "forest": 3.0,
-        "understory": 3.5,
-        "coastal_rocks": 3.0,
-        "palms": 2.5,
-        "mushrooms": 2.0,
+        "forest": 2.6,
+        "understory": 2.2,
+        "coastal_rocks": 1.6,
+        "palms": 1.5,
+        "mushrooms": 1.2,
     }.get(name, HORIZONTAL_SCALE)
 
 
@@ -453,6 +453,14 @@ def scale_radius_tuple(value: tuple[float, float, float, float]) -> tuple[float,
         value[2] * HORIZONTAL_SCALE,
         value[3] * HORIZONTAL_SCALE,
     )
+
+
+def legacy_xz(x: float, z: float) -> tuple[float, float]:
+    return scale_xz((x, z))
+
+
+def legacy_size(size: tuple[float, float, float]) -> tuple[float, float, float]:
+    return scale_distance(size[0]), scale_height(size[1]), scale_distance(size[2])
 
 
 def scale_config(config: IslandModelConfig) -> IslandModelConfig:
@@ -1205,6 +1213,33 @@ def write_obj(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def compact_mesh(
+    vertices: list[tuple[float, float, float, float, float, float]],
+    faces: list[tuple[int, ...]],
+) -> tuple[list[tuple[float, float, float, float, float, float]], list[tuple[int, ...]]]:
+    remap: dict[int, int] = {}
+    compact_vertices: list[tuple[float, float, float, float, float, float]] = []
+    compact_faces: list[tuple[int, ...]] = []
+    for face in faces:
+        compact_face: list[int] = []
+        for source_index in face:
+            if source_index not in remap:
+                remap[source_index] = len(compact_vertices) + 1
+                compact_vertices.append(vertices[source_index - 1])
+            compact_face.append(remap[source_index])
+        compact_faces.append(tuple(compact_face))
+    return compact_vertices, compact_faces
+
+
+def terrain_face_visible(face: tuple[int, ...], vertices: list[tuple[float, float, float, float, float, float]]) -> bool:
+    shoreline_margin = 1.08
+    floor_epsilon = 0.01
+    face_vertices = [vertices[index - 1] for index in face]
+    if any(vertex[1] > TERRAIN.floor_height + floor_epsilon for vertex in face_vertices):
+        return True
+    return any(island_radius(vertex[0], vertex[2]) <= shoreline_margin for vertex in face_vertices)
+
+
 def build_terrain_mesh(
     grid_step: int,
 ) -> tuple[list[tuple[float, float, float, float, float, float]], list[tuple[int, ...]]]:
@@ -1236,7 +1271,8 @@ def build_terrain_mesh(
                 faces.extend(((a, c, d), (a, d, b)))
             else:
                 faces.extend(((a, c, b), (b, c, d)))
-    return vertices, faces
+    faces = [face for face in faces if terrain_face_visible(face, vertices)]
+    return compact_mesh(vertices, faces)
 
 
 def write_chunked_terrain_meshes(
@@ -1285,74 +1321,73 @@ def add_structure_geometry(
     glow_stone = (0.18, 0.48, 0.5)
 
     # Sunken temple in the northern valley.
-    add_slab_on_ground(vertices, faces, 0.0, -84.0, (18.0, 0.9, 14.0), dark_stone)
+    add_slab_on_ground(vertices, faces, *legacy_xz(0.0, -84.0), legacy_size((18.0, 0.9, 14.0)), dark_stone)
     for x in (-8.0, 8.0):
         for z in (-90.0, -78.0):
-            add_box_on_ground(vertices, faces, x, z, (2.0, 6.0, 2.0), stone, 0.04)
-    add_box_on_ground(vertices, faces, 0.0, -90.0, (18.0, 1.2, 2.0), stone, 3.1)
-    add_box_on_ground(vertices, faces, 0.0, -84.0, (1.2, 5.2, 1.2), glow_stone, 0.04)
+            add_box_on_ground(vertices, faces, *legacy_xz(x, z), legacy_size((2.0, 6.0, 2.0)), stone, scale_height(0.04))
+    add_box_on_ground(vertices, faces, *legacy_xz(0.0, -90.0), legacy_size((18.0, 1.2, 2.0)), stone, scale_height(3.1))
+    add_box_on_ground(vertices, faces, *legacy_xz(0.0, -84.0), legacy_size((1.2, 5.2, 1.2)), glow_stone, scale_height(0.04))
 
     # Broken watchtower overlooking the eastern bay.
-    add_box_on_ground(vertices, faces, 91.0, 18.0, (8.0, 5.0, 8.0), dark_stone, 0.04)
-    add_box_on_ground(vertices, faces, 91.0, 18.0, (10.0, 1.0, 10.0), stone, 5.05)
-    add_box_on_ground(vertices, faces, 88.0, 15.0, (1.5, 5.0, 1.5), glow_stone, 5.65)
+    add_box_on_ground(vertices, faces, *legacy_xz(91.0, 18.0), legacy_size((8.0, 5.0, 8.0)), dark_stone, scale_height(0.04))
+    add_box_on_ground(vertices, faces, *legacy_xz(91.0, 18.0), legacy_size((10.0, 1.0, 10.0)), stone, scale_height(5.05))
+    add_box_on_ground(vertices, faces, *legacy_xz(88.0, 15.0), legacy_size((1.5, 5.0, 1.5)), glow_stone, scale_height(5.65))
 
     # Western standing-stone circle.
     for index in range(9):
         angle = index / 9.0 * math.tau
-        x = -82.0 + math.cos(angle) * 11.0
-        z = 38.0 + math.sin(angle) * 11.0
-        add_box_on_ground(vertices, faces, x, z, (1.3, 4.6 + (index % 3) * 0.7, 1.3), stone, 0.04)
-    add_slab_on_ground(vertices, faces, -82.0, 38.0, (8.0, 0.7, 8.0), glow_stone)
+        x, z = legacy_xz(-82.0 + math.cos(angle) * 11.0, 38.0 + math.sin(angle) * 11.0)
+        add_box_on_ground(vertices, faces, x, z, legacy_size((1.3, 4.6 + (index % 3) * 0.7, 1.3)), stone, scale_height(0.04))
+    add_slab_on_ground(vertices, faces, *legacy_xz(-82.0, 38.0), legacy_size((8.0, 0.7, 8.0)), glow_stone)
 
     # Granite House facade, recessed entrance and elevated lookout terrace.
     granite_x, granite_z = GRANITE_HOUSE
     granite_y = terrain_height(granite_x, granite_z)
-    add_box(vertices, faces, (granite_x, granite_y + 0.35, granite_z), (20.0, 0.7, 14.0), dark_stone)
-    add_box(vertices, faces, (granite_x - 8.0, granite_y + 4.0, granite_z - 6.0), (3.0, 8.0, 2.5), stone)
-    add_box(vertices, faces, (granite_x + 8.0, granite_y + 4.0, granite_z - 6.0), (3.0, 8.0, 2.5), stone)
-    add_box(vertices, faces, (granite_x, granite_y + 8.0, granite_z - 6.0), (19.0, 2.0, 2.5), stone)
-    add_box(vertices, faces, (granite_x, granite_y + 2.0, granite_z - 6.4), (7.0, 4.0, 0.8), dark_stone)
-    add_box(vertices, faces, (granite_x, granite_y + 9.4, granite_z + 1.0), (18.0, 0.8, 12.0), stone)
+    add_box(vertices, faces, (granite_x, granite_y + scale_height(0.35), granite_z), legacy_size((20.0, 0.7, 14.0)), dark_stone)
+    add_box(vertices, faces, (granite_x - scale_distance(8.0), granite_y + scale_height(4.0), granite_z - scale_distance(6.0)), legacy_size((3.0, 8.0, 2.5)), stone)
+    add_box(vertices, faces, (granite_x + scale_distance(8.0), granite_y + scale_height(4.0), granite_z - scale_distance(6.0)), legacy_size((3.0, 8.0, 2.5)), stone)
+    add_box(vertices, faces, (granite_x, granite_y + scale_height(8.0), granite_z - scale_distance(6.0)), legacy_size((19.0, 2.0, 2.5)), stone)
+    add_box(vertices, faces, (granite_x, granite_y + scale_height(2.0), granite_z - scale_distance(6.4)), legacy_size((7.0, 4.0, 0.8)), dark_stone)
+    add_box(vertices, faces, (granite_x, granite_y + scale_height(9.4), granite_z + scale_distance(1.0)), legacy_size((18.0, 0.8, 12.0)), stone)
 
     # Walkable bridges cross the lake's outlet and lower river.
-    add_slab_on_ground(vertices, faces, 63.0, -12.0, (5.0, 0.8, 17.0), dark_stone, 0.18)
-    add_slab_on_ground(vertices, faces, 91.0, 8.0, (5.0, 0.8, 16.0), dark_stone, 0.18)
+    add_slab_on_ground(vertices, faces, *legacy_xz(63.0, -12.0), legacy_size((5.0, 0.8, 17.0)), dark_stone, scale_height(0.18))
+    add_slab_on_ground(vertices, faces, *legacy_xz(91.0, 8.0), legacy_size((5.0, 0.8, 16.0)), dark_stone, scale_height(0.18))
     for bridge_x, bridge_z in ((63.0, -19.0), (63.0, -5.0), (91.0, 1.5), (91.0, 14.5)):
-        add_box_on_ground(vertices, faces, bridge_x, bridge_z, (1.2, 2.2, 1.2), stone, 0.04)
+        add_box_on_ground(vertices, faces, *legacy_xz(bridge_x, bridge_z), legacy_size((1.2, 2.2, 1.2)), stone, scale_height(0.04))
 
     # Summit observatory and a southern landing pier create long-distance goals.
-    summit_y = terrain_height(-54.0, -34.0)
-    add_box(vertices, faces, (-54.0, summit_y + 0.4, -34.0), (10.0, 0.8, 10.0), dark_stone)
-    add_box(vertices, faces, (-54.0, summit_y + 3.5, -34.0), (1.5, 6.2, 1.5), glow_stone)
-    add_slab_on_ground(vertices, faces, -25.0, 110.0, (8.0, 0.8, 28.0), dark_stone, 0.12)
+    summit_x, summit_z = legacy_xz(-54.0, -34.0)
+    summit_y = terrain_height(summit_x, summit_z)
+    add_box(vertices, faces, (summit_x, summit_y + scale_height(0.4), summit_z), legacy_size((10.0, 0.8, 10.0)), dark_stone)
+    add_box(vertices, faces, (summit_x, summit_y + scale_height(3.5), summit_z), legacy_size((1.5, 6.2, 1.5)), glow_stone)
+    add_slab_on_ground(vertices, faces, *legacy_xz(-25.0, 110.0), legacy_size((8.0, 0.8, 28.0)), dark_stone, scale_height(0.12))
     for z in (99.0, 109.0, 119.0):
         for x in (-28.0, -22.0):
-            add_box_on_ground(vertices, faces, x, z, (1.0, 2.6, 1.0), stone, -1.55)
+            add_box_on_ground(vertices, faces, *legacy_xz(x, z), legacy_size((1.0, 2.6, 1.0)), stone, scale_height(-1.55))
 
     # New outer island landmarks make the expanded coastline readable from afar.
-    add_slab_on_ground(vertices, faces, 148.0, -92.0, (13.0, 0.9, 10.0), dark_stone, 0.10)
+    add_slab_on_ground(vertices, faces, *legacy_xz(148.0, -92.0), legacy_size((13.0, 0.9, 10.0)), dark_stone, scale_height(0.10))
     for offset_x, offset_z in ((-5.0, -4.0), (5.0, -4.0), (-5.0, 4.0), (5.0, 4.0)):
-        add_box_on_ground(vertices, faces, 148.0 + offset_x, -92.0 + offset_z, (1.6, 5.8, 1.6), stone, 0.08)
-    add_box_on_ground(vertices, faces, 148.0, -92.0, (2.0, 8.8, 2.0), glow_stone, 0.15)
+        add_box_on_ground(vertices, faces, *legacy_xz(148.0 + offset_x, -92.0 + offset_z), legacy_size((1.6, 5.8, 1.6)), stone, scale_height(0.08))
+    add_box_on_ground(vertices, faces, *legacy_xz(148.0, -92.0), legacy_size((2.0, 8.8, 2.0)), glow_stone, scale_height(0.15))
 
-    add_slab_on_ground(vertices, faces, -130.0, 88.0, (16.0, 0.8, 13.0), dark_stone, 0.12)
+    add_slab_on_ground(vertices, faces, *legacy_xz(-130.0, 88.0), legacy_size((16.0, 0.8, 13.0)), dark_stone, scale_height(0.12))
     for index in range(7):
         angle = index / 7.0 * math.tau
         add_box_on_ground(
             vertices,
             faces,
-            -130.0 + math.cos(angle) * 9.0,
-            88.0 + math.sin(angle) * 7.0,
-            (1.1, 3.6 + (index % 2) * 1.4, 1.1),
+            *legacy_xz(-130.0 + math.cos(angle) * 9.0, 88.0 + math.sin(angle) * 7.0),
+            legacy_size((1.1, 3.6 + (index % 2) * 1.4, 1.1)),
             stone,
-            0.06,
+            scale_height(0.06),
         )
 
-    add_slab_on_ground(vertices, faces, 174.0, 75.0, (7.0, 0.8, 34.0), dark_stone, 0.10)
+    add_slab_on_ground(vertices, faces, *legacy_xz(174.0, 75.0), legacy_size((7.0, 0.8, 34.0)), dark_stone, scale_height(0.10))
     for z in (62.0, 73.0, 84.0):
         for x in (171.0, 177.0):
-            add_box_on_ground(vertices, faces, x, z, (0.9, 2.4, 0.9), stone, -1.50)
+            add_box_on_ground(vertices, faces, *legacy_xz(x, z), legacy_size((0.9, 2.4, 0.9)), stone, scale_height(-1.50))
 
 
 def add_rock_geometry(
@@ -2159,28 +2194,28 @@ def landmark_entry(
 
 def generate_landmarks() -> None:
     landmarks: list[dict[str, object]] = [
-        landmark_entry("arrival_camp", "camp", -32.0, 77.0, 1.2, 10.0),
-        landmark_entry("granite_house", "shelter", GRANITE_HOUSE[0], GRANITE_HOUSE[1], 2.0, 12.0),
-        landmark_entry("natural_harbor", "harbor", 91.0, 14.5, 1.2, 18.0),
-        landmark_entry("grant_lake", "water", LAKE_CENTER[0], LAKE_CENTER[1], 1.2, 18.0),
-        landmark_entry("mercy_river_source", "water", RIVER_PATH[0][0], RIVER_PATH[0][1], 1.0, 7.0),
-        landmark_entry("mercy_river_mouth", "water", RIVER_PATH[-1][0], RIVER_PATH[-1][1], 1.0, 9.0),
-        landmark_entry("volcano_crater", "volcano", VOLCANO.center[0], VOLCANO.center[1], 8.0, 20.0),
-        landmark_entry("sunken_temple", "ruin", 0.0, -84.0, 1.3, 12.0),
-        landmark_entry("watchtower", "ruin", 91.0, 18.0, 2.0, 10.0),
-        landmark_entry("standing_stones", "ruin", -82.0, 38.0, 1.5, 12.0),
+        landmark_entry("arrival_camp", "camp", *legacy_xz(-32.0, 77.0), scale_height(1.2), scale_distance(10.0)),
+        landmark_entry("granite_house", "shelter", GRANITE_HOUSE[0], GRANITE_HOUSE[1], scale_height(2.0), scale_distance(12.0)),
+        landmark_entry("natural_harbor", "harbor", *legacy_xz(91.0, 14.5), scale_height(1.2), scale_distance(18.0)),
+        landmark_entry("grant_lake", "water", LAKE_CENTER[0], LAKE_CENTER[1], scale_height(1.2), scale_distance(18.0)),
+        landmark_entry("mercy_river_source", "water", RIVER_PATH[0][0], RIVER_PATH[0][1], scale_height(1.0), scale_distance(7.0)),
+        landmark_entry("mercy_river_mouth", "water", RIVER_PATH[-1][0], RIVER_PATH[-1][1], scale_height(1.0), scale_distance(9.0)),
+        landmark_entry("volcano_crater", "volcano", VOLCANO.center[0], VOLCANO.center[1], scale_height(8.0), scale_distance(20.0)),
+        landmark_entry("sunken_temple", "ruin", *legacy_xz(0.0, -84.0), scale_height(1.3), scale_distance(12.0)),
+        landmark_entry("watchtower", "ruin", *legacy_xz(91.0, 18.0), scale_height(2.0), scale_distance(10.0)),
+        landmark_entry("standing_stones", "ruin", *legacy_xz(-82.0, 38.0), scale_height(1.5), scale_distance(12.0)),
     ]
     for index, grotto in enumerate(GROTTOS, start=1):
         x, z = grotto.position
-        landmarks.append(landmark_entry(f"hidden_grotto_{index}", "grotto", x, z, 1.4, grotto.chamber_radius))
+        landmarks.append(landmark_entry(f"hidden_grotto_{index}", "grotto", x, z, scale_height(1.4), grotto.chamber_radius))
     for index, progress in enumerate(WATER.waterfall_progresses, start=1):
         x, z = path_point(RIVER_PATH, progress)
-        landmarks.append(landmark_entry(f"mercy_falls_{index}", "waterfall", x, z, 1.0, 7.0))
+        landmarks.append(landmark_entry(f"mercy_falls_{index}", "waterfall", x, z, scale_height(1.0), scale_distance(7.0)))
     for index, path in enumerate(TRIBUTARY_PATHS, start=1):
         x, z = path[0]
-        landmarks.append(landmark_entry(f"tributary_source_{index}", "water", x, z, 1.0, 6.0))
+        landmarks.append(landmark_entry(f"tributary_source_{index}", "water", x, z, scale_height(1.0), scale_distance(6.0)))
     for index, (x, z, radius_x, radius_z) in enumerate(CONFIG.islets, start=1):
-        landmarks.append(landmark_entry(f"offshore_islet_{index}", "islet", x, z, 1.2, max(radius_x, radius_z)))
+        landmarks.append(landmark_entry(f"offshore_islet_{index}", "islet", x, z, scale_height(1.2), max(radius_x, radius_z)))
 
     payload = {
         "generated_by": "tools/generate_island.py",
@@ -2236,22 +2271,22 @@ def generate_world_config() -> None:
         "lava": {
             "crater_lake": {
                 "mesh": "builtin/lava",
-                "position": {"x": 0.4, "y": round(crater_level - 4.1, 2), "z": -0.2},
+                "position": {"x": scale_distance(0.4), "y": round(crater_level - scale_height(4.1), 2), "z": scale_distance(-0.2)},
                 "rotation": {"x": 0.0, "y": 0.16, "z": 0.0},
-                "scale": {"x": 13.9, "y": 1.0, "z": 11.6},
+                "scale": {"x": scale_distance(13.9), "y": 1.0, "z": scale_distance(11.6)},
                 "fire_light": {"color": {"x": 1.0, "y": 0.16, "z": 0.025}, "intensity": 4.8, "falloff": 0.055},
             },
             "inner_current": {
                 "mesh": "builtin/lava_tongue",
-                "position": {"x": -3.7, "y": round(crater_level - 4.03, 2), "z": 3.6},
+                "position": {"x": scale_distance(-3.7), "y": round(crater_level - scale_height(4.03), 2), "z": scale_distance(3.6)},
                 "rotation": {"x": 0.0, "y": 0.72, "z": 0.0},
-                "scale": {"x": 8.4, "y": 1.0, "z": 2.7},
+                "scale": {"x": scale_distance(8.4), "y": 1.0, "z": scale_distance(2.7)},
             },
             "overflow": {
                 "mesh": "builtin/lava_tongue",
-                "position": {"x": 2.8, "y": round(crater_level - 4.22, 2), "z": 10.8},
+                "position": {"x": scale_distance(2.8), "y": round(crater_level - scale_height(4.22), 2), "z": scale_distance(10.8)},
                 "rotation": {"x": 0.0, "y": 1.48, "z": 0.0},
-                "scale": {"x": 7.8, "y": 1.0, "z": 1.95},
+                "scale": {"x": scale_distance(7.8), "y": 1.0, "z": scale_distance(1.95)},
             },
         },
     }
@@ -2363,11 +2398,33 @@ def generate_scene() -> None:
         "",
         "# Arrival camp.",
     ]
-    spawn(lines, "tent", -32.0, 77.0, 0.9, (1.3, 1.2, 1.3))
-    spawn(lines, "campfire", -27.0, 76.0, 1.5, (0.6, 0.3, 0.6))
-    spawn(lines, "fallen_trunk", -19.0, 79.0, 1.2, (1.5, 0.6, 0.8))
-    spawn(lines, "fence", -36.0, 80.0, 1.0, (0.3, 0.7, 1.6))
-    spawn(lines, "fence", -33.0, 80.0, 1.0, (0.3, 0.7, 1.6))
+    spawn(lines, "tent", *legacy_xz(-32.0, 77.0), 0.9, (1.3, 1.2, 1.3))
+    spawn(lines, "campfire", *legacy_xz(-27.0, 76.0), 1.5, (0.6, 0.3, 0.6))
+    spawn(lines, "fallen_trunk", *legacy_xz(-19.0, 79.0), 1.2, (1.5, 0.6, 0.8))
+    spawn(lines, "fence", *legacy_xz(-36.0, 80.0), 1.0, (0.3, 0.7, 1.6))
+    spawn(lines, "fence", *legacy_xz(-33.0, 80.0), 1.0, (0.3, 0.7, 1.6))
+
+    lines.extend(("", "# Starter grove. Keeps the first view readable and gives the axe an immediate target."))
+    starter_grove = (
+        ("oak", -42.0, 72.5, 1.18, True, 0.45),
+        ("oak", -45.0, 78.5, 1.04, False, 1.90),
+        ("tree", -39.0, 83.0, 1.12, True, 3.20),
+        ("oak", -28.0, 88.0, 0.96, False, 4.10),
+        ("oak", -21.0, 84.0, 1.10, True, 0.80),
+        ("tree", -18.0, 73.0, 0.98, False, 2.65),
+        ("oak", -49.0, 66.0, 0.90, False, 5.20),
+        ("oak", -12.0, 82.0, 0.92, False, 1.30),
+        ("bush", -41.0, 68.0, 0.80, False, 3.80),
+        ("bush", -25.0, 89.0, 0.72, False, 5.65),
+        ("bush", -15.0, 76.0, 0.76, False, 0.35),
+        ("bush", -47.0, 75.0, 0.68, False, 2.30),
+    )
+    for model, x, z, scale, collidable, yaw in starter_grove:
+        world_x, world_z = legacy_xz(x, z)
+        if collidable:
+            spawn(lines, model, world_x, world_z, scale, (0.46, 2.35, 0.46), yaw)
+        else:
+            spawn_decor(lines, model, world_x, world_z, scale, yaw)
 
     lines.extend(("", "# Walkable stone grottos with open entrances and physical walls."))
     for grotto in GROTTOS:
@@ -2405,7 +2462,7 @@ def generate_scene() -> None:
         ("basalt_scree_tiny", -1.8, 15.2, 0.78, 2.55),
     ]
     for model, x, z, scale, yaw in basalt_scree:
-        spawn_decor(lines, model, x, z, scale, yaw)
+        spawn_decor(lines, model, *legacy_xz(x, z), scale, yaw)
     scree_models = (
         "basalt_scree_tiny",
         "basalt_scree_small",
@@ -2436,19 +2493,19 @@ def generate_scene() -> None:
     begin_placement_rule("forest", forest_rule.count)
     for _ in range(forest_rule.count):
         candidate: tuple[float, float, BiomeConfig] | None = None
-        for _attempt in range(100):
+        for _attempt in range(36):
             x = random.uniform(-TERRAIN.island_radius_x * 0.92, TERRAIN.island_radius_x * 0.92)
             z = random.uniform(-TERRAIN.island_radius_z * 0.92, TERRAIN.island_radius_z * 0.92)
             radius = island_radius(x, z)
-            near_path = abs(x + 0.15 * z + 14.0) < forest_rule.avoid_path_width
+            near_path = abs(x + 0.15 * z + scale_distance(14.0)) < forest_rule.avoid_path_width
             near_landmark = min(
                 math.hypot(x, z),
-                math.hypot(x, z + 84.0),
-                math.hypot(x + 82.0, z - 38.0),
-                math.hypot(x - 91.0, z - 18.0),
-                math.hypot(x, z - 10.0),
+                math.hypot(x, z + scale_distance(84.0)),
+                math.hypot(x + scale_distance(82.0), z - scale_distance(38.0)),
+                math.hypot(x - scale_distance(91.0), z - scale_distance(18.0)),
+                math.hypot(x, z - scale_distance(10.0)),
                 *(math.hypot(x - gx, z - gz) for gx, gz in GROTTO_POSITIONS),
-            ) < 18.0
+            ) < scale_distance(18.0)
             height, slope, moisture = biome_metrics(x, z)
             biome = classify_biome(x, height, z, slope, moisture)
             forest_chance = biome.tree_density * moisture * (1.0 - smoothstep(0.32, 0.82, slope))
@@ -2461,7 +2518,7 @@ def generate_scene() -> None:
                 and moisture >= forest_rule.min_moisture
                 and biome.name in forest_rule.allowed_biomes
                 and biome.tree_density > 0.0
-                and random.random() < forest_chance
+                and random.random() < max(0.42, forest_chance)
             ):
                 candidate = (x, z, biome)
                 break
@@ -2469,21 +2526,64 @@ def generate_scene() -> None:
             record_placement("forest", False)
             continue
         x, z, biome = candidate
-        model = "oak" if random.random() < biome.oak_preference else "tree"
+        model = "oak" if random.random() < max(0.85, biome.oak_preference) else "tree"
         scale = random.uniform(0.75, 1.35)
-        spawn(lines, model, x, z, scale, (0.46, 2.35, 0.46), random.uniform(0.0, math.tau))
+        yaw = random.uniform(0.0, math.tau)
+        if random.random() < 0.32:
+            spawn(lines, model, x, z, scale, (0.46, 2.35, 0.46), yaw)
+        else:
+            spawn_decor(lines, model, x, z, scale, yaw)
         record_placement("forest", True)
+
+    canopy_fill_count = 520
+    begin_placement_rule("canopy_fill", canopy_fill_count)
+    for _ in range(canopy_fill_count):
+        candidate: tuple[float, float, BiomeConfig] | None = None
+        for _attempt in range(24):
+            x = random.uniform(-TERRAIN.island_radius_x * 0.94, TERRAIN.island_radius_x * 0.94)
+            z = random.uniform(-TERRAIN.island_radius_z * 0.94, TERRAIN.island_radius_z * 0.94)
+            radius = island_radius(x, z)
+            near_path = abs(x + 0.15 * z + scale_distance(14.0)) < forest_rule.avoid_path_width * 0.55
+            near_landmark = min(
+                math.hypot(x, z),
+                math.hypot(x, z + scale_distance(84.0)),
+                math.hypot(x + scale_distance(82.0), z - scale_distance(38.0)),
+                math.hypot(x - scale_distance(91.0), z - scale_distance(18.0)),
+                math.hypot(x, z - scale_distance(10.0)),
+                *(math.hypot(x - gx, z - gz) for gx, gz in GROTTO_POSITIONS),
+            ) < scale_distance(11.0)
+            height, slope, moisture = biome_metrics(x, z)
+            biome = classify_biome(x, height, z, slope, moisture)
+            if (
+                0.04 < radius < 0.94
+                and not near_path
+                and not near_landmark
+                and forest_rule.min_height < height < forest_rule.max_height
+                and slope < 0.98
+                and moisture >= 0.10
+                and biome.name in forest_rule.allowed_biomes
+                and biome.tree_density > 0.0
+            ):
+                candidate = (x, z, biome)
+                break
+        if candidate is None:
+            record_placement("canopy_fill", False)
+            continue
+        x, z, biome = candidate
+        model = "oak" if random.random() < max(0.90, biome.oak_preference) else "tree"
+        spawn_decor(lines, model, x, z, random.uniform(0.68, 1.22), random.uniform(0.0, math.tau))
+        record_placement("canopy_fill", True)
 
     lines.extend(("", "# Low understory creates depth between the larger trees."))
     understory_rule = DECORATION_RULES["understory"]
     begin_placement_rule("understory", understory_rule.count)
     for _ in range(understory_rule.count):
         candidate: tuple[float, float] | None = None
-        for _attempt in range(100):
+        for _attempt in range(36):
             x = random.uniform(-TERRAIN.island_radius_x * 0.94, TERRAIN.island_radius_x * 0.94)
             z = random.uniform(-TERRAIN.island_radius_z * 0.94, TERRAIN.island_radius_z * 0.94)
             radius = island_radius(x, z)
-            near_path = abs(x + 0.15 * z + 14.0) < understory_rule.avoid_path_width
+            near_path = abs(x + 0.15 * z + scale_distance(14.0)) < understory_rule.avoid_path_width
             near_grotto = min(math.hypot(x - gx, z - gz) for gx, gz in GROTTO_POSITIONS) < understory_rule.avoid_grotto_radius
             height, slope, moisture = biome_metrics(x, z)
             biome = classify_biome(x, height, z, slope, moisture)
@@ -2547,14 +2647,14 @@ def generate_scene() -> None:
             z = math.sin(angle) * radius * (TERRAIN.island_radius_z / TERRAIN.island_radius_x)
             height, slope, moisture = biome_metrics(x, z)
             biome = classify_biome(x, height, z, slope, moisture)
-            near_harbor = math.hypot(x - HARBOR_CENTER[0], z - HARBOR_CENTER[1]) < 38.0
+            near_harbor = math.hypot(x - HARBOR_CENTER[0], z - HARBOR_CENTER[1]) < scale_distance(38.0)
             if (
                 palm_rule.min_radius < island_radius(x, z) < palm_rule.max_radius
                 and palm_rule.min_height < height < palm_rule.max_height
                 and slope < palm_rule.max_slope
                 and moisture > palm_rule.min_moisture
                 and biome.name in palm_rule.allowed_biomes
-                and (near_harbor or z > 35.0)
+                and (near_harbor or z > scale_distance(35.0))
             ):
                 candidate = (x, z)
                 break
@@ -2572,8 +2672,8 @@ def generate_scene() -> None:
     for _ in range(mushroom_rule.count):
         candidate: tuple[float, float] | None = None
         for _attempt in range(100):
-            x = random.uniform(42.0, TERRAIN.island_radius_x * 0.82)
-            z = random.uniform(-8.0, TERRAIN.island_radius_z * 0.76)
+            x = random.uniform(scale_distance(42.0), TERRAIN.island_radius_x * 0.82)
+            z = random.uniform(scale_distance(-8.0), TERRAIN.island_radius_z * 0.76)
             height, slope, moisture = biome_metrics(x, z)
             biome = classify_biome(x, height, z, slope, moisture)
             if (
