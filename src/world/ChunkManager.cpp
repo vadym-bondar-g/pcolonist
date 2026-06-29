@@ -67,7 +67,7 @@ void ChunkManager::loadInitial(
     }
 }
 
-void ChunkManager::update(
+bool ChunkManager::update(
     glm::vec3 playerPosition,
     Registry& registry,
     AssetManager& assets,
@@ -77,13 +77,18 @@ void ChunkManager::update(
     ScriptSystem& scripts,
     JobSystem& jobs) {
     const ChunkKey center = chunkFor(playerPosition);
-    const bool unloadedStaticColliders = unloadDistantChunks(center, registry);
+    bool unloadedChunks = false;
+    const bool unloadedStaticColliders = unloadDistantChunks(center, registry, unloadedChunks);
     if (unloadedStaticColliders) {
         physics.rebuildStaticIndex(registry);
     }
-    integrateReadyChunks(registry, assetSystem, physics, resources, scripts, jobs);
+    pruneStaleRequests(center);
+    integrateReadyChunks(center, registry, assetSystem, physics, resources, scripts, jobs);
     requestMissingChunks(center, assets, jobs);
-    assets.clearExpired();
+    if (unloadedChunks) {
+        assets.clearExpired();
+    }
+    return unloadedChunks;
 }
 
 void ChunkManager::unloadAll(Registry& registry) {
@@ -171,6 +176,28 @@ bool ChunkManager::shouldKeep(ChunkId id, ChunkKey center) const {
     return !active_.contains(replacement);
 }
 
+bool ChunkManager::shouldTrackRequest(ChunkId id, ChunkKey center) const {
+    return chebyshevDistance(id.key, center) <= config_.loadRadius
+        && desiredId(id.key, center) == id;
+}
+
+void ChunkManager::pruneStaleRequests(ChunkKey center) {
+    for (auto iterator = pending_.begin(); iterator != pending_.end();) {
+        if (shouldTrackRequest(iterator->first, center)) {
+            ++iterator;
+            continue;
+        }
+        iterator = pending_.erase(iterator);
+    }
+    for (auto iterator = missing_.begin(); iterator != missing_.end();) {
+        if (chebyshevDistance(iterator->key, center) <= config_.unloadRadius) {
+            ++iterator;
+            continue;
+        }
+        iterator = missing_.erase(iterator);
+    }
+}
+
 void ChunkManager::requestMissingChunks(ChunkKey center, AssetManager& assets, JobSystem& jobs) {
     for (int z = center.z - config_.loadRadius; z <= center.z + config_.loadRadius; ++z) {
         for (int x = center.x - config_.loadRadius; x <= center.x + config_.loadRadius; ++x) {
@@ -185,6 +212,7 @@ void ChunkManager::requestMissingChunks(ChunkKey center, AssetManager& assets, J
 }
 
 void ChunkManager::integrateReadyChunks(
+    ChunkKey center,
     Registry& registry,
     const AssetSystem& assetSystem,
     PhysicsSystem& physics,
@@ -192,6 +220,10 @@ void ChunkManager::integrateReadyChunks(
     ScriptSystem& scripts,
     JobSystem& jobs) {
     for (auto iterator = pending_.begin(); iterator != pending_.end();) {
+        if (!shouldTrackRequest(iterator->first, center)) {
+            iterator = pending_.erase(iterator);
+            continue;
+        }
         if (!ready(iterator->second.mesh)) {
             ++iterator;
             continue;
@@ -207,7 +239,7 @@ void ChunkManager::integrateReadyChunks(
     }
 }
 
-bool ChunkManager::unloadDistantChunks(ChunkKey center, Registry& registry) {
+bool ChunkManager::unloadDistantChunks(ChunkKey center, Registry& registry, bool& unloadedChunks) {
     bool unloadedStaticColliders = false;
     for (auto iterator = active_.begin(); iterator != active_.end();) {
         if (shouldKeep(iterator->first, center)) {
@@ -218,6 +250,7 @@ bool ChunkManager::unloadDistantChunks(ChunkKey center, Registry& registry) {
             unloadedStaticColliders = unloadedStaticColliders || registry.has<BoxCollider>(entity);
             registry.destroy(entity);
         }
+        unloadedChunks = true;
         iterator = active_.erase(iterator);
     }
     return unloadedStaticColliders;

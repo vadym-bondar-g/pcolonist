@@ -13,6 +13,7 @@ public:
     static Mesh disc(float radius, std::size_t segments, glm::vec3 color);
     static Mesh lavaLake(float radiusX, float radiusZ, std::size_t segments, std::size_t rings, glm::vec3 color);
     static Mesh flame(glm::vec3 baseColor, glm::vec3 tipColor);
+    static Mesh grassPatch(glm::vec3 baseColor, glm::vec3 tipColor);
     static Mesh gridPlane(float size, std::size_t subdivisions, glm::vec3 color);
 };
 

@@ -21,7 +21,10 @@ uniform vec2 waterFlowDirection;
 uniform float lava;
 uniform float fire;
 uniform float smoke;
+uniform float grass;
 uniform float time;
+uniform vec2 windDirection;
+uniform float windStrength;
 
 vec2 waterFlow() {
     return length(waterFlowDirection) > 0.001 ? normalize(waterFlowDirection) : vec2(0.0, 1.0);
@@ -110,6 +113,18 @@ void main() {
             + sin(time * 0.92 + position.z * 4.3) * 0.04;
         world.xz += vec2(0.35, -0.18) * drift * smoothstep(0.0, 0.9, height);
         world.y += height * height * 0.085 + sin(time * 1.6 + position.x * 3.0) * 0.012;
+    }
+    if (grass > 0.5) {
+        float bladeHeight = clamp(textureCoordinate.y, 0.0, 1.0);
+        float bend = smoothstep(0.12, 1.0, bladeHeight);
+        vec2 wind = length(windDirection) > 0.001 ? normalize(windDirection) : normalize(vec2(0.72, 0.38));
+        vec2 crossWind = vec2(-wind.y, wind.x);
+        float gust = sin(dot(world.xz, vec2(0.23, 0.31)) + time * 1.25)
+            + sin(dot(world.xz, vec2(-0.41, 0.19)) - time * 0.86) * 0.48;
+        float flutter = sin(dot(world.xz, crossWind) * 1.7 + time * 3.4 + position.x * 5.0) * 0.35;
+        world.xz += (wind * gust + crossWind * flutter) * 0.052 * windStrength * bend * bend;
+        world.y -= abs(gust) * 0.015 * windStrength * bend;
+        transformedNormal = normalize(transformedNormal + vec3(-wind.x, 0.35, -wind.y) * 0.18 * windStrength * bend);
     }
     vertexColor = color;
     worldPosition = world.xyz;

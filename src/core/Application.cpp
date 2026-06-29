@@ -19,6 +19,7 @@
 #include <array>
 #include <charconv>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <limits>
 #include <memory>
@@ -298,6 +299,27 @@ LavaDefinition parseLavaDefinition(std::string_view text, std::string_view key) 
     return definition;
 }
 
+float deterministicNoise(int x, int z, int salt = 0) {
+    std::uint32_t value = static_cast<std::uint32_t>(x) * 374761393U
+        + static_cast<std::uint32_t>(z) * 668265263U
+        + static_cast<std::uint32_t>(salt) * 362437U;
+    value = (value ^ (value >> 13U)) * 1274126177U;
+    value ^= value >> 16U;
+    return static_cast<float>(value & 0x00ffffffU) / static_cast<float>(0x01000000U);
+}
+
+std::optional<pcolonist::TerrainHit> terrainSurfaceAt(pcolonist::Registry& registry, glm::vec2 point, float maximumHeight) {
+    std::optional<pcolonist::TerrainHit> result;
+    registry.each<pcolonist::TerrainCollider>(
+        [&result, point, maximumHeight](pcolonist::Entity, const pcolonist::TerrainCollider& collider) {
+            if (const auto hit = collider.surfaceAt(point, maximumHeight);
+                hit && (!result || hit->height > result->height)) {
+                result = hit;
+            }
+        });
+    return result;
+}
+
 } // namespace
 
 namespace pcolonist {
@@ -529,8 +551,9 @@ void Application::buildPipeline() {
         if (worldStreamer_ == nullptr || menuOpen_) {
             return;
         }
-        worldStreamer_->update(playerPosition(), registry_, assets_, physics_, resources_, scripts_, jobs_);
-        renderer_->releaseUnusedMeshes(registry_);
+        if (worldStreamer_->update(playerPosition(), registry_, assets_, physics_, resources_, scripts_, jobs_)) {
+            renderer_->releaseUnusedMeshes(registry_);
+        }
     });
     pipeline_.add(FrameStage::Update, "update enemies", [this](FrameContext& context) {
         if (!menuOpen_ && !inventoryOpen_ && !debugPanelOpen_ && !debugUi_.open()) {
@@ -750,6 +773,55 @@ void Application::createWorld() {
     Enemy::create(registry_, {135.0F, 3.0F, -135.0F}, enemyMesh);
     Enemy::create(registry_, {-180.0F, 4.0F, 165.0F}, enemyMesh);
     Enemy::create(registry_, {-105.0F, 1.0F, 36.0F}, enemyMesh);
+    createGrassPatches();
+}
+
+void Application::createGrassPatches() {
+    const auto grassMesh = resources_.load<Mesh>("builtin/grass_patch", [] {
+        return MeshFactory::grassPatch({0.10F, 0.26F, 0.055F}, {0.42F, 0.58F, 0.16F});
+    });
+
+    constexpr float spacing = 4.8F;
+    constexpr int radius = 62;
+    constexpr int maxPatches = 2200;
+    int patches = 0;
+    const glm::vec3 center = landmark("arrival_camp");
+    for (int z = -radius; z <= radius && patches < maxPatches; ++z) {
+        for (int x = -radius; x <= radius && patches < maxPatches; ++x) {
+            const float jitterX = (deterministicNoise(x, z, 1) - 0.5F) * spacing * 0.82F;
+            const float jitterZ = (deterministicNoise(x, z, 2) - 0.5F) * spacing * 0.82F;
+            const glm::vec2 point{
+                center.x + static_cast<float>(x) * spacing + jitterX,
+                center.z + static_cast<float>(z) * spacing + jitterZ,
+            };
+            if (glm::length(point) < 48.0F || glm::length(point) > 390.0F) {
+                continue;
+            }
+            const float densityNoise = deterministicNoise(x, z, 3);
+            const float broadDensity = deterministicNoise(x / 5, z / 5, 4);
+            if (densityNoise < 0.30F || broadDensity < 0.18F) {
+                continue;
+            }
+            const auto surface = terrainSurfaceAt(registry_, point, 80.0F);
+            if (!surface || surface->height < -0.08F || surface->height > 6.2F || surface->normal.y < 0.78F) {
+                continue;
+            }
+
+            const float scale = 0.82F + deterministicNoise(x, z, 5) * 0.84F;
+            const float yaw = deterministicNoise(x, z, 6) * 6.28318530718F;
+            const Entity grass = registry_.create();
+            registry_.emplace<Transform>(
+                grass,
+                Transform{
+                    {point.x, surface->height + 0.015F, point.y},
+                    {0.0F, yaw, 0.0F},
+                    {scale, scale * (0.78F + deterministicNoise(x, z, 7) * 0.34F), scale},
+                });
+            registry_.emplace<MeshRenderer>(grass, grassMesh);
+            registry_.emplace<GrassSurface>(grass);
+            ++patches;
+        }
+    }
 }
 
 Entity Application::createCampfireFire(glm::vec3 position, float size) {

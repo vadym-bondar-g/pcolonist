@@ -22,7 +22,7 @@ void WorldStreamer::loadInitial(
     chunks_.loadInitial(playerPosition, registry, assets_, assetSystem, physics, resources, scripts, jobs);
 }
 
-void WorldStreamer::update(
+bool WorldStreamer::update(
     glm::vec3 playerPosition,
     Registry& registry,
     const AssetSystem& assetSystem,
@@ -30,7 +30,7 @@ void WorldStreamer::update(
     ResourceManager& resources,
     ScriptSystem& scripts,
     JobSystem& jobs) {
-    chunks_.update(playerPosition, registry, assets_, assetSystem, physics, resources, scripts, jobs);
+    return chunks_.update(playerPosition, registry, assets_, assetSystem, physics, resources, scripts, jobs);
 }
 
 void WorldStreamer::unloadAll(Registry& registry) {

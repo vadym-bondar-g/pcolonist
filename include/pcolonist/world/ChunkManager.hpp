@@ -58,7 +58,7 @@ public:
         ResourceManager& resources,
         ScriptSystem& scripts,
         JobSystem& jobs);
-    void update(
+    [[nodiscard]] bool update(
         glm::vec3 playerPosition,
         Registry& registry,
         AssetManager& assets,
@@ -83,15 +83,18 @@ private:
     [[nodiscard]] ChunkId desiredId(ChunkKey key, ChunkKey center) const;
     [[nodiscard]] TerrainTile terrainTile(ChunkId id) const;
     [[nodiscard]] bool shouldKeep(ChunkId id, ChunkKey center) const;
+    [[nodiscard]] bool shouldTrackRequest(ChunkId id, ChunkKey center) const;
+    void pruneStaleRequests(ChunkKey center);
     void requestMissingChunks(ChunkKey center, AssetManager& assets, JobSystem& jobs);
     void integrateReadyChunks(
+        ChunkKey center,
         Registry& registry,
         const AssetSystem& assetSystem,
         PhysicsSystem& physics,
         ResourceManager& resources,
         ScriptSystem& scripts,
         JobSystem& jobs);
-    bool unloadDistantChunks(ChunkKey center, Registry& registry);
+    bool unloadDistantChunks(ChunkKey center, Registry& registry, bool& unloadedChunks);
     void spawnChunk(
         Chunk chunk,
         Registry& registry,

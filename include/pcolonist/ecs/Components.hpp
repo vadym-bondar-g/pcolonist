@@ -41,6 +41,7 @@ struct FireLight {
 };
 struct FireSurface {};
 struct SmokeSurface {};
+struct GrassSurface {};
 struct TerrainSurface {};
 struct TerrainChunk {
     glm::vec2 center{0.0F};

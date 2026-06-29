@@ -26,6 +26,7 @@ uniform float terrain;
 uniform float lava;
 uniform float fire;
 uniform float smoke;
+uniform float grass;
 uniform float time;
 uniform float roughness;
 uniform float specularStrength;
@@ -227,20 +228,27 @@ void main() {
     vec3 lightDirection = normalize(sunDirection);
     float diffuse = max(dot(normal, lightDirection), 0.0);
     float moonDiffuse = max(dot(normal, normalize(moonDirection)), 0.0);
-    vec3 halfDirection = normalize(lightDirection + viewDirection);
-    float materialRoughness = water > 0.5 ? 0.18 : lava > 0.5 || fire > 0.5 ? 0.18 : roughness;
+    float materialRoughness = water > 0.5 ? 0.18 : lava > 0.5 || fire > 0.5 ? 0.18 : grass > 0.5 ? 0.82 : roughness;
     float specularPower = mix(128.0, 4.0, materialRoughness * materialRoughness);
-    float specular = pow(max(dot(normal, halfDirection), 0.0), specularPower);
-    vec3 moonHalfDirection = normalize(normalize(moonDirection) + viewDirection);
-    float moonSpecular = pow(max(dot(normal, moonHalfDirection), 0.0), specularPower);
+    float specular = 0.0;
+    float moonSpecular = 0.0;
+    if (grass < 0.5) {
+        vec3 halfDirection = normalize(lightDirection + viewDirection);
+        vec3 moonHalfDirection = normalize(normalize(moonDirection) + viewDirection);
+        specular = pow(max(dot(normal, halfDirection), 0.0), specularPower);
+        moonSpecular = pow(max(dot(normal, moonHalfDirection), 0.0), specularPower);
+    }
     float rim = pow(1.0 - max(dot(normal, viewDirection), 0.0), 3.0);
     float hemisphere = normal.y * 0.5 + 0.5;
     vec3 hemisphereLight = mix(ambientColor * 0.35, ambientColor * 1.35, hemisphere);
     float cavity = smoothstep(0.15, 0.85, normal.y) * mix(0.82, 1.0, hash(floor(worldPosition * 1.5)));
     float contactShade = mix(0.7, 1.0, smoothstep(0.0, 2.2, worldPosition.y)) * mix(0.82, 1.0, cavity);
-    float shadow = shadowAmount(normal, lightDirection) * daylight;
-    float cloudShadowNoise = terrainDetail(worldPosition.xz + vec2(time * 0.55, time * 0.12));
-    float cloudShadow = mix(1.0, smoothstep(0.28, 0.78, cloudShadowNoise), cloudiness * 0.48);
+    float shadow = grass > 0.5 ? 0.0 : shadowAmount(normal, lightDirection) * daylight;
+    float cloudShadow = 1.0;
+    if (grass < 0.5) {
+        float cloudShadowNoise = terrainDetail(worldPosition.xz + vec2(time * 0.55, time * 0.12));
+        cloudShadow = mix(1.0, smoothstep(0.28, 0.78, cloudShadowNoise), cloudiness * 0.48);
+    }
 
     float surfaceVariation = mix(0.94, 1.06, hash(floor(worldPosition * 3.0)));
     float volcanicGlow = 0.0;
@@ -251,7 +259,16 @@ void main() {
     if (hasDiffuseTexture != 0) {
         albedo *= texture(diffuseTexture, uv).rgb;
     }
-    if (sceneQuality >= 2 && terrain < 0.5 && water < 0.5 && lava < 0.5 && fire < 0.5 && smoke < 0.5) {
+    if (grass > 0.5) {
+        float height = clamp(uv.y, 0.0, 1.0);
+        float bladeNoise = hash(floor(worldPosition * 2.4) + vec3(height * 3.0, height * 5.0, height));
+        float bladeStripe = smoothstep(0.18, 0.92, abs(uv.x - 0.5) * 2.0);
+        vec3 grassBase = mix(vec3(0.075, 0.19, 0.045), vec3(0.17, 0.34, 0.075), bladeNoise);
+        vec3 grassTip = mix(vec3(0.25, 0.42, 0.12), vec3(0.50, 0.62, 0.20), bladeNoise);
+        albedo = mix(grassBase, grassTip, smoothstep(0.18, 1.0, height));
+        albedo *= mix(1.08, 0.86, bladeStripe * smoothstep(0.18, 0.86, height));
+    }
+    if (sceneQuality >= 2 && terrain < 0.5 && water < 0.5 && lava < 0.5 && fire < 0.5 && smoke < 0.5 && grass < 0.5) {
         albedo = objectMaterialDetail(albedo, worldPosition, normal);
     }
     if (terrain > 0.5) {
@@ -303,9 +320,10 @@ void main() {
         if (sceneQuality >= 1) {
             float stoneVeins = 1.0 - smoothstep(0.045, 0.16, cells);
             albedo = mix(albedo, albedo * vec3(0.58, 0.62, 0.60), stoneVeins * steep * 0.42);
-            float grassFibers = smoothstep(0.73, 0.93, grains) * (1.0 - steep)
+            float windTrace = valueNoise(worldPosition.xz * 0.55 + vec2(time * 0.22, -time * 0.08));
+            float grassFibers = smoothstep(0.70, 0.93, grains * 0.72 + windTrace * 0.28) * (1.0 - steep)
                 * smoothstep(0.05, 0.8, height) * (1.0 - smoothstep(4.0, 5.3, height));
-            albedo = mix(albedo, vec3(0.20, 0.43, 0.08), grassFibers * 0.22);
+            albedo = mix(albedo, vec3(0.20, 0.43, 0.08), grassFibers * 0.32);
             albedo = mix(albedo, vec3(0.12, 0.30, 0.08), moss * 0.35 * smoothstep(0.5, 3.0, height));
         }
         float shoreWetness = 1.0 - smoothstep(-0.62, -0.08, height);
@@ -373,21 +391,23 @@ void main() {
         ? 0.8
         : terrain > 0.5
             ? mix(0.08, 0.52, terrainWetness) + terrainBasaltAmount * 0.08
-            : specularStrength;
+            : grass > 0.5 ? 0.08 : specularStrength;
     color += sunColor * specular * materialSpecular * (1.0 - shadow);
     color += moonColor * moonSpecular * nightFactor * materialSpecular * 0.75;
     color += ambientColor * rim * 0.2;
     color += emissiveColor;
     color += vec3(1.0, 0.16, 0.008) * volcanicGlow * (1.6 + sin(time * 1.3) * 0.25);
-    for (int index = 0; index < 4; ++index) {
-        if (index >= fireLightCount) {
-            break;
+    if (grass < 0.5) {
+        for (int index = 0; index < 4; ++index) {
+            if (index >= fireLightCount) {
+                break;
+            }
+            float fireDistance = length(worldPosition - fireLightPositions[index]);
+            float firePulse = 0.82 + sin(time * 8.7 + float(index) * 1.9) * 0.12 + sin(time * 15.3) * 0.06;
+            float fireVisibility = mix(1.0, 0.12, daylight);
+            float fireLight = exp(-fireDistance * fireLightFalloffs[index]) * firePulse * fireVisibility * fireLightIntensities[index];
+            color += fireLightColors[index] * fireLight * (terrain > 0.5 ? 0.92 : 0.52);
         }
-        float fireDistance = length(worldPosition - fireLightPositions[index]);
-        float firePulse = 0.82 + sin(time * 8.7 + float(index) * 1.9) * 0.12 + sin(time * 15.3) * 0.06;
-        float fireVisibility = mix(1.0, 0.12, daylight);
-        float fireLight = exp(-fireDistance * fireLightFalloffs[index]) * firePulse * fireVisibility * fireLightIntensities[index];
-        color += fireLightColors[index] * fireLight * (terrain > 0.5 ? 0.92 : 0.52);
     }
     if (lava > 0.5) {
         vec2 centeredUv = uv - vec2(0.5);

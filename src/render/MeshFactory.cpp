@@ -178,6 +178,55 @@ Mesh MeshFactory::flame(glm::vec3 baseColor, glm::vec3 tipColor) {
     return mesh;
 }
 
+Mesh MeshFactory::grassPatch(glm::vec3 baseColor, glm::vec3 tipColor) {
+    Mesh mesh;
+    constexpr std::array<float, 9> rotations = {0.0F, 0.42F, 0.72F, 1.12F, 1.48F, 1.95F, 2.35F, 2.70F, 2.94F};
+    constexpr std::array<float, 9> widths = {0.20F, 0.12F, 0.15F, 0.11F, 0.18F, 0.12F, 0.13F, 0.14F, 0.16F};
+    constexpr std::array<float, 9> heights = {0.74F, 0.44F, 0.52F, 0.50F, 0.63F, 0.46F, 0.47F, 0.56F, 0.58F};
+    constexpr std::array<glm::vec2, 9> offsets = {
+        glm::vec2{0.0F, 0.0F},
+        glm::vec2{0.09F, 0.03F},
+        glm::vec2{-0.16F, 0.08F},
+        glm::vec2{-0.10F, -0.06F},
+        glm::vec2{0.15F, -0.10F},
+        glm::vec2{0.03F, 0.18F},
+        glm::vec2{-0.04F, -0.18F},
+        glm::vec2{-0.20F, -0.08F},
+        glm::vec2{0.12F, 0.15F},
+    };
+    mesh.vertices.reserve(rotations.size() * 5);
+    mesh.indices.reserve(rotations.size() * 9);
+    for (std::size_t index = 0; index < rotations.size(); ++index) {
+        const float rotation = rotations[index];
+        const glm::vec3 right{std::cos(rotation), 0.0F, std::sin(rotation)};
+        const glm::vec3 center{offsets[index].x, 0.0F, offsets[index].y};
+        const float halfWidth = widths[index] * 0.5F;
+        const float height = heights[index];
+        const glm::vec3 normal = glm::normalize(glm::vec3{-right.z, 0.42F, right.x});
+        const glm::vec3 lean{std::sin(rotation * 2.7F) * 0.035F, 0.0F, std::cos(rotation * 2.1F) * 0.035F};
+        const glm::vec3 shoulder = center + lean * 0.42F + glm::vec3{0.0F, height * 0.72F, 0.0F};
+        const glm::vec3 tip = center + lean + glm::vec3{0.0F, height, 0.0F};
+        const std::uint32_t base = static_cast<std::uint32_t>(mesh.vertices.size());
+        mesh.vertices.push_back({center - right * halfWidth, baseColor, normal, {0.0F, 0.0F}});
+        mesh.vertices.push_back({center + right * halfWidth, baseColor, normal, {1.0F, 0.0F}});
+        mesh.vertices.push_back({shoulder - right * halfWidth * 0.28F, glm::mix(baseColor, tipColor, 0.62F), normal, {0.20F, 0.72F}});
+        mesh.vertices.push_back({shoulder + right * halfWidth * 0.28F, glm::mix(baseColor, tipColor, 0.62F), normal, {0.80F, 0.72F}});
+        mesh.vertices.push_back({tip, tipColor, normal, {0.5F, 1.0F}});
+        mesh.indices.insert(mesh.indices.end(), {
+            base,
+            static_cast<std::uint32_t>(base + 1),
+            static_cast<std::uint32_t>(base + 2),
+            static_cast<std::uint32_t>(base + 1),
+            static_cast<std::uint32_t>(base + 3),
+            static_cast<std::uint32_t>(base + 2),
+            static_cast<std::uint32_t>(base + 2),
+            static_cast<std::uint32_t>(base + 3),
+            static_cast<std::uint32_t>(base + 4),
+        });
+    }
+    return mesh;
+}
+
 Mesh MeshFactory::gridPlane(float size, std::size_t subdivisions, glm::vec3 color) {
     subdivisions = std::max<std::size_t>(subdivisions, 1);
     Mesh mesh;

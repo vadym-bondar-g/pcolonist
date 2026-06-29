@@ -61,6 +61,7 @@ private:
     void resetWorldState();
     void loadMap();
     void createWorld();
+    void createGrassPatches();
     Entity createCampfireFire(glm::vec3 position, float size);
     Entity createFireLayer(
         const std::shared_ptr<Mesh>& mesh,

@@ -8,21 +8,19 @@
 #include <cstddef>
 #include <stdexcept>
 
-namespace {
-
-constexpr int shadowSize = 2048;
-
-} // namespace
-
 namespace pcolonist {
 
 void Renderer::createRenderTargets() {
     if (width_ <= 0 || height_ <= 0) {
         return;
     }
-    glGenFramebuffers(1, &hdrFramebuffer_);
+    unsigned int hdrFramebuffer = 0;
+    glGenFramebuffers(1, &hdrFramebuffer);
+    hdrFramebuffer_.reset(GlHandle::Kind::Framebuffer, hdrFramebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, hdrFramebuffer_);
-    glGenTextures(1, &hdrColor_);
+    unsigned int hdrColor = 0;
+    glGenTextures(1, &hdrColor);
+    hdrColor_.reset(GlHandle::Kind::Texture, hdrColor);
     glBindTexture(GL_TEXTURE_2D, hdrColor_);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width_, height_, 0, GL_RGBA, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -31,7 +29,9 @@ void Renderer::createRenderTargets() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, hdrColor_, 0);
 
-    glGenTextures(1, &hdrDepth_);
+    unsigned int hdrDepth = 0;
+    glGenTextures(1, &hdrDepth);
+    hdrDepth_.reset(GlHandle::Kind::Texture, hdrDepth);
     glBindTexture(GL_TEXTURE_2D, hdrDepth_);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width_, height_, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -46,20 +46,40 @@ void Renderer::createRenderTargets() {
 }
 
 void Renderer::releaseRenderTargets() {
-    glDeleteTextures(1, &hdrDepth_);
-    glDeleteTextures(1, &hdrColor_);
-    glDeleteFramebuffers(1, &hdrFramebuffer_);
-    hdrDepth_ = 0;
-    hdrColor_ = 0;
-    hdrFramebuffer_ = 0;
+    hdrDepth_.reset(GlHandle::Kind::Texture);
+    hdrColor_.reset(GlHandle::Kind::Texture);
+    hdrFramebuffer_.reset(GlHandle::Kind::Framebuffer);
+}
+
+void Renderer::releaseShadowMap() {
+    for (GlHandle& depth : shadowDepths_) {
+        depth.reset(GlHandle::Kind::Texture);
+    }
+    for (GlHandle& framebuffer : shadowFramebuffers_) {
+        framebuffer.reset(GlHandle::Kind::Framebuffer);
+    }
 }
 
 void Renderer::createShadowMap() {
-    glGenFramebuffers(static_cast<int>(shadowFramebuffers_.size()), shadowFramebuffers_.data());
-    glGenTextures(static_cast<int>(shadowDepths_.size()), shadowDepths_.data());
+    releaseShadowMap();
     for (std::size_t cascade = 0; cascade < shadowDepths_.size(); ++cascade) {
+        unsigned int framebuffer = 0;
+        unsigned int depth = 0;
+        glGenFramebuffers(1, &framebuffer);
+        glGenTextures(1, &depth);
+        shadowFramebuffers_[cascade].reset(GlHandle::Kind::Framebuffer, framebuffer);
+        shadowDepths_[cascade].reset(GlHandle::Kind::Texture, depth);
         glBindTexture(GL_TEXTURE_2D, shadowDepths_[cascade]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, shadowSize, shadowSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_DEPTH_COMPONENT24,
+            qualityConfig_.shadowSize,
+            qualityConfig_.shadowSize,
+            0,
+            GL_DEPTH_COMPONENT,
+            GL_FLOAT,
+            nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
