@@ -14,6 +14,7 @@ void runWorldSystemTests();
 void runInventoryTests();
 void runPngLoaderTests();
 void runSaveGameSerializerTests();
+void runScriptSystemTests();
 
 namespace {
 
@@ -107,6 +108,21 @@ void testRejectsSymlinksOutsideRoot() {
         "AssetSystem must reject symlinks outside the asset root");
 }
 
+void testCachesBinaryAssetsInMemory() {
+    TemporaryDirectory temporary;
+    const std::filesystem::path root = temporary.path() / "assets";
+    std::filesystem::create_directories(root / "data");
+    std::ofstream(root / "data" / "value.bin", std::ios::binary) << "first";
+
+    const pcolonist::AssetSystem assets(root);
+    const std::vector<unsigned char>& first = assets.readBinary("data/value.bin");
+    require(std::string(first.begin(), first.end()) == "first", "AssetSystem must read binary assets");
+
+    std::ofstream(root / "data" / "value.bin", std::ios::binary | std::ios::trunc) << "second";
+    const std::vector<unsigned char>& cached = assets.readBinary("data/value.bin");
+    require(std::string(cached.begin(), cached.end()) == "first", "AssetSystem must serve cached binary assets from memory");
+}
+
 } // namespace
 
 int main() {
@@ -114,12 +130,14 @@ int main() {
         testResolvesPathsInsideRoot();
         testRejectsPathsOutsideRoot();
         testRejectsSymlinksOutsideRoot();
+        testCachesBinaryAssetsInMemory();
         runTerrainColliderTests();
         runObjLoaderTests();
         runWorldSystemTests();
         runInventoryTests();
         runPngLoaderTests();
         runSaveGameSerializerTests();
+        runScriptSystemTests();
     } catch (const std::exception& error) {
         std::cerr << "AssetSystem test failed: " << error.what() << '\n';
         return EXIT_FAILURE;

@@ -17,6 +17,13 @@ namespace pcolonist {
 
 namespace {
 
+constexpr float minimumColliderHalfExtent = 0.001F;
+constexpr float maximumColliderHalfExtent = 1024.0F;
+
+bool finite(glm::vec3 value) {
+    return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+}
+
 std::optional<TerrainHit> terrainSurface(Registry& registry, glm::vec2 point, float maximumHeight) {
     std::optional<TerrainHit> result;
     registry.each<TerrainCollider>(
@@ -101,13 +108,37 @@ std::optional<float> horizontalSweep(
 
 } // namespace
 
+glm::vec3 sanitizedColliderHalfExtents(const BoxCollider& collider, const Transform& transform) {
+    if (!finite(collider.halfExtents) || !finite(transform.scale)) {
+        return {};
+    }
+
+    const glm::vec3 half = glm::abs(collider.halfExtents * transform.scale);
+    return glm::clamp(
+        half,
+        glm::vec3{minimumColliderHalfExtent},
+        glm::vec3{maximumColliderHalfExtent});
+}
+
+bool validPhysicsPoint(glm::vec3 point) {
+    return finite(point);
+}
+
 void PhysicsSystem::update(Registry& registry, float deltaTime) const {
     registry.each<Transform, RigidBody, BoxCollider>(
         [this, deltaTime, &registry](Entity entity, Transform& transform, RigidBody& body, const BoxCollider& collider) {
-            if (body.mass <= 0.0F || collider.isStatic) {
+            if (body.mass <= 0.0F
+                || collider.isStatic
+                || !std::isfinite(deltaTime)
+                || deltaTime <= 0.0F
+                || !validPhysicsPoint(transform.position)
+                || !validPhysicsPoint(body.velocity)) {
                 return;
             }
-            const glm::vec3 half = collider.halfExtents * transform.scale;
+            const glm::vec3 half = sanitizedColliderHalfExtents(collider, transform);
+            if (half == glm::vec3{}) {
+                return;
+            }
             const std::optional<WaterHit> water = waterSurface(
                 registry,
                 {transform.position.x, transform.position.z},

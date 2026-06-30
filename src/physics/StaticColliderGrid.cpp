@@ -3,6 +3,8 @@
 #include "pcolonist/ecs/Components.hpp"
 #include "pcolonist/ecs/Registry.hpp"
 
+#include <glm/common.hpp>
+
 #include <algorithm>
 #include <cmath>
 
@@ -16,8 +18,11 @@ void StaticColliderGrid::rebuild(Registry& registry) {
     cells_.clear();
     registry.each<Transform, BoxCollider>(
         [this](Entity, const Transform& transform, const BoxCollider& collider) {
-            if (collider.isStatic) {
-                boxes_.push_back({transform.position, collider.halfExtents * transform.scale});
+            if (collider.isStatic && validPhysicsPoint(transform.position)) {
+                const glm::vec3 halfExtents = sanitizedColliderHalfExtents(collider, transform);
+                if (halfExtents != glm::vec3{}) {
+                    boxes_.push_back({transform.position, halfExtents});
+                }
             }
         });
 
@@ -35,6 +40,10 @@ void StaticColliderGrid::rebuild(Registry& registry) {
 
 std::vector<const StaticBox*> StaticColliderGrid::query(glm::vec3 center, glm::vec3 halfExtents) const {
     std::vector<const StaticBox*> result;
+    if (!validPhysicsPoint(center) || !validPhysicsPoint(halfExtents)) {
+        return result;
+    }
+    halfExtents = glm::abs(halfExtents);
     const Cell minimum = cellAt({center.x - halfExtents.x, center.z - halfExtents.z});
     const Cell maximum = cellAt({center.x + halfExtents.x, center.z + halfExtents.z});
     std::vector<bool> visited(boxes_.size(), false);

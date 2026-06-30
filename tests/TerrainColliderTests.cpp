@@ -3,6 +3,7 @@
 #include "pcolonist/physics/PhysicsSystem.hpp"
 
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 void runTerrainColliderTests() {
@@ -87,5 +88,41 @@ void runTerrainColliderTests() {
     indexedPhysics.update(registry, 0.1F);
     if (registry.get<pcolonist::Transform>(collidingBody).position.x >= 18.5F) {
         throw std::runtime_error("Swept static collision must stop fast bodies before obstacles");
+    }
+
+    pcolonist::Registry invalidRegistry;
+    const pcolonist::Entity negativeObstacle = invalidRegistry.create();
+    invalidRegistry.emplace<pcolonist::Transform>(
+        negativeObstacle,
+        pcolonist::Transform{{0.0F, 1.0F, 0.0F}, {}, {-2.0F, 1.0F, 1.0F}});
+    invalidRegistry.emplace<pcolonist::BoxCollider>(
+        negativeObstacle,
+        pcolonist::BoxCollider{{-1.0F, 1.0F, 1.0F}, true});
+
+    const pcolonist::Entity invalidObstacle = invalidRegistry.create();
+    invalidRegistry.emplace<pcolonist::Transform>(
+        invalidObstacle,
+        pcolonist::Transform{{10.0F, 1.0F, 0.0F}});
+    invalidRegistry.emplace<pcolonist::BoxCollider>(
+        invalidObstacle,
+        pcolonist::BoxCollider{{std::numeric_limits<float>::quiet_NaN(), 1.0F, 1.0F}, true});
+
+    pcolonist::PhysicsSystem robustPhysics;
+    robustPhysics.rebuildStaticIndex(invalidRegistry);
+    if (robustPhysics.staticColliders().size() != 1) {
+        throw std::runtime_error("Static collider grid must ignore invalid collider dimensions");
+    }
+
+    const pcolonist::Entity robustBody = invalidRegistry.create();
+    invalidRegistry.emplace<pcolonist::Transform>(robustBody, pcolonist::Transform{{-4.0F, 1.0F, 0.0F}});
+    invalidRegistry.emplace<pcolonist::RigidBody>(
+        robustBody,
+        pcolonist::RigidBody{{80.0F, 0.0F, 0.0F}, 1.0F, false});
+    invalidRegistry.emplace<pcolonist::BoxCollider>(
+        robustBody,
+        pcolonist::BoxCollider{{-0.5F, 0.5F, 0.5F}});
+    robustPhysics.update(invalidRegistry, 0.1F);
+    if (invalidRegistry.get<pcolonist::Transform>(robustBody).position.x >= -2.5F) {
+        throw std::runtime_error("Physics system must sanitize negative collider extents for moving bodies");
     }
 }

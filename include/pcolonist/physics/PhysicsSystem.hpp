@@ -99,6 +99,9 @@ struct BoxCollider {
     bool isStatic = false;
 };
 
+[[nodiscard]] glm::vec3 sanitizedColliderHalfExtents(const BoxCollider& collider, const Transform& transform);
+[[nodiscard]] bool validPhysicsPoint(glm::vec3 point);
+
 class PhysicsSystem {
 public:
     void update(Registry& registry, float deltaTime) const;

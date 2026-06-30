@@ -8,15 +8,63 @@
 #include "pcolonist/ecs/Registry.hpp"
 #include "pcolonist/physics/PhysicsSystem.hpp"
 
-#include <sstream>
 #include <future>
+#include <cmath>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 
 namespace pcolonist {
+
+namespace {
+
+constexpr float maximumScriptScale = 512.0F;
+constexpr float maximumScriptColliderHalfExtent = 1024.0F;
+
+bool finite(glm::vec3 value) {
+    return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+}
+
+void validateScriptPosition(const Transform& transform, const std::string& command) {
+    if (!finite(transform.position)) {
+        throw std::runtime_error("Script " + command + " position must be finite");
+    }
+}
+
+void validateScriptScale(const Transform& transform, const std::string& command) {
+    if (!finite(transform.scale)
+        || transform.scale.x <= 0.0F
+        || transform.scale.y <= 0.0F
+        || transform.scale.z <= 0.0F
+        || transform.scale.x > maximumScriptScale
+        || transform.scale.y > maximumScriptScale
+        || transform.scale.z > maximumScriptScale) {
+        throw std::runtime_error("Script " + command + " scale must be finite and positive");
+    }
+}
+
+void validateScriptCollider(const BoxCollider& collider, const std::string& command) {
+    if (!finite(collider.halfExtents)
+        || collider.halfExtents.x <= 0.0F
+        || collider.halfExtents.y <= 0.0F
+        || collider.halfExtents.z <= 0.0F
+        || collider.halfExtents.x > maximumScriptColliderHalfExtent
+        || collider.halfExtents.y > maximumScriptColliderHalfExtent
+        || collider.halfExtents.z > maximumScriptColliderHalfExtent) {
+        throw std::runtime_error("Script " + command + " collider half extents must be finite and positive");
+    }
+}
+
+void validateScriptVelocity(const RigidBody& body, const std::string& command) {
+    if (!finite(body.velocity)) {
+        throw std::runtime_error("Script " + command + " velocity must be finite");
+    }
+}
+
+} // namespace
 
 bool ScriptSystem::frameCounterVisible() const {
     return frameCounterVisible_;
@@ -90,6 +138,8 @@ std::vector<Entity> ScriptSystem::execute(
                   >> body.velocity.x >> body.velocity.y >> body.velocity.z)) {
                 throw std::runtime_error("Script spawn_body expects position and velocity");
             }
+            validateScriptPosition(transform, command);
+            validateScriptVelocity(body, command);
             const Entity entity = registry.create();
             registry.emplace<Transform>(entity, transform);
             registry.emplace<RigidBody>(entity, body);
@@ -106,6 +156,8 @@ std::vector<Entity> ScriptSystem::execute(
                   >> collider.halfExtents.x >> collider.halfExtents.y >> collider.halfExtents.z)) {
                 throw std::runtime_error("Script spawn_collider expects position and half extents");
             }
+            validateScriptPosition(transform, command);
+            validateScriptCollider(collider, command);
             const Entity entity = registry.create();
             registry.emplace<Transform>(entity, transform);
             registry.emplace<BoxCollider>(entity, collider);
@@ -137,6 +189,9 @@ std::vector<Entity> ScriptSystem::execute(
                   >> collider.halfExtents.x >> collider.halfExtents.y >> collider.halfExtents.z)) {
                 throw std::runtime_error("Script spawn_model expects id, position, scale and collider");
             }
+            validateScriptPosition(transform, command);
+            validateScriptScale(transform, command);
+            validateScriptCollider(collider, command);
             row >> transform.rotation.y;
             auto iterator = models.find(id);
             if (iterator == models.end()) {
@@ -162,6 +217,8 @@ std::vector<Entity> ScriptSystem::execute(
                   >> transform.scale.x >> transform.scale.y >> transform.scale.z)) {
                 throw std::runtime_error("Script spawn_decor expects id, position and scale");
             }
+            validateScriptPosition(transform, command);
+            validateScriptScale(transform, command);
             row >> transform.rotation.y;
             auto iterator = models.find(id);
             if (iterator == models.end()) {

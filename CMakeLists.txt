@@ -230,13 +230,17 @@ if(BUILD_TESTING)
         tests/WorldSystemTests.cpp
         tests/PngLoaderTests.cpp
         tests/SaveGameSerializerTests.cpp
+        tests/ScriptSystemTests.cpp
         src/assets/Assets.cpp
+        src/assets/MeshLoader.cpp
         src/assets/ObjLoader.cpp
+        src/core/JobSystem.cpp
         src/gameplay/Inventory.cpp
         src/physics/PhysicsSystem.cpp
         src/physics/StaticColliderGrid.cpp
         src/physics/TerrainCollider.cpp
         src/render/PngLoader.cpp
+        src/scripting/ScriptSystem.cpp
         src/serialization/SaveGameSerializer.cpp
         src/world/WaterWaves.cpp
         src/world/WeatherSystem.cpp
