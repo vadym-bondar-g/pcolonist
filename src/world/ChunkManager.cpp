@@ -83,12 +83,12 @@ bool ChunkManager::update(
         physics.rebuildStaticIndex(registry);
     }
     pruneStaleRequests(center);
-    integrateReadyChunks(center, registry, assetSystem, physics, resources, scripts, jobs);
+    const bool integratedChunks = integrateReadyChunks(center, registry, assetSystem, physics, resources, scripts, jobs);
     requestMissingChunks(center, assets, jobs);
     if (unloadedChunks) {
         assets.clearExpired();
     }
-    return unloadedChunks;
+    return unloadedChunks || integratedChunks;
 }
 
 void ChunkManager::unloadAll(Registry& registry) {
@@ -211,7 +211,7 @@ void ChunkManager::requestMissingChunks(ChunkKey center, AssetManager& assets, J
     }
 }
 
-void ChunkManager::integrateReadyChunks(
+bool ChunkManager::integrateReadyChunks(
     ChunkKey center,
     Registry& registry,
     const AssetSystem& assetSystem,
@@ -219,6 +219,7 @@ void ChunkManager::integrateReadyChunks(
     ResourceManager& resources,
     ScriptSystem& scripts,
     JobSystem& jobs) {
+    bool integratedChunks = false;
     for (auto iterator = pending_.begin(); iterator != pending_.end();) {
         if (!shouldTrackRequest(iterator->first, center)) {
             iterator = pending_.erase(iterator);
@@ -232,11 +233,13 @@ void ChunkManager::integrateReadyChunks(
         try {
             Chunk chunk{iterator->second.terrain, iterator->second.mesh.get(), {}};
             spawnChunk(std::move(chunk), registry, assetSystem, physics, resources, scripts, jobs);
+            integratedChunks = true;
         } catch (const std::exception&) {
             missing_.insert(iterator->first);
         }
         iterator = pending_.erase(iterator);
     }
+    return integratedChunks;
 }
 
 bool ChunkManager::unloadDistantChunks(ChunkKey center, Registry& registry, bool& unloadedChunks) {

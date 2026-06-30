@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
+#include <iomanip>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -374,7 +375,11 @@ void Application::initialize() {
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
-    renderer_ = std::make_unique<Renderer>(config_.assetRoot);
+    initializePerformanceLog();
+    writePerformanceEvent("asset_preload_begin");
+    assets_.preloadAll();
+    writePerformanceEvent("asset_preload_end");
+    renderer_ = std::make_unique<Renderer>(assets_);
     renderer_->setShadowsEnabled(config_.shadows);
     renderer_->setBloomEnabled(config_.bloom);
     renderer_->setGraphicsQuality(config_.graphicsQuality);
@@ -401,6 +406,7 @@ void Application::initialize() {
     updateCursorMode();
     vsync_ = config_.vsync;
     initialized_ = true;
+    writePerformanceEvent("initialize_complete");
 
     if (config_.loadGame && !loadGame()) {
         throw std::runtime_error("Cannot load save file: " + config_.savePath.string());
@@ -408,6 +414,8 @@ void Application::initialize() {
 }
 
 void Application::shutdown() {
+    writePerformanceEvent("shutdown");
+    shutdownPerformanceLog();
     initialized_ = false;
     debugUi_.shutdown();
     ui_.shutdown();
@@ -552,6 +560,7 @@ void Application::buildPipeline() {
             return;
         }
         if (worldStreamer_->update(playerPosition(), registry_, assets_, physics_, resources_, scripts_, jobs_)) {
+            renderer_->preloadResources(registry_);
             renderer_->releaseUnusedMeshes(registry_);
         }
     });
@@ -606,6 +615,7 @@ void Application::buildPipeline() {
         renderer_->render(camera_, registry_, weather_);
     });
     pipeline_.add(FrameStage::Render, "render UI", [this](FrameContext& context) {
+        DebugUiStats stats = debugUiStats(context.deltaTime, context.totalTime);
         ui_.render(
             fullscreen_,
             input_.cursorCaptured(),
@@ -623,7 +633,8 @@ void Application::buildPipeline() {
             saveAvailable(),
             gameStarted_);
         ui_.updateTitle(window_, registry_, audio_, context.deltaTime, menuOpen_);
-        debugUi_.render(debugUiStats(context.deltaTime, context.totalTime));
+        debugUi_.render(stats);
+        trackPerformance(stats);
     });
     pipeline_.add(FrameStage::Present, "present frame", [this](FrameContext&) {
         glfwSwapBuffers(window_);
@@ -655,6 +666,11 @@ void Application::resetWorldState() {
 
 void Application::loadMap() {
     const bool chunkAssetsAvailable = std::filesystem::exists(assets_.resolve("maps/chunks/terrain_lod0_-1_1.obj"));
+    if (chunkAssetsAvailable) {
+        worldStreamer_ = std::make_unique<WorldStreamer>(assetManager_);
+        worldStreamer_->loadInitial(landmark("arrival_camp"), registry_, assets_, physics_, resources_, scripts_, jobs_);
+        return;
+    }
 
     const auto structures = resources_.load<Mesh>("maps/demo_map_structures.obj", [this] {
         return MeshLoader::load(assets_, "maps/demo_map_structures.obj");
@@ -670,12 +686,6 @@ void Application::loadMap() {
     const Entity rocksEntity = registry_.create();
     registry_.emplace<Transform>(rocksEntity);
     registry_.emplace<MeshRenderer>(rocksEntity, rocks);
-
-    if (chunkAssetsAvailable) {
-        worldStreamer_ = std::make_unique<WorldStreamer>(assetManager_);
-        worldStreamer_->loadInitial(landmark("arrival_camp"), registry_, assets_, physics_, resources_, scripts_, jobs_);
-        return;
-    }
 
     const auto terrain = resources_.load<Mesh>("maps/demo_map_terrain.obj", [this] {
         return MeshLoader::load(assets_, "maps/demo_map_terrain.obj");
@@ -1004,6 +1014,7 @@ void Application::startNewGame() {
     physicsTime_ = weather_.time();
     craftMessage_ = crafting_.nextHint(inventory_, nearCraftStation());
     teleportPlayer(landmark("arrival_camp"));
+    renderer_->preloadResources(registry_);
     gameStarted_ = true;
     menuOpen_ = false;
     inventoryOpen_ = false;
@@ -1110,6 +1121,7 @@ bool Application::loadGame() {
     }
     teleportPlayer(snapshot.playerPosition);
     registry_.get<RigidBody>(player_.entity()).velocity = snapshot.playerVelocity;
+    renderer_->preloadResources(registry_);
     craftMessage_ = "СОХРАНЕНИЕ ЗАГРУЖЕНО";
     gameStarted_ = true;
     menuOpen_ = false;
@@ -1259,6 +1271,112 @@ glm::vec3 Application::playerPosition() const {
         return {};
     }
     return registry_.get<Transform>(player_.entity()).position;
+}
+
+void Application::initializePerformanceLog() {
+    const std::filesystem::path directory = config_.savePath.has_parent_path()
+        ? config_.savePath.parent_path()
+        : std::filesystem::path{"."};
+    const std::filesystem::path path = directory / "pcolonist_fps.log";
+    performanceLog_.open(path, std::ios::out | std::ios::app);
+    if (!performanceLog_) {
+        return;
+    }
+
+    performanceLog_
+        << "# session_start save_path=" << config_.savePath.generic_string()
+        << " asset_root=" << config_.assetRoot.generic_string() << '\n'
+        << "type,time,frames,fps,avg_ms,min_ms,max_ms,entities,mesh_renderers,active_chunks,pending_chunks,lod0,lod1,lod2,terrain_draw,object_draw,shadows,bloom,note\n";
+    performanceLog_ << std::fixed << std::setprecision(3);
+    nextPerformanceLogTime_ = 2.0;
+    performanceWindowStart_ = 0.0;
+    performanceFrameTimeSum_ = 0.0;
+    performanceFrameTimeMin_ = 1000000.0F;
+    performanceFrameTimeMax_ = 0.0F;
+    performanceFrameCount_ = 0;
+}
+
+void Application::shutdownPerformanceLog() {
+    if (performanceLog_) {
+        performanceLog_.flush();
+        performanceLog_.close();
+    }
+}
+
+void Application::writePerformanceEvent(std::string_view event) {
+    if (!performanceLog_) {
+        return;
+    }
+
+    const double time = glfwInitialized_ ? glfwGetTime() : 0.0;
+    performanceLog_
+        << "event,"
+        << time
+        << ",0,0.000,0.000,0.000,0.000,0,0,0,0,0,0,0,0.000,0.000,"
+        << (renderer_ != nullptr && renderer_->shadowsEnabled() ? 1 : 0) << ','
+        << (renderer_ != nullptr && renderer_->bloomEnabled() ? 1 : 0) << ','
+        << event << '\n';
+}
+
+void Application::trackPerformance(const DebugUiStats& stats) {
+    if (!performanceLog_) {
+        return;
+    }
+
+    if (performanceFrameCount_ == 0) {
+        performanceWindowStart_ = stats.totalTime;
+    }
+    ++performanceFrameCount_;
+    performanceFrameTimeSum_ += stats.deltaTime;
+    performanceFrameTimeMin_ = std::min(performanceFrameTimeMin_, stats.deltaTime);
+    performanceFrameTimeMax_ = std::max(performanceFrameTimeMax_, stats.deltaTime);
+
+    if (stats.totalTime < nextPerformanceLogTime_) {
+        return;
+    }
+
+    const double elapsed = std::max(0.001, stats.totalTime - performanceWindowStart_);
+    const double fps = static_cast<double>(performanceFrameCount_) / elapsed;
+    const double averageMs = performanceFrameTimeSum_ * 1000.0 / static_cast<double>(performanceFrameCount_);
+    const double minMs = static_cast<double>(performanceFrameTimeMin_) * 1000.0;
+    const double maxMs = static_cast<double>(performanceFrameTimeMax_) * 1000.0;
+    const RendererDebugOptions rendererOptions = renderer_ != nullptr ? renderer_->debugOptions() : RendererDebugOptions{};
+
+    std::string note = fps < 30.0 ? "low_fps" : maxMs > 50.0 ? "frame_spike" : "ok";
+    if (stats.streaming.pendingChunks > 0) {
+        note += ";pending_chunks";
+    }
+    if (menuOpen_) {
+        note += ";menu";
+    }
+
+    performanceLog_
+        << "sample,"
+        << stats.totalTime << ','
+        << performanceFrameCount_ << ','
+        << fps << ','
+        << averageMs << ','
+        << minMs << ','
+        << maxMs << ','
+        << stats.entities << ','
+        << stats.meshRenderers << ','
+        << stats.streaming.activeChunks << ','
+        << stats.streaming.pendingChunks << ','
+        << stats.streaming.lod0Chunks << ','
+        << stats.streaming.lod1Chunks << ','
+        << stats.streaming.lod2Chunks << ','
+        << rendererOptions.terrainDrawDistance << ','
+        << rendererOptions.objectDrawDistance << ','
+        << (stats.shadows ? 1 : 0) << ','
+        << (stats.bloom ? 1 : 0) << ','
+        << note << '\n';
+
+    nextPerformanceLogTime_ = stats.totalTime + 2.0;
+    performanceWindowStart_ = stats.totalTime;
+    performanceFrameTimeSum_ = 0.0;
+    performanceFrameTimeMin_ = 1000000.0F;
+    performanceFrameTimeMax_ = 0.0F;
+    performanceFrameCount_ = 0;
 }
 
 void Application::useContextAction() {

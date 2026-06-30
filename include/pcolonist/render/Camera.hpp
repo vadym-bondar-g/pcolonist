@@ -30,12 +30,16 @@ public:
 
 private:
     void updateVectors();
+    void updateViewMatrix();
 
     glm::vec3 position_;
     glm::vec3 front_ = {0.0F, 0.0F, -1.0F};
     glm::vec3 up_ = {0.0F, 1.0F, 0.0F};
     glm::vec3 right_ = {1.0F, 0.0F, 0.0F};
+    glm::vec3 horizontalFront_ = {0.0F, 0.0F, -1.0F};
+    glm::vec3 horizontalRight_ = {1.0F, 0.0F, 0.0F};
     glm::vec3 worldUp_ = {0.0F, 1.0F, 0.0F};
+    glm::mat4 viewMatrix_{1.0F};
     float yaw_ = -90.0F;
     float pitch_ = 0.0F;
     float movementSpeed_ = 4.0F;

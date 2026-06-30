@@ -78,7 +78,12 @@ Shader::~Shader() {
 }
 
 void Shader::use() const {
+    static unsigned int currentProgram = 0;
+    if (currentProgram == id_) {
+        return;
+    }
     glUseProgram(id_);
+    currentProgram = id_;
 }
 
 void Shader::setFloat(std::string_view name, float value) const {

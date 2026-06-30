@@ -15,7 +15,7 @@ Camera::Camera(glm::vec3 position)
 }
 
 glm::mat4 Camera::viewMatrix() const {
-    return glm::lookAt(position_, position_ + front_, up_);
+    return viewMatrix_;
 }
 
 const glm::vec3& Camera::position() const {
@@ -27,15 +27,16 @@ const glm::vec3& Camera::front() const {
 }
 
 glm::vec3 Camera::horizontalFront() const {
-    return glm::normalize(glm::vec3{front_.x, 0.0F, front_.z});
+    return horizontalFront_;
 }
 
 glm::vec3 Camera::horizontalRight() const {
-    return glm::normalize(glm::vec3{right_.x, 0.0F, right_.z});
+    return horizontalRight_;
 }
 
 void Camera::setPosition(glm::vec3 position) {
     position_ = position;
+    updateViewMatrix();
 }
 
 void Camera::move(CameraMovement direction, float deltaTime) {
@@ -61,6 +62,7 @@ void Camera::move(CameraMovement direction, float deltaTime) {
         position_ -= worldUp_ * velocity;
         break;
     }
+    updateViewMatrix();
 }
 
 void Camera::look(float xOffset, float yOffset) {
@@ -79,6 +81,13 @@ void Camera::updateVectors() {
     front_ = glm::normalize(front);
     right_ = glm::normalize(glm::cross(front_, worldUp_));
     up_ = glm::normalize(glm::cross(right_, front_));
+    horizontalFront_ = glm::normalize(glm::vec3{front_.x, 0.0F, front_.z});
+    horizontalRight_ = glm::normalize(glm::vec3{right_.x, 0.0F, right_.z});
+    updateViewMatrix();
+}
+
+void Camera::updateViewMatrix() {
+    viewMatrix_ = glm::lookAt(position_, position_ + front_, up_);
 }
 
 } // namespace pcolonist

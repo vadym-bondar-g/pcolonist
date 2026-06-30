@@ -17,6 +17,7 @@
 namespace pcolonist {
 
 class Camera;
+class AssetSystem;
 class Mesh;
 class Registry;
 class WeatherSystem;
@@ -37,6 +38,7 @@ struct RendererDebugOptions {
 class Renderer {
 public:
     Renderer();
+    explicit Renderer(const AssetSystem& assets);
     explicit Renderer(std::filesystem::path assetRoot);
     ~Renderer();
 
@@ -44,6 +46,7 @@ public:
     Renderer& operator=(const Renderer&) = delete;
 
     void resize(int width, int height);
+    void preloadResources(Registry& registry);
     void render(const Camera& camera, Registry& registry, const WeatherSystem& weather);
     void releaseUnusedMeshes(Registry& registry);
     void setShadowsEnabled(bool enabled);
@@ -59,6 +62,8 @@ public:
     [[nodiscard]] const RendererDebugOptions& debugOptions() const;
 
 private:
+    Renderer(std::filesystem::path assetRoot, const AssetSystem* assets);
+
     struct GlHandle {
         enum class Kind {
             Buffer,
@@ -200,6 +205,7 @@ private:
     ShaderLibrary shaders_;
     Skybox skybox_;
     std::filesystem::path assetRoot_;
+    const AssetSystem* assets_ = nullptr;
     std::unordered_map<const Mesh*, GpuMesh> meshes_;
     std::unordered_map<const Mesh*, float> meshRadii_;
     std::unordered_map<Entity, CachedModelMatrix> modelMatrices_;

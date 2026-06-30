@@ -28,6 +28,8 @@
 #include "pcolonist/world/WeatherSystem.hpp"
 #include "pcolonist/world/WorldStreamer.hpp"
 
+#include <cstdint>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -99,6 +101,10 @@ private:
     glm::vec3 playerPosition() const;
     ObjectiveHudState objectiveHudState() const;
     DebugUiStats debugUiStats(float deltaTime, double totalTime);
+    void initializePerformanceLog();
+    void shutdownPerformanceLog();
+    void writePerformanceEvent(std::string_view event);
+    void trackPerformance(const DebugUiStats& stats);
     void updateCursorMode();
 
     static void keyCallback(GLFWwindow* window, int key, int scanCode, int action, int modifiers);
@@ -134,6 +140,7 @@ private:
     UiSystem ui_;
     FrameArena frameArena_;
     std::string sceneSnapshot_;
+    std::ofstream performanceLog_;
     std::unordered_map<std::string, glm::vec3> landmarks_;
     std::vector<glm::vec3> debugTeleports_;
     std::unique_ptr<Renderer> renderer_;
@@ -155,6 +162,12 @@ private:
     int windowedHeight_ = 720;
     double lastMouseX_ = 0.0;
     double lastMouseY_ = 0.0;
+    double nextPerformanceLogTime_ = 0.0;
+    double performanceWindowStart_ = 0.0;
+    double performanceFrameTimeSum_ = 0.0;
+    float performanceFrameTimeMin_ = 1000000.0F;
+    float performanceFrameTimeMax_ = 0.0F;
+    std::uint64_t performanceFrameCount_ = 0;
     FixedTimestep physicsTimestep_;
     float physicsTime_ = 0.0F;
     bool initialized_ = false;

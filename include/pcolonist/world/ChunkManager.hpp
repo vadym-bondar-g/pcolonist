@@ -86,7 +86,7 @@ private:
     [[nodiscard]] bool shouldTrackRequest(ChunkId id, ChunkKey center) const;
     void pruneStaleRequests(ChunkKey center);
     void requestMissingChunks(ChunkKey center, AssetManager& assets, JobSystem& jobs);
-    void integrateReadyChunks(
+    [[nodiscard]] bool integrateReadyChunks(
         ChunkKey center,
         Registry& registry,
         const AssetSystem& assetSystem,

@@ -1,5 +1,6 @@
 #include "pcolonist/render/Renderer.hpp"
 
+#include "pcolonist/assets/AssetSystem.hpp"
 #include "pcolonist/core/ApplicationConfig.hpp"
 #include "pcolonist/ecs/Components.hpp"
 #include "pcolonist/ecs/Registry.hpp"
@@ -18,7 +19,9 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstring>
 #include <filesystem>
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -133,6 +136,10 @@ bool sphereInFrustum(const Frustum& frustum, glm::vec3 center, float radius) {
     return std::all_of(frustum.begin(), frustum.end(), [center, radius](const FrustumPlane& plane) {
         return glm::dot(plane.normal, center) + plane.distance >= -radius;
     });
+}
+
+bool sphereBehindCamera(glm::vec3 cameraPosition, glm::vec3 cameraFront, glm::vec3 center, float radius) {
+    return glm::dot(center - cameraPosition, cameraFront) < -radius;
 }
 
 float meshRadius(const pcolonist::Mesh& mesh) {
@@ -282,9 +289,16 @@ std::size_t Renderer::BatchKeyHash::operator()(const BatchKey& key) const {
 Renderer::Renderer()
     : Renderer(PCOLONIST_ASSET_DIR) {}
 
+Renderer::Renderer(const AssetSystem& assets)
+    : Renderer(assets.resolve("."), &assets) {}
+
 Renderer::Renderer(std::filesystem::path assetRoot)
+    : Renderer(std::move(assetRoot), nullptr) {}
+
+Renderer::Renderer(std::filesystem::path assetRoot, const AssetSystem* assets)
     : shaders_(assetRoot / "shaders"),
-      assetRoot_(std::move(assetRoot)) {
+      assetRoot_(std::move(assetRoot)),
+      assets_(assets) {
     shaders_.preload();
     unsigned int screenVertexArray = 0;
     glGenVertexArrays(1, &screenVertexArray);
@@ -320,6 +334,20 @@ void Renderer::resize(int width, int height) {
     glViewport(0, 0, width, height);
 }
 
+void Renderer::preloadResources(Registry& registry) {
+    registry.each<MeshRenderer>([this](Entity, const MeshRenderer& renderer) {
+        if (!renderer.mesh) {
+            return;
+        }
+        upload(*renderer.mesh);
+        for (const MeshDraw& draw : renderer.mesh->draws) {
+            if (!draw.diffuseTexture.empty()) {
+                static_cast<void>(loadTexture(draw.diffuseTexture));
+            }
+        }
+    });
+}
+
 void Renderer::collectRenderItems(
     Registry& registry,
     const Camera& camera,
@@ -328,9 +356,10 @@ void Renderer::collectRenderItems(
     float objectDistance) {
     renderScratch_.items.clear();
     const glm::vec3& cameraPosition = camera.position();
+    const glm::vec3& cameraFront = camera.front();
     const Frustum frustum = cameraFrustum(camera, aspectRatio, qualityConfig_.cameraFarPlane);
     registry.each<Transform, MeshRenderer>(
-        [this, &registry, cameraPosition, &frustum, terrainDistance, objectDistance](
+        [this, &registry, cameraPosition, cameraFront, &frustum, terrainDistance, objectDistance](
             Entity entity,
             const Transform& transform,
             const MeshRenderer& renderer) {
@@ -395,6 +424,9 @@ void Renderer::collectRenderItems(
                 terrainChunk = true;
             }
             const bool keepOffscreenWater = water && waterKind == static_cast<int>(WaterKind::Ocean);
+            if (sphereBehindCamera(cameraPosition, cameraFront, cullCenter, cullRadius) && !keepOffscreenWater) {
+                return;
+            }
             if (!sphereInFrustum(frustum, cullCenter, cullRadius) && !keepOffscreenWater) {
                 return;
             }
@@ -547,12 +579,14 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
     int fireLightCount = 0;
     const auto fireLights = collectFireLights(registry, fireLightCount);
     shader.setInt("fireLightCount", fireLightCount);
-    for (int index = 0; index < maxFireLights; ++index) {
-        const std::size_t lightIndex = static_cast<std::size_t>(index);
-        shader.setVec3(fireLightPositionUniforms[lightIndex], fireLights[lightIndex].position);
-        shader.setVec3(fireLightColorUniforms[lightIndex], fireLights[lightIndex].color);
-        shader.setFloat(fireLightIntensityUniforms[lightIndex], fireLights[lightIndex].intensity);
-        shader.setFloat(fireLightFalloffUniforms[lightIndex], fireLights[lightIndex].falloff);
+    if (fireLightCount > 0) {
+        for (int index = 0; index < fireLightCount; ++index) {
+            const std::size_t lightIndex = static_cast<std::size_t>(index);
+            shader.setVec3(fireLightPositionUniforms[lightIndex], fireLights[lightIndex].position);
+            shader.setVec3(fireLightColorUniforms[lightIndex], fireLights[lightIndex].color);
+            shader.setFloat(fireLightIntensityUniforms[lightIndex], fireLights[lightIndex].intensity);
+            shader.setFloat(fireLightFalloffUniforms[lightIndex], fireLights[lightIndex].falloff);
+        }
     }
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, shadowDepths_[0]);
@@ -578,7 +612,41 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
             renderScratch_.drawOrder.push_back(batchIndex);
         }
     }
-    std::stable_sort(
+    std::sort(
+        renderScratch_.drawOrder.begin(),
+        renderScratch_.drawOrder.end(),
+        [this](std::size_t leftIndex, std::size_t rightIndex) {
+            const RenderBatch& left = renderScratch_.batches[leftIndex];
+            const RenderBatch& right = renderScratch_.batches[rightIndex];
+            const auto bucket = [](const RenderBatch& batch) {
+                if (batch.terrain) {
+                    return 0;
+                }
+                if (batch.grass) {
+                    return 1;
+                }
+                return 2;
+            };
+            const int leftBucket = bucket(left);
+            const int rightBucket = bucket(right);
+            if (leftBucket != rightBucket) {
+                return leftBucket < rightBucket;
+            }
+            if (left.mesh != right.mesh) {
+                return std::less<const Mesh*>{}(left.mesh, right.mesh);
+            }
+            if (left.waterKind != right.waterKind) {
+                return left.waterKind < right.waterKind;
+            }
+            if (left.waterFlowDirection.x != right.waterFlowDirection.x) {
+                return left.waterFlowDirection.x < right.waterFlowDirection.x;
+            }
+            if (left.waterFlowDirection.y != right.waterFlowDirection.y) {
+                return left.waterFlowDirection.y < right.waterFlowDirection.y;
+            }
+            return left.waterFoamStrength < right.waterFoamStrength;
+        });
+    std::sort(
         renderScratch_.transparentOrder.begin(),
         renderScratch_.transparentOrder.end(),
         [this](std::size_t leftIndex, std::size_t rightIndex) {
@@ -608,18 +676,84 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     }
     DrawState drawState;
+    struct BatchUniformState {
+        float water = -1.0F;
+        int waterKind = -1;
+        float waterFlowDirectionX = -1.0F;
+        float waterFlowDirectionY = -1.0F;
+        float waterFoamStrength = -1.0F;
+        float terrain = -1.0F;
+        float lava = -1.0F;
+        float fire = -1.0F;
+        float smoke = -1.0F;
+        float grass = -1.0F;
+        int hasDiffuseTexture = -1;
+        float roughness = -1.0F;
+        float specularStrength = -1.0F;
+        float emissiveColorR = -1.0F;
+        float emissiveColorG = -1.0F;
+        float emissiveColorB = -1.0F;
+    };
+    BatchUniformState batchState;
+    unsigned int lastVertexArray = 0;
+    unsigned int lastTerrainTexture0 = 0;
+    unsigned int lastTerrainTexture1 = 0;
+    unsigned int lastTerrainTexture2 = 0;
+    unsigned int lastDiffuseTexture = 0;
+    const auto sameDrawState = [](const MeshDraw& left, const MeshDraw& right) {
+        return left.firstIndex + left.indexCount == right.firstIndex
+            && left.diffuseTexture == right.diffuseTexture
+            && left.roughness == right.roughness
+            && left.specularStrength == right.specularStrength
+            && left.emissive == right.emissive;
+    };
     for (const std::size_t batchIndex : renderScratch_.drawOrder) {
         const RenderBatch& batch = renderScratch_.batches[batchIndex];
         GpuMesh& gpuMesh = upload(*batch.mesh);
-        shader.setFloat("water", batch.water ? 1.0F : 0.0F);
-        shader.setInt("waterKind", batch.waterKind);
-        shader.setVec2("waterFlowDirection", batch.waterFlowDirection);
-        shader.setFloat("waterFoamStrength", batch.waterFoamStrength);
-        shader.setFloat("terrain", batch.terrain ? 1.0F : 0.0F);
-        shader.setFloat("lava", batch.lava ? 1.0F : 0.0F);
-        shader.setFloat("fire", batch.fire ? 1.0F : 0.0F);
-        shader.setFloat("smoke", batch.smoke ? 1.0F : 0.0F);
-        shader.setFloat("grass", batch.grass ? 1.0F : 0.0F);
+        const float water = batch.water ? 1.0F : 0.0F;
+        if (batchState.water != water) {
+            batchState.water = water;
+            shader.setFloat("water", water);
+        }
+        if (batchState.waterKind != batch.waterKind) {
+            batchState.waterKind = batch.waterKind;
+            shader.setInt("waterKind", batch.waterKind);
+        }
+        if (batchState.waterFlowDirectionX != batch.waterFlowDirection.x
+            || batchState.waterFlowDirectionY != batch.waterFlowDirection.y) {
+            batchState.waterFlowDirectionX = batch.waterFlowDirection.x;
+            batchState.waterFlowDirectionY = batch.waterFlowDirection.y;
+            shader.setVec2("waterFlowDirection", batch.waterFlowDirection);
+        }
+        if (batchState.waterFoamStrength != batch.waterFoamStrength) {
+            batchState.waterFoamStrength = batch.waterFoamStrength;
+            shader.setFloat("waterFoamStrength", batch.waterFoamStrength);
+        }
+        const float terrain = batch.terrain ? 1.0F : 0.0F;
+        if (batchState.terrain != terrain) {
+            batchState.terrain = terrain;
+            shader.setFloat("terrain", terrain);
+        }
+        const float lava = batch.lava ? 1.0F : 0.0F;
+        if (batchState.lava != lava) {
+            batchState.lava = lava;
+            shader.setFloat("lava", lava);
+        }
+        const float fire = batch.fire ? 1.0F : 0.0F;
+        if (batchState.fire != fire) {
+            batchState.fire = fire;
+            shader.setFloat("fire", fire);
+        }
+        const float smoke = batch.smoke ? 1.0F : 0.0F;
+        if (batchState.smoke != smoke) {
+            batchState.smoke = smoke;
+            shader.setFloat("smoke", smoke);
+        }
+        const float grass = batch.grass ? 1.0F : 0.0F;
+        if (batchState.grass != grass) {
+            batchState.grass = grass;
+            shader.setFloat("grass", grass);
+        }
         if (batch.fire) {
             applyDrawState(drawState, true, GL_SRC_ALPHA, GL_ONE, false);
         } else if (batch.water || batch.lava) {
@@ -630,41 +764,97 @@ void Renderer::render(const Camera& camera, Registry& registry, const WeatherSys
             applyDrawState(drawState, false, GL_ONE, GL_ZERO, true);
         }
         if (batch.terrain) {
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, terrainEarthTexture_);
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, terrainSandTexture_);
-            glActiveTexture(GL_TEXTURE2);
-            glBindTexture(GL_TEXTURE_2D, terrainBasaltTexture_);
+            if (lastTerrainTexture0 != terrainEarthTexture_) {
+                lastTerrainTexture0 = terrainEarthTexture_;
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, terrainEarthTexture_);
+            }
+            if (lastTerrainTexture1 != terrainSandTexture_) {
+                lastTerrainTexture1 = terrainSandTexture_;
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, terrainSandTexture_);
+            }
+            if (lastTerrainTexture2 != terrainBasaltTexture_) {
+                lastTerrainTexture2 = terrainBasaltTexture_;
+                glActiveTexture(GL_TEXTURE2);
+                glBindTexture(GL_TEXTURE_2D, terrainBasaltTexture_);
+            }
         }
-        glBindVertexArray(gpuMesh.vertexArray);
+        if (lastVertexArray != gpuMesh.vertexArray.get()) {
+            lastVertexArray = gpuMesh.vertexArray.get();
+            glBindVertexArray(gpuMesh.vertexArray);
+        }
         uploadInstances(gpuMesh, batch.models);
         if (batch.mesh->draws.empty()) {
-            shader.setInt("hasDiffuseTexture", 0);
-            shader.setFloat("roughness", 0.72F);
-            shader.setFloat("specularStrength", 0.2F);
-            shader.setVec3("emissiveColor", {0.0F, 0.0F, 0.0F});
+            if (batchState.hasDiffuseTexture != 0) {
+                batchState.hasDiffuseTexture = 0;
+                shader.setInt("hasDiffuseTexture", 0);
+            }
+            if (batchState.roughness != 0.72F) {
+                batchState.roughness = 0.72F;
+                shader.setFloat("roughness", 0.72F);
+            }
+            if (batchState.specularStrength != 0.2F) {
+                batchState.specularStrength = 0.2F;
+                shader.setFloat("specularStrength", 0.2F);
+            }
+            if (batchState.emissiveColorR != 0.0F || batchState.emissiveColorG != 0.0F || batchState.emissiveColorB != 0.0F) {
+                batchState.emissiveColorR = 0.0F;
+                batchState.emissiveColorG = 0.0F;
+                batchState.emissiveColorB = 0.0F;
+                shader.setVec3("emissiveColor", {0.0F, 0.0F, 0.0F});
+            }
             glDrawElementsInstanced(
                 GL_TRIANGLES, static_cast<int>(gpuMesh.indexCount), GL_UNSIGNED_INT, nullptr,
                 static_cast<int>(batch.models.size()));
             continue;
         }
-        for (const MeshDraw& draw : batch.mesh->draws) {
+        for (std::size_t drawIndex = 0; drawIndex < batch.mesh->draws.size();) {
+            const MeshDraw& draw = batch.mesh->draws[drawIndex];
+            std::size_t mergedIndexCount = draw.indexCount;
+            std::size_t nextDrawIndex = drawIndex + 1;
+            while (nextDrawIndex < batch.mesh->draws.size()
+                && sameDrawState(batch.mesh->draws[nextDrawIndex - 1], batch.mesh->draws[nextDrawIndex])) {
+                mergedIndexCount += batch.mesh->draws[nextDrawIndex].indexCount;
+                ++nextDrawIndex;
+            }
             const bool textured = !draw.diffuseTexture.empty();
-            shader.setInt("hasDiffuseTexture", textured ? 1 : 0);
-            shader.setFloat("roughness", draw.roughness);
-            shader.setFloat("specularStrength", draw.specularStrength);
-            shader.setVec3("emissiveColor", draw.emissive);
+            const int hasTexture = textured ? 1 : 0;
+            if (batchState.hasDiffuseTexture != hasTexture) {
+                batchState.hasDiffuseTexture = hasTexture;
+                shader.setInt("hasDiffuseTexture", hasTexture);
+            }
+            if (batchState.roughness != draw.roughness) {
+                batchState.roughness = draw.roughness;
+                shader.setFloat("roughness", draw.roughness);
+            }
+            if (batchState.specularStrength != draw.specularStrength) {
+                batchState.specularStrength = draw.specularStrength;
+                shader.setFloat("specularStrength", draw.specularStrength);
+            }
+            if (batchState.emissiveColorR != draw.emissive.x
+                || batchState.emissiveColorG != draw.emissive.y
+                || batchState.emissiveColorB != draw.emissive.z) {
+                batchState.emissiveColorR = draw.emissive.x;
+                batchState.emissiveColorG = draw.emissive.y;
+                batchState.emissiveColorB = draw.emissive.z;
+                shader.setVec3("emissiveColor", draw.emissive);
+            }
             if (textured) {
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, loadTexture(draw.diffuseTexture));
+                const unsigned int texture = loadTexture(draw.diffuseTexture);
+                if (lastDiffuseTexture != texture) {
+                    lastDiffuseTexture = texture;
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, texture);
+                }
             }
             glDrawElementsInstanced(
                 GL_TRIANGLES,
-                static_cast<int>(draw.indexCount),
+                static_cast<int>(mergedIndexCount),
                 GL_UNSIGNED_INT,
                 reinterpret_cast<void*>(draw.firstIndex * sizeof(std::uint32_t)),
                 static_cast<int>(batch.models.size()));
+            drawIndex = nextDrawIndex;
         }
     }
     applyDrawState(drawState, false, GL_ONE, GL_ZERO, true);
@@ -853,13 +1043,33 @@ void Renderer::renderShadowMap(const Camera& camera, const WeatherSystem& weathe
             objectShadowDistance,
             true,
             minimumShadowRadius);
+        renderScratch_.drawOrder.clear();
+        renderScratch_.drawOrder.reserve(batchCount);
+        for (std::size_t batchIndex = 0; batchIndex < batchCount; ++batchIndex) {
+            renderScratch_.drawOrder.push_back(batchIndex);
+        }
+        std::sort(
+            renderScratch_.drawOrder.begin(),
+            renderScratch_.drawOrder.end(),
+            [this](std::size_t leftIndex, std::size_t rightIndex) {
+                const RenderBatch& left = renderScratch_.batches[leftIndex];
+                const RenderBatch& right = renderScratch_.batches[rightIndex];
+                if (left.mesh != right.mesh) {
+                    return std::less<const Mesh*>{}(left.mesh, right.mesh);
+                }
+                return left.terrain > right.terrain;
+            });
         glBindFramebuffer(GL_FRAMEBUFFER, shadowFramebuffers_[cascade]);
         glClear(GL_DEPTH_BUFFER_BIT);
         shader.setMat4("lightSpaceMatrix", lightSpaceMatrices_[cascade]);
-        for (std::size_t batchIndex = 0; batchIndex < batchCount; ++batchIndex) {
+        unsigned int lastVertexArray = 0;
+        for (const std::size_t batchIndex : renderScratch_.drawOrder) {
             const RenderBatch& batch = renderScratch_.batches[batchIndex];
             GpuMesh& gpuMesh = upload(*batch.mesh);
-            glBindVertexArray(gpuMesh.vertexArray);
+            if (lastVertexArray != gpuMesh.vertexArray.get()) {
+                lastVertexArray = gpuMesh.vertexArray.get();
+                glBindVertexArray(gpuMesh.vertexArray);
+            }
             uploadInstances(gpuMesh, batch.models);
             glDrawElementsInstanced(
                 GL_TRIANGLES, static_cast<int>(gpuMesh.indexCount), GL_UNSIGNED_INT, nullptr,
@@ -876,6 +1086,7 @@ void Renderer::uploadInstances(GpuMesh& gpuMesh, const std::vector<glm::mat4>& m
     if (models.empty()) {
         return;
     }
+    const std::size_t byteCount = models.size() * sizeof(glm::mat4);
     if (models.size() > gpuMesh.instanceCapacity) {
         const std::size_t nextCapacity = std::max(models.size(), std::max<std::size_t>(1, gpuMesh.instanceCapacity * 2));
         glBufferData(
@@ -885,11 +1096,15 @@ void Renderer::uploadInstances(GpuMesh& gpuMesh, const std::vector<glm::mat4>& m
             GL_STREAM_DRAW);
         gpuMesh.instanceCapacity = nextCapacity;
     }
-    glBufferSubData(
+    void* mapped = glMapBufferRange(
         GL_ARRAY_BUFFER,
         0,
-        static_cast<GLsizeiptr>(models.size() * sizeof(glm::mat4)),
-        models.data());
+        static_cast<GLsizeiptr>(byteCount),
+        GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+    if (mapped) {
+        std::memcpy(mapped, models.data(), byteCount);
+        glUnmapBuffer(GL_ARRAY_BUFFER);
+    }
 }
 
 void Renderer::loadTerrainTextures() {
@@ -955,7 +1170,9 @@ unsigned int Renderer::loadTexture(const std::filesystem::path& path) {
     const std::filesystem::path fullPath = assetRoot_ / path;
     Image image;
     try {
-        image = PngLoader::load(fullPath);
+        image = assets_ != nullptr
+            ? PngLoader::load(path.generic_string(), assets_->readBinary(path))
+            : PngLoader::load(fullPath);
     } catch (const std::exception& exception) {
         throw std::runtime_error(
             "Failed to load texture '" + path.generic_string()
