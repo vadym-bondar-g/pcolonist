@@ -1,28 +1,28 @@
 {
   "biomes": {
     "beach": {
-      "ratio": 0.6138,
-      "samples": 666
+      "ratio": 0.4011,
+      "samples": 430
     },
     "coastal_jungle": {
-      "ratio": 0.0,
-      "samples": 0
+      "ratio": 0.0112,
+      "samples": 12
     },
     "highland": {
-      "ratio": 0.0175,
+      "ratio": 0.0177,
       "samples": 19
     },
     "temperate_forest": {
-      "ratio": 0.224,
-      "samples": 243
+      "ratio": 0.417,
+      "samples": 447
     },
     "volcanic": {
-      "ratio": 0.0608,
+      "ratio": 0.0616,
       "samples": 66
     },
     "wetland": {
-      "ratio": 0.0839,
-      "samples": 91
+      "ratio": 0.0914,
+      "samples": 98
     }
   },
   "decoration_rules": {
@@ -32,7 +32,7 @@
         "highland",
         "volcanic"
       ],
-      "count": 780,
+      "count": 416,
       "height": [
         -10.8,
         4.32
@@ -50,7 +50,7 @@
         "temperate_forest",
         "wetland"
       ],
-      "count": 1560,
+      "count": 1352,
       "height": [
         0.135,
         20.25
@@ -66,7 +66,7 @@
       "allowed_biomes": [
         "wetland"
       ],
-      "count": 280,
+      "count": 168,
       "height": [
         -0.405,
         5.670000000000001
@@ -84,7 +84,7 @@
         "coastal_jungle",
         "wetland"
       ],
-      "count": 475,
+      "count": 285,
       "height": [
         -0.6075,
         3.24
@@ -103,7 +103,7 @@
         "temperate_forest",
         "highland"
       ],
-      "count": 2170,
+      "count": 1364,
       "height": [
         -0.27,
         16.200000000000003
@@ -123,7 +123,7 @@
     "terrain_vertices_per_side": 481
   },
   "height": {
-    "average": 3.024,
+    "average": 3.032,
     "max": 64.595,
     "min": -0.25
   },
@@ -144,13 +144,13 @@
   },
   "seed": 1847,
   "slope": {
-    "average": 0.153,
+    "average": 0.154,
     "max": 3.285,
-    "steep_sample_ratio": 0.0249
+    "steep_sample_ratio": 0.0252
   },
   "walkability": {
     "average": 0.953,
-    "good_sample_ratio": 0.9539
+    "good_sample_ratio": 0.9534
   },
   "water": {
     "harbor_center": {
@@ -161,15 +161,15 @@
       "x": 93.0,
       "z": -72.0
     },
-    "river_points": 49,
+    "river_points": 50,
     "river_source": {
       "x": 117.0,
       "z": -60.0
     },
     "tributary_points": [
-      29,
-      29,
-      29
+      30,
+      30,
+      30
     ]
   }
 }

@@ -6,6 +6,7 @@
 
 #include <glm/vec3.hpp>
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -141,6 +142,10 @@ private:
     float animationTime_ = 0.0F;
     std::uint32_t frames_ = 0;
     unsigned int currentFps_ = 0;
+    std::array<float, 72> frameTimes_{};
+    std::size_t frameTimeCursor_ = 0;
+    std::size_t frameTimeCount_ = 0;
+    float currentFrameMs_ = 0.0F;
     float menuFade_ = 0.0F;
     UiLanguage language_ = UiLanguage::English;
     bool frameCounterVisible_ = false;

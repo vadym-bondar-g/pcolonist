@@ -202,8 +202,10 @@ std::vector<Entity> ScriptSystem::execute(
             registry.emplace<Transform>(entity, transform);
             registry.emplace<MeshRenderer>(entity, model);
             registry.emplace<BoxCollider>(entity, collider);
-            if (id == "tree" || id == "oak") {
-                registry.emplace<ResourceNode>(entity);
+            if (id == "tree") {
+                registry.emplace<ResourceNode>(entity, ResourceNode{3, 3, 5, 0, 1, 0, ResourceKind::Tree});
+            } else if (id == "oak") {
+                registry.emplace<ResourceNode>(entity, ResourceNode{4, 4, 7, 0, 1, 0, ResourceKind::Tree});
             }
             spawned.push_back(entity);
             continue;

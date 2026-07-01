@@ -6,451 +6,126 @@
       "size": 0
     },
     "base_terrain_height": {
-      "hits": 1264566,
-      "misses": 632283,
-      "size": 632283
+      "hits": 259419,
+      "misses": 129711,
+      "size": 129711
     },
     "biome_metrics": {
-      "hits": 0,
-      "misses": 126449,
-      "size": 126449
+      "hits": 6565,
+      "misses": 25942,
+      "size": 25942
     },
     "island_radius": {
-      "hits": 236845,
-      "misses": 632283,
-      "size": 632283
+      "hits": 46726,
+      "misses": 129711,
+      "size": 129711
     },
     "raw_terrain_height": {
       "hits": 0,
-      "misses": 632283,
-      "size": 632283
+      "misses": 129710,
+      "size": 129710
     },
     "river_distance": {
-      "hits": 126377,
-      "misses": 126449,
-      "size": 126449
+      "hits": 25942,
+      "misses": 25942,
+      "size": 25942
     },
     "river_network_sample": {
-      "hits": 126449,
-      "misses": 632283,
-      "size": 632283
+      "hits": 25942,
+      "misses": 129710,
+      "size": 129710
     },
     "terrain_height": {
-      "hits": 1592,
-      "misses": 632283,
-      "size": 632283
+      "hits": 25,
+      "misses": 129710,
+      "size": 129710
     },
     "water_distance": {
-      "hits": 0,
-      "misses": 126377,
-      "size": 126377
+      "hits": 14198,
+      "misses": 25942,
+      "size": 25942
     }
   },
   "debug": {
     "available": true,
-    "good_sample_ratio": 0.9539,
-    "steep_sample_ratio": 0.0249
+    "good_sample_ratio": 0.9534,
+    "steep_sample_ratio": 0.0252
   },
   "files": {
-    "assets/scripts/chunks/scene_-1_-1.scene": {
-      "bytes": 2993,
+    "assets/maps/biomes.ppm": {
+      "bytes": 54533,
       "exists": true
     },
-    "assets/scripts/chunks/scene_-1_-2.scene": {
-      "bytes": 5462,
+    "assets/maps/heightmap.pgm": {
+      "bytes": 15804,
       "exists": true
     },
-    "assets/scripts/chunks/scene_-1_-3.scene": {
-      "bytes": 949,
+    "assets/maps/material_grass.pgm": {
+      "bytes": 14979,
       "exists": true
     },
-    "assets/scripts/chunks/scene_-1_-4.scene": {
-      "bytes": 1883,
+    "assets/maps/material_rock.pgm": {
+      "bytes": 13342,
       "exists": true
     },
-    "assets/scripts/chunks/scene_-1_0.scene": {
-      "bytes": 1988,
+    "assets/maps/material_sand.pgm": {
+      "bytes": 14355,
       "exists": true
     },
-    "assets/scripts/chunks/scene_-1_1.scene": {
-      "bytes": 1602,
+    "assets/maps/material_volcanic.pgm": {
+      "bytes": 13350,
       "exists": true
     },
-    "assets/scripts/chunks/scene_-1_2.scene": {
-      "bytes": 1265,
+    "assets/maps/material_wetness.pgm": {
+      "bytes": 13418,
       "exists": true
     },
-    "assets/scripts/chunks/scene_-1_3.scene": {
-      "bytes": 1520,
+    "assets/maps/moisture.pgm": {
+      "bytes": 13470,
       "exists": true
     },
-    "assets/scripts/chunks/scene_-2_-2.scene": {
-      "bytes": 1022,
+    "assets/maps/slope.pgm": {
+      "bytes": 13660,
       "exists": true
     },
-    "assets/scripts/chunks/scene_-2_-3.scene": {
-      "bytes": 1894,
+    "assets/maps/terrain_report.json": {
+      "bytes": 3286,
       "exists": true
     },
-    "assets/scripts/chunks/scene_-2_-4.scene": {
-      "bytes": 1535,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-2_1.scene": {
-      "bytes": 973,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-2_2.scene": {
-      "bytes": 1233,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-2_3.scene": {
-      "bytes": 1238,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-3_-2.scene": {
-      "bytes": 1168,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-3_-3.scene": {
-      "bytes": 2545,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-3_-4.scene": {
-      "bytes": 1318,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-3_1.scene": {
-      "bytes": 1157,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-3_2.scene": {
-      "bytes": 1879,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-3_3.scene": {
-      "bytes": 951,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-4_-1.scene": {
-      "bytes": 1809,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-4_-2.scene": {
-      "bytes": 1900,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-4_-3.scene": {
-      "bytes": 1099,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-4_0.scene": {
-      "bytes": 1443,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-4_1.scene": {
-      "bytes": 1801,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-4_2.scene": {
-      "bytes": 1165,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-5_-1.scene": {
-      "bytes": 1308,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-5_0.scene": {
-      "bytes": 1162,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_-5_1.scene": {
-      "bytes": 1023,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_0_-1.scene": {
-      "bytes": 17617,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_0_-2.scene": {
-      "bytes": 6778,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_0_-3.scene": {
-      "bytes": 878,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_0_-4.scene": {
-      "bytes": 1721,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_0_0.scene": {
-      "bytes": 2299,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_0_2.scene": {
-      "bytes": 1431,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_0_3.scene": {
-      "bytes": 2204,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_1_-1.scene": {
-      "bytes": 8933,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_1_-2.scene": {
-      "bytes": 1223,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_1_-3.scene": {
-      "bytes": 1589,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_1_-4.scene": {
-      "bytes": 1740,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_1_0.scene": {
-      "bytes": 3545,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_1_1.scene": {
-      "bytes": 1011,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_1_2.scene": {
-      "bytes": 1437,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_1_3.scene": {
-      "bytes": 1657,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_2_-1.scene": {
-      "bytes": 1203,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_2_-2.scene": {
-      "bytes": 1446,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_2_-3.scene": {
-      "bytes": 2027,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_2_0.scene": {
-      "bytes": 8591,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_2_1.scene": {
-      "bytes": 12018,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_2_2.scene": {
-      "bytes": 2967,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_2_3.scene": {
-      "bytes": 949,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_3_-1.scene": {
-      "bytes": 1872,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_3_-2.scene": {
-      "bytes": 2093,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_3_-3.scene": {
-      "bytes": 879,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_3_0.scene": {
-      "bytes": 1920,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_3_1.scene": {
-      "bytes": 3030,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_3_2.scene": {
-      "bytes": 2013,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_4_-1.scene": {
-      "bytes": 1447,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_4_0.scene": {
-      "bytes": 1226,
-      "exists": true
-    },
-    "assets/scripts/chunks/scene_4_1.scene": {
-      "bytes": 878,
-      "exists": true
-    },
-    "assets/scripts/gameplay_goals.json": {
-      "bytes": 10781,
-      "exists": true
-    },
-    "assets/scripts/models.scene": {
-      "bytes": 98962,
+    "assets/maps/walkability.pgm": {
+      "bytes": 60326,
       "exists": true
     }
   },
   "generated_by": "tools/generate_island.py",
   "grid": 481,
-  "group": "scene",
-  "issues": [
-    {
-      "code": "river_misses_harbor",
-      "details": {
-        "mouth_distance_to_harbor": 54.8,
-        "river_length": 192.0,
-        "river_points": 49,
-        "tributary_lengths": [
-          95.2,
-          95.2,
-          95.2
-        ],
-        "tributary_points": [
-          29,
-          29,
-          29
-        ]
-      },
-      "message": "Mercy River mouth is far from the harbor target.",
-      "severity": "warning"
-    },
-    {
-      "code": "low_landmark_walkability",
-      "details": {
-        "category": "grotto",
-        "walkability": 0.0
-      },
-      "message": "Landmark hidden_grotto_1 may be hard to reach.",
-      "severity": "warning"
-    },
-    {
-      "code": "high_placement_skip_ratio",
-      "details": {
-        "requested": 520,
-        "rule": "canopy_fill",
-        "skipped": 284,
-        "skipped_ratio": 0.546,
-        "spawned": 236
-      },
-      "message": "Decoration rule canopy_fill skipped many requested placements.",
-      "severity": "warning"
-    },
-    {
-      "code": "high_placement_skip_ratio",
-      "details": {
-        "requested": 1352,
-        "rule": "forest",
-        "skipped": 1019,
-        "skipped_ratio": 0.754,
-        "spawned": 333
-      },
-      "message": "Decoration rule forest skipped many requested placements.",
-      "severity": "warning"
-    },
-    {
-      "code": "high_placement_skip_ratio",
-      "details": {
-        "requested": 168,
-        "rule": "mushrooms",
-        "skipped": 154,
-        "skipped_ratio": 0.917,
-        "spawned": 14
-      },
-      "message": "Decoration rule mushrooms skipped many requested placements.",
-      "severity": "warning"
-    },
-    {
-      "code": "high_placement_skip_ratio",
-      "details": {
-        "requested": 285,
-        "rule": "palms",
-        "skipped": 56,
-        "skipped_ratio": 0.196,
-        "spawned": 229
-      },
-      "message": "Decoration rule palms skipped many requested placements.",
-      "severity": "warning"
-    },
-    {
-      "code": "high_placement_skip_ratio",
-      "details": {
-        "requested": 1364,
-        "rule": "understory",
-        "skipped": 1082,
-        "skipped_ratio": 0.793,
-        "spawned": 282
-      },
-      "message": "Decoration rule understory skipped many requested placements.",
-      "severity": "warning"
-    }
-  ],
+  "group": "debug",
+  "issues": [],
   "landmarks": {
     "available": true,
     "checked": 25
   },
   "river": {
-    "mouth_distance_to_harbor": 54.8,
-    "river_length": 192.0,
-    "river_points": 49,
+    "mouth_distance_to_harbor": 0.0,
+    "river_length": 246.8,
+    "river_points": 50,
     "tributary_lengths": [
-      95.2,
-      95.2,
-      95.2
+      254.25,
+      164.8,
+      300.4
     ],
     "tributary_points": [
-      29,
-      29,
-      29
+      30,
+      30,
+      30
     ]
   },
   "scene": {
-    "placement": {
-      "canopy_fill": {
-        "requested": 520,
-        "skipped": 284,
-        "spawned": 236
-      },
-      "coastal_rocks": {
-        "requested": 416,
-        "skipped": 0,
-        "spawned": 416
-      },
-      "forest": {
-        "requested": 1352,
-        "skipped": 1019,
-        "spawned": 333
-      },
-      "mushrooms": {
-        "requested": 168,
-        "skipped": 154,
-        "spawned": 14
-      },
-      "palms": {
-        "requested": 285,
-        "skipped": 56,
-        "spawned": 229
-      },
-      "understory": {
-        "requested": 1364,
-        "skipped": 1082,
-        "spawned": 282
-      }
-    },
+    "placement": {},
     "spawns": {
       "spawn_collider": 15,
-      "spawn_decor": 1076,
-      "spawn_model": 524
+      "spawn_decor": 1324,
+      "spawn_model": 567
     }
   },
   "seed": 1847,

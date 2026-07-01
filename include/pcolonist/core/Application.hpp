@@ -12,15 +12,18 @@
 #include "pcolonist/core/JobSystem.hpp"
 #include "pcolonist/ecs/Registry.hpp"
 #include "pcolonist/gameplay/CraftingSystem.hpp"
+#include "pcolonist/gameplay/BuildingPlacementSystem.hpp"
 #include "pcolonist/gameplay/DiscoverySystem.hpp"
 #include "pcolonist/gameplay/Enemy.hpp"
 #include "pcolonist/gameplay/Inventory.hpp"
 #include "pcolonist/gameplay/Player.hpp"
+#include "pcolonist/gameplay/ResourceHarvestingSystem.hpp"
 #include "pcolonist/gameplay/SurvivalSystem.hpp"
 #include "pcolonist/memory/FrameArena.hpp"
 #include "pcolonist/physics/PhysicsSystem.hpp"
 #include "pcolonist/platform/Input.hpp"
 #include "pcolonist/render/Camera.hpp"
+#include "pcolonist/render/RendererBackend.hpp"
 #include "pcolonist/scripting/ScriptSystem.hpp"
 #include "pcolonist/ui/DebugUi.hpp"
 #include "pcolonist/ui/UiSystem.hpp"
@@ -40,7 +43,6 @@ struct GLFWwindow;
 
 namespace pcolonist {
 
-class Renderer;
 struct Mesh;
 
 class Application {
@@ -129,6 +131,8 @@ private:
     EnemySystem enemies_;
     Inventory inventory_;
     CraftingSystem crafting_;
+    BuildingPlacementSystem buildingPlacement_;
+    ResourceHarvestingSystem harvesting_;
     DiscoverySystem discovery_;
     SurvivalSystem survival_;
     WeatherSystem weather_;
@@ -143,7 +147,7 @@ private:
     std::ofstream performanceLog_;
     std::unordered_map<std::string, glm::vec3> landmarks_;
     std::vector<glm::vec3> debugTeleports_;
-    std::unique_ptr<Renderer> renderer_;
+    std::unique_ptr<RendererBackend> renderer_;
     std::unique_ptr<WorldStreamer> worldStreamer_;
     bool firstMouseEvent_ = true;
     bool cursorCaptured_ = false;

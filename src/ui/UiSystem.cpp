@@ -376,12 +376,41 @@ void UiSystem::render(
     rectangle(fullscreenX + 15.0F, 31.0F, 2.0F, 18.0F, textPrimary);
     rectangle(fullscreenX + 37.0F, 31.0F, 2.0F, 18.0F, textPrimary);
 
-    if (frameCounterVisible_) {
+    if (frameCounterVisible_ && gameStarted && !menuOpen) {
         const std::string fpsLabel = "FPS " + std::to_string(currentFps_);
-        const float frameCounterX = static_cast<float>(width_ - 126);
-        card(frameCounterX, 72.0F, 108.0F, 38.0F, 8.0F);
-        rectangle(frameCounterX + 12.0F, 86.0F, 3.0F, 10.0F, green);
-        text(frameCounterX + 26.0F, 84.0F, fpsLabel, 1.45F, textPrimary);
+        const std::string frameMsLabel = "MS " + std::to_string(static_cast<int>(std::lround(currentFrameMs_)));
+        const float graphWidth = compact ? 146.0F : 174.0F;
+        const float graphHeight = compact ? 52.0F : 58.0F;
+        const float frameCounterX = static_cast<float>(width_) - graphWidth - 18.0F;
+        const float frameCounterY = 72.0F;
+        card(frameCounterX, frameCounterY, graphWidth, graphHeight + 40.0F, 8.0F);
+        const glm::vec4 frameAccent = currentFrameMs_ > 33.4F ? danger : (currentFrameMs_ > 16.7F ? amber : green);
+        rectangle(frameCounterX + 12.0F, frameCounterY + 14.0F, 3.0F, 10.0F, frameAccent);
+        text(frameCounterX + 26.0F, frameCounterY + 12.0F, fpsLabel, compact ? 1.18F : 1.35F, textPrimary);
+        text(frameCounterX + graphWidth - 62.0F, frameCounterY + 12.0F, frameMsLabel, compact ? 1.00F : 1.12F, textMuted);
+
+        const float graphX = frameCounterX + 12.0F;
+        const float graphY = frameCounterY + 34.0F;
+        const float innerWidth = graphWidth - 24.0F;
+        const float innerHeight = graphHeight - 8.0F;
+        rectangle(graphX, graphY, innerWidth, innerHeight, {0.025F, 0.018F, 0.010F, 0.58F}, 4.0F);
+        rectangle(graphX, graphY + innerHeight * 0.45F, innerWidth, 1.0F, {0.92F, 0.64F, 0.24F, 0.18F});
+        rectangle(graphX, graphY + innerHeight * 0.72F, innerWidth, 1.0F, {0.86F, 0.30F, 0.22F, 0.18F});
+        if (frameTimeCount_ > 0) {
+            const float barWidth = std::max(1.0F, innerWidth / static_cast<float>(frameTimes_.size()));
+            const std::size_t oldest = frameTimeCursor_ >= frameTimeCount_
+                ? frameTimeCursor_ - frameTimeCount_
+                : frameTimes_.size() + frameTimeCursor_ - frameTimeCount_;
+            for (std::size_t index = 0; index < frameTimeCount_; ++index) {
+                const float sample = frameTimes_[(oldest + index) % frameTimes_.size()];
+                const float normalized = std::clamp(sample / 50.0F, 0.0F, 1.0F);
+                const float height = std::max(1.0F, normalized * (innerHeight - 4.0F));
+                const float x = graphX + static_cast<float>(index) * barWidth;
+                const float y = graphY + innerHeight - 2.0F - height;
+                const glm::vec4 sampleColor = sample > 33.4F ? danger : (sample > 16.7F ? amber : waterBlue);
+                rectangle(x, y, std::max(1.0F, barWidth - 1.0F), height, sampleColor, 1.0F);
+            }
+        }
     }
 
     if (!compact) {
@@ -570,6 +599,12 @@ void UiSystem::updateTitle(
     elapsed_ += deltaTime;
     animationTime_ += deltaTime;
     ++frames_;
+    if (std::isfinite(deltaTime) && deltaTime > 0.0F) {
+        currentFrameMs_ = deltaTime * 1000.0F;
+        frameTimes_[frameTimeCursor_] = currentFrameMs_;
+        frameTimeCursor_ = (frameTimeCursor_ + 1U) % frameTimes_.size();
+        frameTimeCount_ = std::min(frameTimeCount_ + 1U, frameTimes_.size());
+    }
     if (elapsed_ < 0.25F) {
         return;
     }

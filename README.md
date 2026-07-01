@@ -58,6 +58,20 @@ python3 tools/generate_island.py --only debug --grid 61 --output-dir /tmp/pcolon
 python3 tools/generate_island.py --only scene
 ```
 
+To review the generated island in Blender as one assembled scene:
+
+```bash
+blender --python tools/import_island_to_blender.py
+blender --background --python tools/import_island_to_blender.py -- --output /tmp/pcolonist_island.blend
+blender /tmp/pcolonist_island.blend
+```
+
+Use `--skip-props` for a terrain/water-only review or `--prop-limit 500` for a
+faster first import. If you generate into a scratch directory, pass that root
+with `--root /tmp/pcolonist-island`. When launching from Blender's Text Editor,
+open `tools/import_island_to_blender.py` as a file or run Blender from the
+project root so the script can find `assets/maps`.
+
 `--only map` writes the terrain, split meshes, LODs, internal water and
 landmarks. `--only debug` writes traversal/material/biome debug maps and the
 terrain report. `--only scene` writes only `assets/scripts/models.scene`.

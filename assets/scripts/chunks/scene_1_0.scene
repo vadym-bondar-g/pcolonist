@@ -18,52 +18,79 @@ model basalt_scree_medium models/basalt_scree_medium.obj
 model basalt_scree_large models/basalt_scree_large.obj
 model basalt_scree_shard models/basalt_scree_shard.obj
 
+spawn_decor oak 203.6 2.22 10.2 1.18 1.18 1.18 2.464
 spawn_model oak 193.7 2.45 25.5 0.92 0.92 0.92 0.46 2.35 0.46 3.453
-spawn_decor oak 190.7 4.02 7.9 0.87 0.87 0.87 2.788
+spawn_decor oak 208.7 1.22 21.6 0.97 0.97 0.97 5.391
 spawn_decor tree 187.8 4.01 15.1 0.95 0.95 0.95 4.281
 spawn_decor oak 183.7 2.63 8.0 0.89 0.89 0.89 0.869
 spawn_model oak 198.5 1.92 28.8 0.96 0.96 0.96 0.46 2.35 0.46 2.543
-spawn_model oak 196.4 3.96 15.2 1.05 1.05 1.05 0.46 2.35 0.46 0.693
-spawn_model oak 187.7 3.86 22.3 1.15 1.15 1.15 0.46 2.35 0.46 4.109
 spawn_model oak 173.0 4.17 18.6 0.76 0.76 0.76 0.46 2.35 0.46 5.581
 spawn_model oak 182.1 2.54 6.2 0.88 0.88 0.88 0.46 2.35 0.46 3.549
+spawn_decor oak 196.2 4.02 11.8 0.93 0.93 0.93 3.637
 spawn_decor oak 174.9 4.06 15.5 1.30 1.30 1.30 4.352
+spawn_decor oak 159.3 4.36 8.1 1.00 1.00 1.00 5.250
 spawn_model tree 164.4 4.04 10.8 1.27 1.27 1.27 0.46 2.35 0.46 5.906
+spawn_decor oak 197.4 1.88 0.0 1.34 1.34 1.34 3.242
+spawn_model oak 164.8 4.36 16.6 1.01 1.01 1.01 0.46 2.35 0.46 4.885
 spawn_model oak 186.7 3.95 21.1 0.85 0.85 0.85 0.46 2.35 0.46 0.979
-spawn_decor tree 181.7 2.70 11.7 1.23 1.23 1.23 4.574
 spawn_model oak 203.5 2.13 20.5 0.94 0.94 0.94 0.46 2.35 0.46 4.817
-spawn_model oak 146.6 6.58 3.6 1.24 1.24 1.24 0.46 2.35 0.46 1.869
+spawn_decor oak 214.7 0.95 11.6 0.95 0.95 0.95 0.509
+spawn_decor oak 169.8 3.85 15.2 1.03 1.03 1.03 1.583
+spawn_decor oak 162.9 3.99 2.8 0.88 0.88 0.88 0.358
 spawn_decor oak 143.3 6.66 0.1 1.21 1.21 1.21 4.820
-spawn_decor tree 200.0 2.08 4.5 1.07 1.07 1.07 6.063
-spawn_decor oak 194.7 2.46 24.4 1.33 1.33 1.33 4.550
+spawn_decor tree 200.0 2.16 4.5 1.07 1.07 1.07 6.063
+spawn_decor oak 236.0 1.00 19.2 0.84 0.84 0.84 1.526
+spawn_decor oak 181.2 3.81 13.5 0.76 0.76 0.76 2.287
+spawn_decor oak 199.0 2.21 25.0 1.09 1.09 1.09 6.123
+spawn_decor oak 226.9 1.33 59.7 0.76 0.76 0.76 3.691
+spawn_decor oak 184.1 2.61 6.9 1.04 1.04 1.04 4.070
+spawn_decor oak 206.6 2.03 14.0 0.71 0.71 0.71 1.257
 spawn_decor oak 165.4 3.91 9.1 0.68 0.68 0.68 3.836
 spawn_decor oak 150.6 6.44 13.5 1.08 1.08 1.08 5.810
-spawn_decor oak 207.9 1.77 11.6 0.87 0.87 0.87 2.731
+spawn_decor oak 207.9 1.75 11.6 0.87 0.87 0.87 2.731
 spawn_decor oak 153.5 6.12 7.4 0.96 0.96 0.96 0.001
 spawn_decor oak 173.1 2.64 0.8 1.05 1.05 1.05 0.854
-spawn_decor oak 193.7 4.03 13.6 0.76 0.76 0.76 0.578
 spawn_decor oak 189.0 4.04 12.0 0.74 0.74 0.74 4.599
+spawn_decor oak 252.8 1.18 81.5 0.95 0.95 0.95 0.608
+spawn_decor oak 219.1 0.93 48.9 0.98 0.98 0.98 3.012
+spawn_decor oak 233.2 1.71 61.1 0.81 0.81 0.81 5.588
+spawn_decor tree 246.8 1.25 87.3 0.73 0.73 0.73 3.839
 spawn_decor oak 144.0 6.59 8.3 0.78 0.78 0.78 2.216
-spawn_decor oak 190.9 3.96 3.6 0.72 0.72 0.72 4.548
-spawn_decor oak 194.4 2.59 1.7 1.05 1.05 1.05 4.571
+spawn_decor oak 190.9 3.97 3.6 0.72 0.72 0.72 4.548
+spawn_decor oak 197.4 1.80 32.3 1.10 1.10 1.10 1.073
+spawn_decor oak 194.4 2.61 1.7 1.05 1.05 1.05 4.571
+spawn_decor oak 234.1 1.56 61.4 1.13 1.13 1.13 1.777
 spawn_decor oak 202.0 1.93 23.7 0.75 0.75 0.75 1.466
 spawn_decor oak 182.7 2.66 10.7 0.96 0.96 0.96 5.256
 spawn_decor oak 194.3 4.05 13.6 0.74 0.74 0.74 4.948
-spawn_decor oak 149.0 6.38 2.7 1.18 1.18 1.18 5.410
-spawn_decor oak 161.0 4.08 3.2 0.86 0.86 0.86 5.600
-spawn_decor oak 187.8 2.69 1.4 0.95 0.95 0.95 3.188
-spawn_decor oak 152.7 6.36 11.6 1.07 1.07 1.07 5.982
-spawn_decor tree 185.9 3.94 17.9 0.69 0.69 0.69 0.855
-spawn_decor oak 166.2 4.02 0.2 0.74 0.74 0.74 4.909
-spawn_decor oak 185.2 2.65 2.3 0.73 0.73 0.73 2.931
-spawn_decor oak 195.4 2.56 21.4 0.74 0.74 0.74 5.267
-spawn_decor oak 198.1 1.70 31.6 1.11 1.11 1.11 1.106
-spawn_decor oak 198.7 2.24 3.3 1.02 1.02 1.02 0.832
-spawn_decor oak 201.1 2.57 13.7 0.98 0.98 0.98 1.088
-spawn_decor bush 204.5 1.67 22.5 0.58 0.58 0.58 5.261
+spawn_decor oak 226.5 0.98 26.2 1.05 1.05 1.05 3.503
+spawn_decor oak 237.1 1.14 24.0 1.08 1.08 1.08 5.122
+spawn_decor oak 227.6 1.00 24.0 1.09 1.09 1.09 2.578
+spawn_decor bush 228.9 1.14 43.8 0.58 0.58 0.58 1.028
+spawn_decor bush 214.7 1.20 16.5 0.88 0.88 0.88 2.893
+spawn_decor bush 166.2 4.02 0.2 0.63 0.63 0.63 4.909
+spawn_decor bush 208.2 1.35 21.3 0.65 0.65 0.65 6.062
+spawn_decor bush 198.7 2.26 3.3 0.99 0.99 0.99 0.832
+spawn_decor bush 229.9 1.39 57.2 1.20 1.20 1.20 1.676
+spawn_decor bush 241.5 0.93 62.5 0.66 0.66 0.66 4.823
 spawn_decor bush 207.0 1.63 20.7 0.99 0.99 0.99 1.481
-spawn_decor bush 192.1 4.08 9.9 0.88 0.88 0.88 4.378
+spawn_decor bush 249.4 1.19 75.5 0.69 0.69 0.69 6.215
+spawn_decor bush 249.5 1.63 67.1 1.22 1.22 1.22 4.282
+spawn_decor bush 248.3 1.43 61.6 0.63 0.63 0.63 3.582
+spawn_decor bush 235.9 0.96 51.7 0.62 0.62 0.62 3.487
+spawn_decor bush 237.7 1.00 21.0 0.62 0.62 0.62 2.217
 spawn_decor bush 184.3 3.82 14.7 0.96 0.96 0.96 6.192
+spawn_decor bush 249.9 1.64 71.9 1.20 1.20 1.20 1.565
+spawn_decor bush 252.3 1.36 91.8 0.79 0.79 0.79 5.519
+spawn_decor bush 222.9 1.46 21.5 0.83 0.83 0.83 1.062
+spawn_decor bush 248.7 1.37 95.1 1.13 1.13 1.13 1.584
+spawn_decor bush 171.1 2.70 2.0 0.58 0.58 0.58 4.640
 spawn_decor bush 185.4 2.68 7.5 0.94 0.94 0.94 5.359
+spawn_decor bush 254.2 1.02 46.0 0.93 0.93 0.93 1.633
 spawn_decor bush 202.6 1.92 22.9 0.68 0.68 0.68 4.518
-spawn_decor bush 196.3 3.96 7.2 0.57 0.57 0.57 4.666
+spawn_decor bush 212.0 1.46 19.2 0.85 0.85 0.85 3.952
+spawn_decor bush 206.1 0.92 24.9 1.21 1.21 1.21 2.015
+spawn_decor bush 253.1 1.63 57.0 0.77 0.77 0.77 1.251
+spawn_decor bush 245.6 1.31 93.5 1.09 1.09 1.09 0.043
+spawn_decor bush 235.4 1.39 62.9 0.64 0.64 0.64 3.734
+spawn_decor bush 252.8 1.19 83.0 0.62 0.62 0.62 1.788

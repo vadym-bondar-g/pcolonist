@@ -53,9 +53,32 @@ struct TerrainLod {
 };
 struct LavaSurface {};
 
+enum class ResourceKind {
+    Tree,
+    Stone,
+    Plant,
+    Ore,
+};
+
 struct ResourceNode {
     int health = 3;
+    int maxHealth = 3;
     int woodYield = 5;
+    int stoneYield = 0;
+    int fiberYield = 0;
+    int metalYield = 0;
+    ResourceKind kind = ResourceKind::Tree;
+};
+
+enum class BuildingKind {
+    Campfire,
+    StorageCrate,
+    Workbench,
+};
+
+struct ConstructedBuilding {
+    BuildingKind kind = BuildingKind::Campfire;
+    int tier = 1;
 };
 
 } // namespace pcolonist

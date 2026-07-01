@@ -159,6 +159,8 @@ RuntimeOptions parseRuntimeOptions(const std::vector<std::string>& arguments) {
             options.mode = LaunchMode::ValidateAssets;
         } else if (argument == "--dump-config") {
             options.mode = LaunchMode::DumpConfig;
+        } else if (argument == "--probe-vulkan") {
+            options.mode = LaunchMode::ProbeVulkan;
         } else if (argument == "--assets") {
             options.application.assetRoot = requireValue("--assets");
         } else if (argument == "--save") {
@@ -220,6 +222,7 @@ void printUsage(std::ostream& output, const char* executable) {
         << "      --load [PATH]       Load a save file at startup\n"
         << "      --validate-assets   Check required assets without creating a window\n"
         << "      --dump-config       Print resolved startup configuration without creating a window\n"
+        << "      --probe-vulkan      Print Vulkan loader and device capabilities\n"
         << "      --window-size WxH   Set initial window size, for example 1600x900\n"
         << "      --width N           Set initial window width\n"
         << "      --height N          Set initial window height\n"

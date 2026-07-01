@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pcolonist/assets/AssetSystem.hpp"
+#include "pcolonist/gameplay/PlayerVitals.hpp"
 #include "pcolonist/world/WeatherSystem.hpp"
 
 #include <glm/vec3.hpp>
@@ -76,13 +77,16 @@ private:
     [[nodiscard]] float biomeHungerModifier() const;
     [[nodiscard]] float biomeFatigueModifier() const;
     [[nodiscard]] float biomeTargetTemperature(const WeatherSystem& weather) const;
+    [[nodiscard]] bool sicknessExposure() const;
+    void syncStatusFromVitals();
+    void syncVitalsFromStatus(float sicknessRisk);
     void updateWarnings();
 
     std::vector<Location> locations_;
+    PlayerVitals vitals_;
     SurvivalStatus status_;
     std::string currentLocationName_ = "Открытая местность";
     const Location* currentLocation_ = nullptr;
-    float sicknessRisk_ = 0.0F;
     float forageCooldown_ = 0.0F;
     float materialCooldown_ = 0.0F;
 };

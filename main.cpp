@@ -1,5 +1,6 @@
 #include "pcolonist/core/Application.hpp"
 #include "pcolonist/core/RuntimeOptions.hpp"
+#include "pcolonist/render/VulkanSupport.hpp"
 
 #include <exception>
 #include <iostream>
@@ -80,6 +81,9 @@ int runApplication(const std::vector<std::string>& arguments, std::ostream& outp
                 : static_cast<int>(pcolonist::ExitCode::AssetValidationFailed);
         case pcolonist::LaunchMode::DumpConfig:
             printRuntimeConfig(options, output);
+            return static_cast<int>(pcolonist::ExitCode::Success);
+        case pcolonist::LaunchMode::ProbeVulkan:
+            pcolonist::printVulkanProbe(output, pcolonist::probeVulkanSupport());
             return static_cast<int>(pcolonist::ExitCode::Success);
         case pcolonist::LaunchMode::Run:
             break;

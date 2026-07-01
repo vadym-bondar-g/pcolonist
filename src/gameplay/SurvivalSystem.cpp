@@ -11,10 +11,6 @@
 
 namespace {
 
-float clamp01(float value) {
-    return std::clamp(value, 0.0F, 100.0F);
-}
-
 std::string extractString(std::string_view object, std::string_view key) {
     const std::string pattern = "\"" + std::string(key) + "\"";
     const std::size_t keyPosition = object.find(pattern);
@@ -183,60 +179,34 @@ void SurvivalSystem::update(glm::vec3 playerPosition, const WeatherSystem& weath
     forageCooldown_ = std::max(forageCooldown_ - deltaTime, 0.0F);
     materialCooldown_ = std::max(materialCooldown_ - deltaTime, 0.0F);
 
-    const float stormModifier = 1.0F + weather.stormStrength() * 0.18F;
-    status_.thirst = clamp01(status_.thirst - 0.11F * biomeThirstModifier() * stormModifier * deltaTime);
-    status_.hunger = clamp01(status_.hunger - 0.045F * biomeHungerModifier() * deltaTime);
-    status_.fatigue = clamp01(status_.fatigue + 0.055F * biomeFatigueModifier() * stormModifier * deltaTime);
-
-    const float targetTemperature = biomeTargetTemperature(weather);
-    const float temperatureBlend = std::clamp(deltaTime * 0.035F, 0.0F, 1.0F);
-    status_.bodyTemperature += (targetTemperature - status_.bodyTemperature) * temperatureBlend;
-
-    const bool riskyBiome = status_.biomeName == "Болота" || status_.biomeName == "Пещеры";
-    sicknessRisk_ += riskyBiome ? 1.9F * deltaTime : -2.2F * deltaTime;
-    sicknessRisk_ = std::clamp(sicknessRisk_, 0.0F, 100.0F);
-    if (sicknessRisk_ >= 100.0F) {
-        status_.sick = true;
-    }
-    if (!riskyBiome && status_.thirst > 55.0F && status_.hunger > 45.0F) {
-        status_.sick = sicknessRisk_ > 20.0F;
-    }
-
-    status_.dehydrated = status_.thirst <= 0.1F;
-    status_.starving = status_.hunger <= 0.1F;
-    status_.exhausted = status_.fatigue >= 98.0F;
-    status_.hypothermia = status_.bodyTemperature < 35.4F;
-    status_.hyperthermia = status_.bodyTemperature > 39.0F;
-
-    float damage = 0.0F;
-    damage += status_.dehydrated ? 2.5F : 0.0F;
-    damage += status_.starving ? 0.65F : 0.0F;
-    damage += status_.exhausted ? 0.32F : 0.0F;
-    damage += status_.hypothermia || status_.hyperthermia ? 0.9F : 0.0F;
-    damage += status_.sick ? 0.35F : 0.0F;
-    if (damage > 0.0F) {
-        status_.health = clamp01(status_.health - damage * deltaTime);
-    } else if (status_.thirst > 55.0F && status_.hunger > 55.0F && status_.fatigue < 45.0F) {
-        status_.health = clamp01(status_.health + 0.08F * deltaTime);
-    }
-
+    vitals_.update(PlayerVitalsContext{
+        deltaTime,
+        biomeThirstModifier(),
+        biomeHungerModifier(),
+        biomeFatigueModifier(),
+        biomeTargetTemperature(weather),
+        weather.stormStrength(),
+        sicknessExposure(),
+    });
+    syncStatusFromVitals();
     updateWarnings();
 }
 
 void SurvivalSystem::drinkCleanWater(int units) {
-    status_.thirst = clamp01(status_.thirst + 28.0F * static_cast<float>(std::max(units, 0)));
-    sicknessRisk_ = std::max(sicknessRisk_ - 18.0F, 0.0F);
+    vitals_.drinkCleanWater(units);
+    syncStatusFromVitals();
     updateWarnings();
 }
 
 void SurvivalSystem::eatForagedFood(int nutrition) {
-    status_.hunger = clamp01(status_.hunger + static_cast<float>(std::max(nutrition, 0)));
+    vitals_.eat(static_cast<float>(std::max(nutrition, 0)));
+    syncStatusFromVitals();
     updateWarnings();
 }
 
 void SurvivalSystem::restNearFire(float seconds) {
-    status_.fatigue = clamp01(status_.fatigue - seconds * 0.75F);
-    status_.bodyTemperature += (37.1F - status_.bodyTemperature) * 0.25F;
+    vitals_.restNearHeat(seconds);
+    syncStatusFromVitals();
     updateWarnings();
 }
 
@@ -294,12 +264,13 @@ const std::string& SurvivalSystem::currentLocationName() const {
 }
 
 SurvivalSnapshot SurvivalSystem::snapshot() const {
-    return {status_, sicknessRisk_, forageCooldown_, materialCooldown_};
+    return {status_, vitals_.state().sicknessRisk, forageCooldown_, materialCooldown_};
 }
 
 void SurvivalSystem::applySnapshot(const SurvivalSnapshot& snapshot) {
     status_ = snapshot.status;
-    sicknessRisk_ = std::clamp(snapshot.sicknessRisk, 0.0F, 100.0F);
+    syncVitalsFromStatus(snapshot.sicknessRisk);
+    syncStatusFromVitals();
     forageCooldown_ = std::max(snapshot.forageCooldown, 0.0F);
     materialCooldown_ = std::max(snapshot.materialCooldown, 0.0F);
     currentLocationName_ = status_.biomeName;
@@ -386,6 +357,42 @@ float SurvivalSystem::biomeTargetTemperature(const WeatherSystem& weather) const
     return target;
 }
 
+bool SurvivalSystem::sicknessExposure() const {
+    return status_.biomeName == "Болота" || status_.biomeName == "Пещеры";
+}
+
+void SurvivalSystem::syncStatusFromVitals() {
+    const PlayerVitalsState& vitals = vitals_.state();
+    status_.health = vitals.health;
+    status_.thirst = vitals.thirst;
+    status_.hunger = vitals.hunger;
+    status_.fatigue = vitals.fatigue;
+    status_.bodyTemperature = vitals.bodyTemperature;
+    status_.sick = vitals.sick;
+    status_.dehydrated = vitals.dehydrated;
+    status_.starving = vitals.starving;
+    status_.exhausted = vitals.exhausted;
+    status_.hypothermia = vitals.hypothermia;
+    status_.hyperthermia = vitals.hyperthermia;
+}
+
+void SurvivalSystem::syncVitalsFromStatus(float sicknessRisk) {
+    vitals_.applyState(PlayerVitalsState{
+        status_.health,
+        status_.thirst,
+        status_.hunger,
+        status_.fatigue,
+        status_.bodyTemperature,
+        sicknessRisk,
+        status_.sick,
+        status_.dehydrated,
+        status_.starving,
+        status_.exhausted,
+        status_.hypothermia,
+        status_.hyperthermia,
+    });
+}
+
 void SurvivalSystem::updateWarnings() {
     if (status_.health < 25.0F) {
         status_.warning = "Критическое состояние";
@@ -399,7 +406,7 @@ void SurvivalSystem::updateWarnings() {
         status_.warning = "Перегрев";
     } else if (status_.exhausted || status_.fatigue > 82.0F) {
         status_.warning = "Нужно отдохнуть";
-    } else if (status_.sick || sicknessRisk_ > 65.0F) {
+    } else if (status_.sick || vitals_.state().sicknessRisk > 65.0F) {
         status_.warning = "Риск болезни";
     } else if (canForageFood()) {
         status_.warning = "Рядом съедобные ресурсы";

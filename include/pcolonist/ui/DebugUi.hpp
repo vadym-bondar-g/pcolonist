@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pcolonist/render/Renderer.hpp"
+#include "pcolonist/render/RendererBackend.hpp"
 #include "pcolonist/world/ChunkManager.hpp"
 
 #include <glm/vec3.hpp>

@@ -16,6 +16,17 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+    {
+      "name": "release-max",
+      "displayName": "Release Max Performance",
+      "binaryDir": "${sourceDir}/build/release-max",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "PCOLONIST_ENABLE_IPO": "ON",
+        "PCOLONIST_ENABLE_NATIVE_OPTIMIZATIONS": "ON",
+        "PCOLONIST_ENABLE_IMGUI_DEBUG": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -26,6 +37,10 @@
     {
       "name": "release",
       "configurePreset": "release"
+    },
+    {
+      "name": "release-max",
+      "configurePreset": "release-max"
     }
   ]
 }

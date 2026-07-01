@@ -7,6 +7,7 @@
 #include "pcolonist/physics/PhysicsSystem.hpp"
 #include "pcolonist/render/MeshFactory.hpp"
 #include "pcolonist/render/Renderer.hpp"
+#include "pcolonist/render/VulkanSupport.hpp"
 #include "pcolonist/serialization/SaveGameSerializer.hpp"
 #include "pcolonist/serialization/SceneSerializer.hpp"
 #include "pcolonist/world/WorldStreamer.hpp"
@@ -22,6 +23,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <iomanip>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -64,38 +66,6 @@ pcolonist::KeyAction toKeyAction(int action) {
         return pcolonist::KeyAction::Repeat;
     }
     return pcolonist::KeyAction::Release;
-}
-
-std::optional<float> rayBoxDistance(
-    glm::vec3 origin,
-    glm::vec3 direction,
-    glm::vec3 center,
-    glm::vec3 halfExtents,
-    float maximumDistance) {
-    float near = 0.0F;
-    float far = maximumDistance;
-    for (int axis = 0; axis < 3; ++axis) {
-        const float minimum = center[axis] - halfExtents[axis];
-        const float maximum = center[axis] + halfExtents[axis];
-        if (std::abs(direction[axis]) < 0.00001F) {
-            if (origin[axis] < minimum || origin[axis] > maximum) {
-                return std::nullopt;
-            }
-            continue;
-        }
-        const float inverse = 1.0F / direction[axis];
-        float first = (minimum - origin[axis]) * inverse;
-        float second = (maximum - origin[axis]) * inverse;
-        if (first > second) {
-            std::swap(first, second);
-        }
-        near = std::max(near, first);
-        far = std::min(far, second);
-        if (near > far) {
-            return std::nullopt;
-        }
-    }
-    return near <= maximumDistance ? std::optional<float>{near} : std::nullopt;
 }
 
 std::size_t matchingBrace(std::string_view text, std::size_t open) {
@@ -375,6 +345,10 @@ void Application::initialize() {
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
+    const VulkanProbeResult vulkan = probeVulkanSupport();
+    std::clog << "pcolonist: vulkan="
+              << (vulkan.compiled ? (vulkan.available ? "available" : "unavailable") : "disabled")
+              << " devices=" << vulkan.devices.size() << '\n';
     initializePerformanceLog();
     writePerformanceEvent("asset_preload_begin");
     assets_.preloadAll();
@@ -1228,41 +1202,31 @@ void Application::stopPlayerMotion() {
 }
 
 void Application::useSelectedTool() {
-    if (inventory_.selectedTool() != Tool::Axe) {
-        return;
-    }
-
-    constexpr float reach = 4.5F;
-    Entity target = nullEntity;
-    float nearest = reach;
-    registry_.each<Transform, ResourceNode, BoxCollider>(
-        [this, &target, &nearest](
-            Entity entity,
-            const Transform& transform,
-            const ResourceNode&,
-            const BoxCollider& collider) {
-            const auto distance = rayBoxDistance(
-                camera_.position(),
-                camera_.front(),
-                transform.position,
-                collider.halfExtents * transform.scale,
-                nearest);
-            if (distance) {
-                target = entity;
-                nearest = *distance;
-            }
+    const HarvestResult result = harvesting_.harvest(
+        registry_,
+        HarvestRequest{
+            camera_.position(),
+            camera_.front(),
+            4.5F,
+            inventory_.selectedTool(),
         });
-    if (target == nullEntity) {
+    if (!result.hit || !result.harvested) {
+        if (!result.message.empty()) {
+            craftMessage_ = std::string(result.message);
+        }
         return;
     }
 
-    ResourceNode& resource = registry_.get<ResourceNode>(target);
-    --resource.health;
-    if (resource.health <= 0) {
-        inventory_.addWood(resource.woodYield);
+    if (result.depleted) {
+        inventory_.addWood(result.yield.wood);
+        inventory_.addStone(result.yield.stone);
+        inventory_.addFiber(result.yield.fiber);
+        inventory_.addMetal(result.yield.metal);
         craftMessage_ = crafting_.nextHint(inventory_, nearCraftStation());
-        registry_.destroy(target);
+        registry_.destroy(result.target);
         physics_.rebuildStaticIndex(registry_);
+    } else {
+        craftMessage_ = std::string(result.message);
     }
 }
 
@@ -1384,8 +1348,32 @@ void Application::useContextAction() {
     const auto near = [&position](glm::vec3 point, float radius) {
         return glm::length(glm::vec2{position.x - point.x, position.z - point.z}) <= radius;
     };
-    if (near(landmark("arrival_camp"), 14.0F) && !fireLit_ && inventory_.wood() > 0 && inventory_.stone() > 0) {
-        if (inventory_.spendWood(1) && inventory_.spendStone(1)) {
+    if (near(landmark("arrival_camp"), 14.0F) && !fireLit_) {
+        const BuildingDefinition& campfire = BuildingPlacementSystem::definition(BuildingKind::Campfire);
+        if (!inventory_.canAfford(campfire.cost.wood, campfire.cost.stone, campfire.cost.fiber, campfire.cost.metal)) {
+            craftMessage_ = "НУЖНЫ ДЕРЕВО/КАМЕНЬ";
+            return;
+        }
+
+        const glm::vec3 forward = camera_.horizontalFront();
+        const glm::vec3 desiredPosition = position + forward * 2.35F;
+        const float yaw = std::atan2(forward.x, forward.z);
+        const BuildingPlacementResult placement = buildingPlacement_.preview(
+            registry_,
+            BuildingPlacementRequest{BuildingKind::Campfire, desiredPosition, position, yaw});
+        if (!placement.canPlace) {
+            craftMessage_ = std::string(placement.reason);
+            return;
+        }
+
+        if (inventory_.spendResources(campfire.cost.wood, campfire.cost.stone, campfire.cost.fiber, campfire.cost.metal)) {
+            const Entity building = registry_.create();
+            registry_.emplace<Transform>(building, placement.transform);
+            registry_.emplace<BoxCollider>(building, placement.collider);
+            registry_.emplace<ConstructedBuilding>(building, ConstructedBuilding{BuildingKind::Campfire, 1});
+            const glm::vec3 groundPosition = placement.transform.position - glm::vec3{0.0F, placement.collider.halfExtents.y, 0.0F};
+            createCampfireFire(groundPosition, 1.0F);
+            physics_.rebuildStaticIndex(registry_);
             fireLit_ = true;
             craftMessage_ = crafting_.nextHint(inventory_, nearCraftStation());
         }

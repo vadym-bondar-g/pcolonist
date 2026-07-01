@@ -18,23 +18,31 @@ model basalt_scree_medium models/basalt_scree_medium.obj
 model basalt_scree_large models/basalt_scree_large.obj
 model basalt_scree_shard models/basalt_scree_shard.obj
 
-spawn_model rock 471.4 -2.37 287.2 0.85 0.85 0.85 0.82 0.70 0.74 2.915
-spawn_model rock 426.8 -1.29 274.2 1.54 1.54 1.54 0.82 0.70 0.74 1.754
-spawn_model rock 478.5 -2.14 274.0 1.78 1.78 1.78 0.82 0.70 0.74 5.866
-spawn_model rock 432.5 -1.14 291.1 0.92 0.92 0.92 0.82 0.70 0.74 4.951
-spawn_model rock 403.5 -1.13 327.4 0.96 0.96 0.96 0.82 0.70 0.74 4.066
-spawn_model rock 416.1 -1.27 339.4 1.04 1.04 1.04 0.82 0.70 0.74 2.936
-spawn_decor palm 404.2 0.05 259.6 0.83 0.83 0.83 0.067
-spawn_decor palm 404.6 -0.39 263.7 1.02 1.02 1.02 0.905
-spawn_decor palm 408.9 -0.23 258.7 1.18 1.18 1.18 2.788
-spawn_decor palm 392.6 -0.50 288.2 1.00 1.00 1.00 2.860
-spawn_decor palm 412.7 -0.52 256.3 1.09 1.09 1.09 5.447
-spawn_decor palm 388.5 -0.22 302.1 0.97 0.97 0.97 5.504
-spawn_decor palm 394.0 -0.55 294.5 0.90 0.90 0.90 1.486
-spawn_decor palm 384.8 -0.41 306.1 1.24 1.24 1.24 5.731
-spawn_decor palm 384.7 0.01 297.0 1.25 1.25 1.25 1.556
-spawn_decor palm 395.5 -0.49 278.8 1.20 1.20 1.20 2.218
-spawn_decor palm 401.2 -0.33 273.5 0.88 0.88 0.88 5.598
-spawn_decor palm 387.2 -0.34 290.6 1.26 1.26 1.26 5.510
-spawn_decor palm 384.9 0.01 296.9 1.03 1.03 1.03 0.780
-spawn_decor palm 400.4 0.19 257.4 1.33 1.33 1.33 1.676
+spawn_model rock 425.7 -1.33 301.1 1.70 1.70 1.70 0.82 0.70 0.74 4.701
+spawn_model rock 429.4 -1.09 268.0 0.91 0.91 0.91 0.82 0.70 0.74 3.595
+spawn_model rock 433.8 -1.20 292.7 1.53 1.53 1.53 0.82 0.70 0.74 3.835
+spawn_model rock 408.4 -1.22 336.4 1.19 1.19 1.19 0.82 0.70 0.74 5.019
+spawn_model rock 473.7 -2.32 268.6 1.64 1.64 1.64 0.82 0.70 0.74 3.646
+spawn_model rock 387.3 -2.84 273.4 1.64 1.64 1.64 0.82 0.70 0.74 0.199
+spawn_model rock 421.6 -1.23 279.9 1.42 1.42 1.42 0.82 0.70 0.74 4.016
+spawn_model rock 392.7 -1.13 328.6 0.87 0.87 0.87 0.82 0.70 0.74 5.003
+spawn_model rock 408.3 -1.24 338.8 1.36 1.36 1.36 0.82 0.70 0.74 2.992
+spawn_model rock 399.2 -0.68 286.5 1.15 1.15 1.15 0.82 0.70 0.74 6.214
+spawn_model rock 465.4 -2.23 295.4 0.79 0.79 0.79 0.82 0.70 0.74 1.612
+spawn_decor palm 395.6 -0.16 259.2 0.82 0.82 0.82 3.083
+spawn_decor palm 398.9 -0.24 279.9 1.08 1.08 1.08 0.430
+spawn_decor palm 402.2 -0.49 270.7 0.94 0.94 0.94 6.193
+spawn_decor palm 394.8 -0.47 300.5 1.13 1.13 1.13 0.247
+spawn_decor palm 386.9 -0.43 306.0 0.98 0.98 0.98 1.782
+spawn_decor palm 412.6 -0.57 257.8 0.92 0.92 0.92 3.353
+spawn_decor palm 410.4 -0.45 259.9 0.94 0.94 0.94 0.706
+spawn_decor palm 400.2 -0.25 277.0 1.24 1.24 1.24 3.802
+spawn_decor palm 407.8 -0.49 263.2 0.87 0.87 0.87 2.843
+spawn_decor palm 386.4 -0.43 306.1 1.13 1.13 1.13 3.551
+spawn_decor palm 401.5 -0.39 266.4 1.02 1.02 1.02 4.122
+spawn_decor palm 394.3 -0.59 284.4 0.80 0.80 0.80 0.323
+spawn_decor palm 387.6 -0.05 298.1 0.86 0.86 0.86 1.232
+spawn_decor palm 389.2 -0.17 300.3 0.87 0.87 0.87 6.191
+spawn_decor palm 391.4 -0.31 257.2 1.35 1.35 1.35 2.513
+spawn_decor palm 385.5 -0.12 292.9 0.90 0.90 0.90 4.237
+spawn_decor palm 397.6 -0.36 274.3 0.90 0.90 0.90 0.158

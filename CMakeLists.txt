@@ -3,6 +3,7 @@ project(pcolonist VERSION 0.1.0 LANGUAGES C CXX)
 
 include(CTest)
 include(FetchContent)
+include(CheckIPOSupported)
 
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "Build GLFW documentation")
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "Build GLFW tests")
@@ -69,7 +70,10 @@ endif()
 
 glad_add_library(glad_gl_core_33 REPRODUCIBLE API gl:core=3.3)
 find_package(Threads REQUIRED)
+option(PCOLONIST_ENABLE_VULKAN "Enable Vulkan loader capability probing" ON)
 option(PCOLONIST_ENABLE_FREETYPE_UI "Render UI text with FreeType TTF fonts" OFF)
+option(PCOLONIST_ENABLE_IPO "Enable interprocedural optimization for pcolonist release builds" OFF)
+option(PCOLONIST_ENABLE_NATIVE_OPTIMIZATIONS "Optimize pcolonist for the build machine CPU" OFF)
 if(PCOLONIST_ENABLE_FREETYPE_UI)
     find_package(Freetype REQUIRED)
 endif()
@@ -106,10 +110,13 @@ add_executable(pcolonist
     src/core/JobSystem.cpp
     src/core/RuntimeOptions.cpp
     src/gameplay/Enemy.cpp
+    src/gameplay/BuildingPlacementSystem.cpp
     src/gameplay/CraftingSystem.cpp
     src/gameplay/DiscoverySystem.cpp
     src/gameplay/Inventory.cpp
     src/gameplay/Player.cpp
+    src/gameplay/PlayerVitals.cpp
+    src/gameplay/ResourceHarvestingSystem.cpp
     src/gameplay/SurvivalSystem.cpp
     src/memory/FrameArena.cpp
     src/physics/PhysicsSystem.cpp
@@ -124,6 +131,7 @@ add_executable(pcolonist
     src/render/Shader.cpp
     src/render/ShaderLibrary.cpp
     src/render/Skybox.cpp
+    src/render/VulkanSupport.cpp
     src/scripting/ScriptSystem.cpp
     src/serialization/SaveGameSerializer.cpp
     src/serialization/SceneSerializer.cpp
@@ -141,6 +149,12 @@ add_executable(pcolonist
 
 target_include_directories(pcolonist PRIVATE include)
 target_link_libraries(pcolonist PRIVATE glfw glad_gl_core_33 glm::glm PNG::PNG Threads::Threads)
+if(PCOLONIST_ENABLE_VULKAN)
+    target_link_libraries(pcolonist PRIVATE ${CMAKE_DL_LIBS})
+    target_compile_definitions(pcolonist PRIVATE PCOLONIST_ENABLE_VULKAN=1)
+else()
+    target_compile_definitions(pcolonist PRIVATE PCOLONIST_ENABLE_VULKAN=0)
+endif()
 if(PCOLONIST_ENABLE_FREETYPE_UI)
     target_link_libraries(pcolonist PRIVATE Freetype::Freetype)
     target_compile_definitions(pcolonist PRIVATE PCOLONIST_ENABLE_FREETYPE_UI=1)
@@ -151,6 +165,23 @@ if(PCOLONIST_HAS_IMGUI_DEBUG)
 endif()
 target_compile_features(pcolonist PRIVATE cxx_std_20)
 set_target_properties(pcolonist PROPERTIES CXX_EXTENSIONS OFF)
+
+if(PCOLONIST_ENABLE_IPO)
+    check_ipo_supported(RESULT pcolonist_ipo_supported OUTPUT pcolonist_ipo_error LANGUAGES CXX)
+    if(pcolonist_ipo_supported)
+        set_property(TARGET pcolonist PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+    else()
+        message(WARNING "IPO/LTO is not supported by this toolchain: ${pcolonist_ipo_error}")
+    endif()
+endif()
+
+if(PCOLONIST_ENABLE_NATIVE_OPTIMIZATIONS)
+    if(MSVC)
+        target_compile_options(pcolonist PRIVATE $<$<CONFIG:Release>:/arch:AVX2>)
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+        target_compile_options(pcolonist PRIVATE $<$<CONFIG:Release>:-march=native>)
+    endif()
+endif()
 
 target_compile_definitions(pcolonist PRIVATE
     PCOLONIST_ASSET_DIR="assets"
@@ -229,13 +260,19 @@ if(BUILD_TESTING)
         tests/TerrainColliderTests.cpp
         tests/WorldSystemTests.cpp
         tests/PngLoaderTests.cpp
+        tests/PlayerVitalsTests.cpp
+        tests/ResourceHarvestingTests.cpp
+        tests/BuildingPlacementTests.cpp
         tests/SaveGameSerializerTests.cpp
         tests/ScriptSystemTests.cpp
         src/assets/Assets.cpp
         src/assets/MeshLoader.cpp
         src/assets/ObjLoader.cpp
         src/core/JobSystem.cpp
+        src/gameplay/BuildingPlacementSystem.cpp
         src/gameplay/Inventory.cpp
+        src/gameplay/PlayerVitals.cpp
+        src/gameplay/ResourceHarvestingSystem.cpp
         src/physics/PhysicsSystem.cpp
         src/physics/StaticColliderGrid.cpp
         src/physics/TerrainCollider.cpp

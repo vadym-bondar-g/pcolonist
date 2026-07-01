@@ -15,6 +15,7 @@ enum class LaunchMode {
     Version,
     ValidateAssets,
     DumpConfig,
+    ProbeVulkan,
 };
 
 enum class ExitCode : int {

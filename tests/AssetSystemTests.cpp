@@ -13,6 +13,9 @@ void runObjLoaderTests();
 void runWorldSystemTests();
 void runInventoryTests();
 void runPngLoaderTests();
+void runPlayerVitalsTests();
+void runResourceHarvestingTests();
+void runBuildingPlacementTests();
 void runSaveGameSerializerTests();
 void runScriptSystemTests();
 
@@ -136,6 +139,9 @@ int main() {
         runWorldSystemTests();
         runInventoryTests();
         runPngLoaderTests();
+        runPlayerVitalsTests();
+        runResourceHarvestingTests();
+        runBuildingPlacementTests();
         runSaveGameSerializerTests();
         runScriptSystemTests();
     } catch (const std::exception& error) {

@@ -764,6 +764,8 @@ def trace_downhill_path(
         if math.hypot(point[0] - target[0], point[1] - target[1]) < step_size * 1.2:
             path.append(target)
             break
+    if path[-1] != target:
+        path.append(target)
     return tuple(path)
 
 
@@ -954,12 +956,25 @@ def classify_biome(
     volcano_x, volcano_z = VOLCANO.center
     if math.hypot(x - volcano_x, z - volcano_z) < VOLCANO.cone_radius and y > BIOMES["volcanic"].min_height:
         return BIOMES["volcanic"]
-    if radius > 0.82 or y < BIOMES["beach"].max_height:
+    if radius > 0.94 or y < scale_height(0.65):
         return BIOMES["beach"]
-    if (x > 45.0 and z > 5.0 and y < 4.8) or (moisture > 0.72 and distance_to_water < WATER.wet_bank_width):
-        return BIOMES["wetland"]
-    if z > 18.0 and y < 13.0 and slope < 0.78 and moisture > BIOMES["coastal_jungle"].min_moisture * 0.65:
+
+    northern_coastal_belt = z > scale_distance(18.0) and radius > 0.58 and y < scale_height(9.0)
+    harbor_jungle_belt = (
+        math.hypot(x - HARBOR_CENTER[0], z - HARBOR_CENTER[1]) < scale_distance(78.0)
+        and y < scale_height(7.0)
+        and radius > 0.45
+    )
+    if (
+        (northern_coastal_belt or harbor_jungle_belt)
+        and slope < 0.78
+        and moisture > BIOMES["coastal_jungle"].min_moisture * 0.72
+    ):
         return BIOMES["coastal_jungle"]
+
+    marsh_basin = x > scale_distance(45.0) and z > scale_distance(5.0) and y < scale_height(4.8)
+    if marsh_basin or (moisture > 0.72 and distance_to_water < WATER.wet_bank_width):
+        return BIOMES["wetland"]
     if y > BIOMES["highland"].min_height or slope > 0.72:
         return BIOMES["highland"]
     return BIOMES["temperate_forest"]
@@ -2179,6 +2194,7 @@ def landmark_entry(
     y_offset: float = 1.6,
     radius: float = 6.0,
 ) -> dict[str, object]:
+    x, z = walkable_landmark_position(category, x, z, radius)
     return {
         "name": name,
         "category": category,
@@ -2190,6 +2206,26 @@ def landmark_entry(
         "radius": radius,
         "walkability": round(walkability_score(x, z), 3),
     }
+
+
+def walkable_landmark_position(category: str, x: float, z: float, radius: float) -> tuple[float, float]:
+    if category in {"water", "waterfall", "volcano", "islet"}:
+        return x, z
+
+    best = (walkability_score(x, z), x, z)
+    search_radii = (radius * 0.25, radius * 0.5, radius * 0.75, radius)
+    for search_radius in search_radii:
+        samples = max(12, round(search_radius * 1.4))
+        for index in range(samples):
+            angle = math.tau * index / samples
+            candidate_x = x + math.cos(angle) * search_radius
+            candidate_z = z + math.sin(angle) * search_radius
+            score = walkability_score(candidate_x, candidate_z)
+            if score > best[0]:
+                best = (score, candidate_x, candidate_z)
+        if best[0] >= 0.2:
+            break
+    return best[1], best[2]
 
 
 def generate_landmarks() -> None:
@@ -2207,7 +2243,19 @@ def generate_landmarks() -> None:
     ]
     for index, grotto in enumerate(GROTTOS, start=1):
         x, z = grotto.position
-        landmarks.append(landmark_entry(f"hidden_grotto_{index}", "grotto", x, z, scale_height(1.4), grotto.chamber_radius))
+        dx, dz = normalized2(grotto.entrance_direction)
+        entrance_x = x + dx * grotto.chamber_radius * 0.82
+        entrance_z = z + dz * grotto.chamber_radius * 0.82
+        landmarks.append(
+            landmark_entry(
+                f"hidden_grotto_{index}",
+                "grotto",
+                entrance_x,
+                entrance_z,
+                scale_height(1.4),
+                grotto.chamber_radius,
+            )
+        )
     for index, progress in enumerate(WATER.waterfall_progresses, start=1):
         x, z = path_point(RIVER_PATH, progress)
         landmarks.append(landmark_entry(f"mercy_falls_{index}", "waterfall", x, z, scale_height(1.0), scale_distance(7.0)))
@@ -3065,6 +3113,7 @@ def check_debug_report(issues: list[dict[str, object]]) -> dict[str, object]:
     report = json.loads(TERRAIN_REPORT_PATH.read_text(encoding="utf-8"))
     walkability = report.get("walkability", {})
     slope = report.get("slope", {})
+    biomes = report.get("biomes", {})
     good_ratio = float(walkability.get("good_sample_ratio", 0.0))
     steep_ratio = float(slope.get("steep_sample_ratio", 0.0))
     if good_ratio < 0.18:
@@ -3082,6 +3131,29 @@ def check_debug_report(issues: list[dict[str, object]]) -> dict[str, object]:
             "high_steep_ratio",
             "Generated terrain has a high ratio of steep samples.",
             {"steep_sample_ratio": steep_ratio},
+        )
+    for name in BIOMES:
+        ratio = float(biomes.get(name, {}).get("ratio", 0.0))
+        if ratio <= 0.0:
+            add_quality_issue(
+                issues,
+                "warning",
+                "missing_biome_samples",
+                f"Biome {name} has no land samples in the debug report.",
+                {"biome": name},
+            )
+    dominant_biome = max(
+        ((name, float(stats.get("ratio", 0.0))) for name, stats in biomes.items()),
+        key=lambda item: item[1],
+        default=("", 0.0),
+    )
+    if dominant_biome[1] > 0.58:
+        add_quality_issue(
+            issues,
+            "warning",
+            "dominant_biome_ratio",
+            f"Biome {dominant_biome[0]} dominates the sampled land area.",
+            {"biome": dominant_biome[0], "ratio": round(dominant_biome[1], 4)},
         )
     return {"available": True, "good_sample_ratio": good_ratio, "steep_sample_ratio": steep_ratio}
 

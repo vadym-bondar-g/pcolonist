@@ -2,6 +2,7 @@
 
 #include "pcolonist/ecs/Components.hpp"
 #include "pcolonist/ecs/Registry.hpp"
+#include "pcolonist/render/RendererBackend.hpp"
 #include "pcolonist/render/ShaderLibrary.hpp"
 #include "pcolonist/render/Skybox.hpp"
 
@@ -23,43 +24,31 @@ class Registry;
 class WeatherSystem;
 enum class GraphicsQuality;
 
-struct RendererDebugOptions {
-    float terrainDrawDistance = 340.0F;
-    float objectDrawDistance = 260.0F;
-    bool showTerrain = true;
-    bool showObjects = true;
-    bool showResources = true;
-    bool showWater = true;
-    bool showLava = true;
-    bool showFire = true;
-    bool wireframe = false;
-};
-
-class Renderer {
+class Renderer : public RendererBackend {
 public:
     Renderer();
     explicit Renderer(const AssetSystem& assets);
     explicit Renderer(std::filesystem::path assetRoot);
-    ~Renderer();
+    ~Renderer() override;
 
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    void resize(int width, int height);
-    void preloadResources(Registry& registry);
-    void render(const Camera& camera, Registry& registry, const WeatherSystem& weather);
-    void releaseUnusedMeshes(Registry& registry);
-    void setShadowsEnabled(bool enabled);
-    void setBloomEnabled(bool enabled);
-    void setGraphicsQuality(GraphicsQuality quality);
-    void setSkyQuality(SkyQuality quality);
-    void setDebugOptions(RendererDebugOptions options);
-    void cycleSkyQuality();
-    [[nodiscard]] bool shadowsEnabled() const;
-    [[nodiscard]] bool bloomEnabled() const;
-    [[nodiscard]] SkyQuality skyQuality() const;
-    [[nodiscard]] const char* skyQualityName() const;
-    [[nodiscard]] const RendererDebugOptions& debugOptions() const;
+    void resize(int width, int height) override;
+    void preloadResources(Registry& registry) override;
+    void render(const Camera& camera, Registry& registry, const WeatherSystem& weather) override;
+    void releaseUnusedMeshes(Registry& registry) override;
+    void setShadowsEnabled(bool enabled) override;
+    void setBloomEnabled(bool enabled) override;
+    void setGraphicsQuality(GraphicsQuality quality) override;
+    void setSkyQuality(SkyQuality quality) override;
+    void setDebugOptions(RendererDebugOptions options) override;
+    void cycleSkyQuality() override;
+    [[nodiscard]] bool shadowsEnabled() const override;
+    [[nodiscard]] bool bloomEnabled() const override;
+    [[nodiscard]] SkyQuality skyQuality() const override;
+    [[nodiscard]] const char* skyQualityName() const override;
+    [[nodiscard]] const RendererDebugOptions& debugOptions() const override;
 
 private:
     Renderer(std::filesystem::path assetRoot, const AssetSystem* assets);
